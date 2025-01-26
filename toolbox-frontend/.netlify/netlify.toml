@@ -1,0 +1,33 @@
+headers = []
+redirects = []
+
+[functions]
+
+[functions."*"]
+
+[[plugins]]
+origin = "ui"
+package = "netlify-plugin-no-more-404"
+
+[plugins.inputs]
+
+[build]
+publish = "/Users/jaiparmani/Desktop/TECH/DEVELOPMENT/ToolBoxFrontend/toolbox-frontend/build"
+publishOrigin = "ui"
+commandOrigin = "ui"
+base = "/Users/jaiparmani/Desktop/TECH/DEVELOPMENT/ToolBoxFrontend/toolbox-frontend"
+command = "npm run build"
+
+[build.environment]
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]

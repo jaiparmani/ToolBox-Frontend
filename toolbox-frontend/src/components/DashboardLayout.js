@@ -11,8 +11,9 @@ import { PageContainer } from '@toolpad/core/PageContainer';
 import Grid from '@mui/material/Grid2';
 import ExpenseTrackerPage from './screens/ExpenseTrackerPage';
 import HobbyTracker from './screens/HobbyTracker.js';
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useNavigate, RouterProvider } from 'react-router-dom'
 import LandingPage from './screens/LandingPage'
+import Router from './Router.js';
 const NAVIGATION = [
   {
     kind: 'header',
@@ -63,7 +64,7 @@ const NAVIGATION = [
     icon: <LayersIcon />,
   },
   {
-    segment: 'habitTracker',
+    segment: 'hobby-tracker',
     title: 'Habit Tracker',
     icon: <LayersIcon />,
     component: HobbyTracker ,
@@ -86,12 +87,14 @@ const demoTheme = extendTheme({
 
 function useDemoRouter(initialPath) {
   const [pathname, setPathname] = React.useState(initialPath);
-
+  const navigate = useNavigate();
   const router = React.useMemo(() => {
     return {
       pathname,
       searchParams: new URLSearchParams(),
-      navigate: (path) => setPathname(path),
+      navigate: (path) =>    {setPathname(path);
+         navigate(path);
+        },
     };
   }, [pathname]);
 
@@ -109,15 +112,16 @@ export default function DashboardLayoutBasic(props) {
   const { window } = props;
   const [component, setComponent] = React.useState(HobbyTracker);
 
-  const router = useDemoRouter('/dashboard');
+  const router = useDemoRouter('');
   React.useEffect(() => {
     router.navigate(router.pathname);
   }, [router.pathname]);
+
+  
   // Remove this const when copying and pasting into your project.
+
   const demoWindow = window ? window() : undefined;
-  React.useEffect(() => {
-   alert(component)
-  }, [component]);
+  
   return (
     <AppProvider
       navigation={NAVIGATION}
@@ -125,17 +129,10 @@ export default function DashboardLayoutBasic(props) {
       theme={demoTheme}
       window={demoWindow}
     >
-            <component />
 
       <DashboardLayout>
-      <BrowserRouter>
-    <Routes>
-    <Route path="/" element={<LandingPage />} />
-    <Route path="/about" element={<h1>Hi</h1>} />
-    <Route path="/habitTracker" element={<HobbyTracker />} />
+      <Router />
 
-</  Routes>
-</BrowserRouter>
       </DashboardLayout>
 
     </AppProvider>

@@ -26,6 +26,7 @@ export default function ExpenseTrackerPage() {
             onChange={(e)=>setDescription(e.target.value)}
           />
 
+
         <FormHelperText id="outlined-weight-helper-text">Description</FormHelperText>
           <OutlinedInput
             id="outlined-adornment-weight"

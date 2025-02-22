@@ -10,7 +10,9 @@ import { DashboardLayout } from '@toolpad/core/DashboardLayout';
 import { PageContainer } from '@toolpad/core/PageContainer';
 import Grid from '@mui/material/Grid2';
 import ExpenseTrackerPage from './screens/ExpenseTrackerPage';
-
+import HobbyTracker from './screens/HobbyTracker.js';
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import LandingPage from './screens/LandingPage'
 const NAVIGATION = [
   {
     kind: 'header',
@@ -60,8 +62,13 @@ const NAVIGATION = [
     title: 'Integrations',
     icon: <LayersIcon />,
   },
+  {
+    segment: 'habitTracker',
+    title: 'Habit Tracker',
+    icon: <LayersIcon />,
+    component: HobbyTracker ,
+  },
 ];
-
 const demoTheme = extendTheme({
   colorSchemes: { light: true, dark: true },
   colorSchemeSelector: 'class',
@@ -76,6 +83,7 @@ const demoTheme = extendTheme({
   },
 });
 
+
 function useDemoRouter(initialPath) {
   const [pathname, setPathname] = React.useState(initialPath);
 
@@ -83,7 +91,7 @@ function useDemoRouter(initialPath) {
     return {
       pathname,
       searchParams: new URLSearchParams(),
-      navigate: (path) => setPathname(String(path)),
+      navigate: (path) => setPathname(path),
     };
   }, [pathname]);
 
@@ -99,12 +107,17 @@ const Skeleton = styled('div')(({ theme, height }) => ({
 
 export default function DashboardLayoutBasic(props) {
   const { window } = props;
+  const [component, setComponent] = React.useState(HobbyTracker);
 
   const router = useDemoRouter('/dashboard');
-
+  React.useEffect(() => {
+    router.navigate(router.pathname);
+  }, [router.pathname]);
   // Remove this const when copying and pasting into your project.
   const demoWindow = window ? window() : undefined;
-
+  React.useEffect(() => {
+   alert(component)
+  }, [component]);
   return (
     <AppProvider
       navigation={NAVIGATION}
@@ -112,45 +125,19 @@ export default function DashboardLayoutBasic(props) {
       theme={demoTheme}
       window={demoWindow}
     >
+            <component />
+
       <DashboardLayout>
-        <PageContainer>
-          <Grid container spacing={1}>
-            <Grid size={5} />
-            <Grid size={12}>
-              <Skeleton height={14} />
-            </Grid>
-            <Grid size={12}>
-              <Skeleton height={14} />
-            </Grid>
-            <Grid size={4}>
-              <Skeleton height={100} />
-            </Grid>
-            <Grid size={8}>
-              <Skeleton height={100} />
-            </Grid>
+      <BrowserRouter>
+    <Routes>
+    <Route path="/" element={<LandingPage />} />
+    <Route path="/about" element={<h1>Hi</h1>} />
+    <Route path="/habitTracker" element={<HobbyTracker />} />
 
-            <Grid size={12}>
-              <Skeleton height={150} />
-            </Grid>
-            <Grid size={12}>
-              <Skeleton height={14} />
-            </Grid>
-
-            <Grid size={3}>
-              <Skeleton height={100} />
-            </Grid>
-            <Grid size={3}>
-              <Skeleton height={100} />
-            </Grid>
-            <Grid size={3}>
-              <Skeleton height={100} />
-            </Grid>
-            <Grid size={3}>
-              <Skeleton height={100} />
-            </Grid>
-          </Grid>
-        </PageContainer>
+</  Routes>
+</BrowserRouter>
       </DashboardLayout>
+
     </AppProvider>
   );
 }

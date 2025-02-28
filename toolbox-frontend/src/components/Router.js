@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import DashboardLayoutBasic from './DashboardLayout'
 import HobbyTracker from './screens/HobbyTracker'
 import ExpenseTrackerPage from './screens/ExpenseTrackerPage'
+import QRCodeGenerator from './screens/QRCodeGenerator'
 
 export default function Router() {
   return (
@@ -11,6 +12,8 @@ export default function Router() {
     <Route path="/about" element={<h1>Hi</h1>} />
     <Route path="/hobby-tracker" element={<HobbyTracker/>} />
     <Route path="/expense-tracker" element={<ExpenseTrackerPage/>} />
+    <Route path="/util/qr-generator" element={<QRCodeGenerator />} />
+
 
 </  Routes>
 

@@ -14,6 +14,7 @@ import HobbyTracker from './screens/HobbyTracker.js';
 import { BrowserRouter, Routes, Route, useNavigate, RouterProvider } from 'react-router-dom'
 import LandingPage from './screens/LandingPage'
 import Router from './Router.js';
+import QRCodeGenerator from './screens/QRCodeGenerator.js';
 const NAVIGATION = [
   {
     kind: 'header',
@@ -68,6 +69,29 @@ const NAVIGATION = [
     title: 'Habit Tracker',
     icon: <LayersIcon />,
     component: HobbyTracker ,
+  },
+  {
+    kind: 'header',
+    title: 'Utilities',
+  },
+  {
+    segment: 'util',
+    title: 'Random',
+    icon: <BarChartIcon />,
+    children: [
+      {
+        segment: 'qr-generator',
+        title: 'QR Code Generator',
+        icon: <LayersIcon />,
+        component: QRCodeGenerator,
+      },
+      {
+        segment: 'hobby-tracker',
+        title: 'Habit Tracker',
+        icon: <LayersIcon />,
+        component: HobbyTracker,
+      },
+    ]
   },
 ];
 const demoTheme = extendTheme({

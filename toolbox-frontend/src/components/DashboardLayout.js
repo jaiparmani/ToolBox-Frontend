@@ -15,6 +15,7 @@ import ArraySumDemo from './ArraySumDemo';
 import { BrowserRouter, Routes, Route, useNavigate, RouterProvider } from 'react-router-dom'
 import LandingPage from './screens/LandingPage'
 import Router from './Router.js';
+import QRCodeGenerator from './screens/QRCodeGenerator.js';
 const NAVIGATION = [
   {
     kind: 'header',

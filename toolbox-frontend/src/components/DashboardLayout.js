@@ -11,6 +11,7 @@ import { PageContainer } from '@toolpad/core/PageContainer';
 import Grid from '@mui/material/Grid2';
 import ExpenseTrackerPage from './screens/ExpenseTrackerPage';
 import HobbyTracker from './screens/HobbyTracker.js';
+import ArraySumDemo from './ArraySumDemo';
 import { BrowserRouter, Routes, Route, useNavigate, RouterProvider } from 'react-router-dom'
 import LandingPage from './screens/LandingPage'
 import Router from './Router.js';
@@ -68,6 +69,12 @@ const NAVIGATION = [
     title: 'Habit Tracker',
     icon: <LayersIcon />,
     component: HobbyTracker ,
+  },
+  {
+    segment: 'array-sum',
+    title: 'Array Sum Demo',
+    icon: <BarChartIcon />,
+    component: ArraySumDemo ,
   },
 ];
 const demoTheme = extendTheme({

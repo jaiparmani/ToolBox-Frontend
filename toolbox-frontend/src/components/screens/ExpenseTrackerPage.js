@@ -1,46 +1,1313 @@
-import React from 'react'
-import TextField from '@mui/material/TextField';
-import Box from '@mui/material/Box';
-import OutlinedInput from '@mui/material/OutlinedInput';
-import FormControl from '@mui/material/FormControl';
-import InputAdornment from '@mui/material/InputAdornment';
-import FormHelperText from '@mui/material/FormHelperText';
-import { Button } from '@mui/material';
-import { addExpenseApi } from '../rest/expenseTrackerApis';
-import Autocomplete from '@mui/material/Autocomplete';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+ Box, Container, Typography, Paper, Grid, Card, CardContent,
+ Button, Dialog, DialogTitle, DialogContent, DialogActions,
+ TextField, Alert, Snackbar, Chip, IconButton, Tooltip,
+ Fab, Switch, FormControlLabel, Divider, Tab, Tabs,
+ Table, TableBody, TableCell, TableContainer, TableHead,
+ TableRow, TablePagination, InputAdornment, Menu, MenuItem,
+ ListItemIcon, ListItemText, Badge, LinearProgress
+} from '@mui/material';
+import {
+ Add as AddIcon,
+ Edit as EditIcon,
+ Delete as DeleteIcon,
+ Search as SearchIcon,
+ FilterList as FilterIcon,
+ MoreVert as MoreVertIcon,
+ Dashboard as DashboardIcon,
+ Category as CategoryIcon,
+ Tag as TagIcon,
+ TrendingUp as TrendingUpIcon,
+ TrendingDown as TrendingDownIcon,
+ AccountBalance as BalanceIcon,
+ Refresh as RefreshIcon,
+ Close as CloseIcon,
+ CheckCircle as CheckCircleIcon,
+ Error as ErrorIcon,
+ Logout as LogoutIcon,
+ Login as LoginIcon,
+ KeyboardArrowDown as ArrowDownIcon
+} from '@mui/icons-material';
+
+// Import API functions and reusable components
+import {
+ addExpenseApi, getExpenses, updateExpense, deleteExpense,
+ getCategories, createCategory, updateCategory, deleteCategory,
+ getTags, createTag, updateTag, deleteTag,
+ getExpenseSummary, getAuthCredentials, clearAuthCredentials,
+ setAuthCredentials, getAuthHeaders, handleApiError,
+ transformExpenseForUI
+} from '../rest/expenseTrackerApis';
+
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
 import FormTextFieldComponent from '../ReusableComponents/FormTextFieldComponent';
 import AutocompleteComponent from '../ReusableComponents/AutocompleteComponent';
 import SubmitButton from '../ReusableComponents/Buttons/SubmitButton';
 
-export default function ExpenseTrackerPage() {
-  const [amount, setAmount] = React.useState();
-  const [description, setDescription] = React.useState();
-  const [category, setCategory] = React.useState();
-  const [date, setDate] = React.useState();
-  const addExpense = () => {
-    console.log(date)
-    console.log('amount', amount)
-    console.log('category', category)
-    console.log('description', description)
-    addExpenseApi('user', amount, category, date, description, (data) => {}, (error) => {});
-  }
-  const top100Films = [
-    { label: 'The Shawshank Redemption', id: 1994 },
-    { label: 'The Godfather', id: 1972 },
-    { label: 'The Godfather: Part II', id: 1974 },]
-  return (
-    <Box >
-      <FormControl sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100vh', alignContent: 'space-between'  }} variant="outlined">
-        <FormTextFieldComponent category="Amount" value={amount} onChange={setAmount}/>
-        <AutocompleteComponent options={top100Films} label="Category" onChange={setCategory}/>
-        <FormTextFieldComponent category="Description" value={description} onChange={setDescription}/>
-        <DatePickerComponent value={date} onChange={setDate}/>
-        <SubmitButton onClick={()=>{addExpense()}} />
-                  <Button onClick={addExpense}>submit</Button>
-          
-      </FormControl>
-      </Box>
+// Color palette for categories
+const categoryColors = [
+ '#f44336', '#e91e63', '#9c27b0', '#673ab7',
+ '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4',
+ '#009688', '#4caf50', '#8bc34a', '#cddc39',
+ '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'
+];
 
-  )
+export default function ExpenseTrackerPage() {
+ // Authentication state
+ const [isAuthenticated, setIsAuthenticated] = useState(false);
+ const [authChecked, setAuthChecked] = useState(false);
+ const [loginCredentials, setLoginCredentials] = useState({ username: '', password: '' });
+
+ // Main data state
+ const [expenses, setExpenses] = useState([]);
+ const [categories, setCategories] = useState([]);
+ const [tags, setTags] = useState([]);
+ const [summary, setSummary] = useState(null);
+
+ // UI state
+ const [loading, setLoading] = useState(false);
+ const [error, setError] = useState(null);
+ const [success, setSuccess] = useState(null);
+ const [activeTab, setActiveTab] = useState(0);
+
+ // Expense form state
+ const [expenseForm, setExpenseForm] = useState({
+   open: false,
+   editing: false,
+   data: {
+     id: null,
+     amount: '',
+     description: '',
+     categoryId: '',
+     date: new Date(),
+     tagIds: [],
+     location: '',
+     paymentMethod: '',
+     transactionType: 'expense',
+     isRecurring: false
+   }
+ });
+
+ // Category form state
+ const [categoryForm, setCategoryForm] = useState({
+   open: false,
+   editing: false,
+   data: {
+     id: null,
+     name: '',
+     description: '',
+     color: categoryColors[0],
+     icon: 'category',
+     transactionType: 'expense'
+   }
+ });
+
+ // Tag form state
+ const [tagForm, setTagForm] = useState({
+   open: false,
+   editing: false,
+   data: {
+     id: null,
+     name: '',
+     color: '#2196f3'
+   }
+ });
+
+ // Filtering and pagination state
+ const [filters, setFilters] = useState({
+   search: '',
+   category: '',
+   dateFrom: '',
+   dateTo: '',
+   amountMin: '',
+   amountMax: '',
+   tags: []
+ });
+ const [pagination, setPagination] = useState({
+   page: 0,
+   pageSize: 10,
+   total: 0
+ });
+ const [sortBy, setSortBy] = useState('-date');
+ const [anchorEl, setAnchorEl] = useState(null);
+ const [menuType, setMenuType] = useState(null);
+
+ // Check authentication on component mount
+ useEffect(() => {
+   checkAuthentication();
+ }, []);
+
+ // Load data when authenticated
+ useEffect(() => {
+   if (isAuthenticated) {
+     loadAllData();
+   }
+ }, [isAuthenticated, filters, pagination.page, pagination.pageSize, sortBy]);
+
+ const checkAuthentication = () => {
+   try {
+     const credentials = getAuthCredentials();
+     setIsAuthenticated(!!credentials);
+   } catch (error) {
+     setIsAuthenticated(false);
+     setError('Authentication check failed');
+   } finally {
+     setAuthChecked(true);
+   }
+ };
+
+ const handleLogin = async () => {
+   if (!loginCredentials.username || !loginCredentials.password) {
+     setError('Please enter both username and password');
+     return;
+   }
+
+   setLoading(true);
+   try {
+     setAuthCredentials(loginCredentials.username, loginCredentials.password);
+     setIsAuthenticated(true);
+     setSuccess('Login successful!');
+     setLoginCredentials({ username: '', password: '' });
+   } catch (error) {
+     setError('Login failed. Please check your credentials.');
+   } finally {
+     setLoading(false);
+   }
+ };
+
+ const handleLogout = () => {
+   clearAuthCredentials();
+   setIsAuthenticated(false);
+   setExpenses([]);
+   setCategories([]);
+   setTags([]);
+   setSummary(null);
+ };
+
+ const loadAllData = async () => {
+   setLoading(true);
+   try {
+     await Promise.all([
+       loadExpenses(),
+       loadCategories(),
+       loadTags(),
+       loadSummary()
+     ]);
+   } catch (error) {
+     setError('Failed to load data');
+   } finally {
+     setLoading(false);
+   }
+ };
+
+ const loadExpenses = async () => {
+   try {
+     const response = await getExpenses({
+       search: filters.search,
+       category: filters.category,
+       dateFrom: filters.dateFrom,
+       dateTo: filters.dateTo,
+       amountMin: filters.amountMin,
+       amountMax: filters.amountMax,
+       tags: filters.tags,
+       ordering: sortBy,
+       page: pagination.page + 1,
+       pageSize: pagination.pageSize
+     });
+     setExpenses(response.results || []);
+     setPagination(prev => ({ ...prev, total: response.count || 0 }));
+   } catch (error) {
+     throw error;
+   }
+ };
+
+ const loadCategories = async () => {
+   try {
+     const response = await getCategories();
+     setCategories(response.results || []);
+   } catch (error) {
+     throw error;
+   }
+ };
+
+ const loadTags = async () => {
+   try {
+     const response = await getTags();
+     setTags(response.results || []);
+   } catch (error) {
+     throw error;
+   }
+ };
+
+ const loadSummary = async () => {
+   try {
+     const summaryData = await getExpenseSummary({
+       dateFrom: filters.dateFrom,
+       dateTo: filters.dateTo
+     });
+     setSummary(summaryData);
+   } catch (error) {
+     throw error;
+   }
+ };
+
+ // Form handlers
+ const openExpenseForm = (expense = null) => {
+   if (expense) {
+     setExpenseForm({
+       open: true,
+       editing: true,
+       data: {
+         id: expense.id,
+         amount: expense.amount,
+         description: expense.description,
+         categoryId: expense.category?.id || '',
+         date: expense.date,
+         tagIds: expense.tags?.map(tag => tag.id) || [],
+         location: expense.location || '',
+         paymentMethod: expense.paymentMethod || '',
+         transactionType: expense.type || 'expense',
+         isRecurring: expense.isRecurring || false
+       }
+     });
+   } else {
+     setExpenseForm({
+       open: true,
+       editing: false,
+       data: {
+         id: null,
+         amount: '',
+         description: '',
+         categoryId: '',
+         date: new Date(),
+         tagIds: [],
+         location: '',
+         paymentMethod: '',
+         transactionType: 'expense',
+         isRecurring: false
+       }
+     });
+   }
+ };
+
+ const closeExpenseForm = () => {
+   setExpenseForm({ open: false, editing: false, data: {} });
+ };
+
+ const saveExpense = async () => {
+   // Enhanced validation with better error messages
+   if (!expenseForm.data.amount || parseFloat(expenseForm.data.amount) <= 0) {
+     setError('Please enter a valid amount greater than 0');
+     return;
+   }
+
+   if (!expenseForm.data.description || expenseForm.data.description.trim().length < 3) {
+     setError('Please enter a description (minimum 3 characters)');
+     return;
+   }
+
+   if (!expenseForm.data.categoryId) {
+     setError('Please select a category');
+     return;
+   }
+
+   if (!expenseForm.data.date) {
+     setError('Please select a date');
+     return;
+   }
+
+   setLoading(true);
+   try {
+     if (expenseForm.editing) {
+       await updateExpense(expenseForm.data.id, expenseForm.data);
+       setSuccess('Expense updated successfully!');
+     } else {
+       await addExpenseApi(expenseForm.data);
+       setSuccess('Expense added successfully!');
+     }
+     closeExpenseForm();
+     loadExpenses();
+     loadSummary();
+   } catch (error) {
+     console.error('Expense save error:', error);
+     // Show more specific error messages based on error type
+     if (error.message.includes('400')) {
+       setError(`Validation error: ${error.message}`);
+     } else if (error.message.includes('401')) {
+       setError('Authentication failed. Please log in again.');
+     } else if (error.message.includes('403')) {
+       setError('You do not have permission to perform this action.');
+     } else if (error.message.includes('404')) {
+       setError('Category not found. Please refresh and try again.');
+     } else {
+       setError(`Failed to ${expenseForm.editing ? 'update' : 'add'} expense: ${error.message}`);
+     }
+   } finally {
+     setLoading(false);
+   }
+ };
+
+ const deleteExpenseHandler = async (expenseId) => {
+   if (!window.confirm('Are you sure you want to delete this expense?')) return;
+
+   setLoading(true);
+   try {
+     await deleteExpense(expenseId);
+     setSuccess('Expense deleted successfully!');
+     loadExpenses();
+     loadSummary();
+   } catch (error) {
+     setError('Failed to delete expense');
+   } finally {
+     setLoading(false);
+   }
+ };
+
+ // Category handlers
+ const openCategoryForm = (category = null) => {
+   if (category) {
+     setCategoryForm({
+       open: true,
+       editing: true,
+       data: { ...category }
+     });
+   } else {
+     setCategoryForm({
+       open: true,
+       editing: false,
+       data: {
+         id: null,
+         name: '',
+         description: '',
+         color: categoryColors[Math.floor(Math.random() * categoryColors.length)],
+         icon: 'category',
+         transactionType: 'expense'
+       }
+     });
+   }
+ };
+
+ const closeCategoryForm = () => {
+   setCategoryForm({ open: false, editing: false, data: {} });
+ };
+
+ const saveCategory = async () => {
+   if (!categoryForm.data.name) {
+     setError('Please enter a category name');
+     return;
+   }
+
+   setLoading(true);
+   try {
+     if (categoryForm.editing) {
+       await updateCategory(categoryForm.data.id, categoryForm.data);
+       setSuccess('Category updated successfully!');
+     } else {
+       await createCategory(categoryForm.data);
+       setSuccess('Category created successfully!');
+     }
+     closeCategoryForm();
+     loadCategories();
+   } catch (error) {
+     setError(`Failed to ${categoryForm.editing ? 'update' : 'create'} category`);
+   } finally {
+     setLoading(false);
+   }
+ };
+
+ const deleteCategoryHandler = async (categoryId) => {
+   if (!window.confirm('Are you sure you want to delete this category?')) return;
+
+   setLoading(true);
+   try {
+     await deleteCategory(categoryId);
+     setSuccess('Category deleted successfully!');
+     loadCategories();
+   } catch (error) {
+     setError('Failed to delete category');
+   } finally {
+     setLoading(false);
+   }
+ };
+
+ // Tag handlers
+ const openTagForm = (tag = null) => {
+   if (tag) {
+     setTagForm({
+       open: true,
+       editing: true,
+       data: { ...tag }
+     });
+   } else {
+     setTagForm({
+       open: true,
+       editing: false,
+       data: {
+         id: null,
+         name: '',
+         color: '#2196f3'
+       }
+     });
+   }
+ };
+
+ const closeTagForm = () => {
+   setTagForm({ open: false, editing: false, data: {} });
+ };
+
+ const saveTag = async () => {
+   if (!tagForm.data.name) {
+     setError('Please enter a tag name');
+     return;
+   }
+
+   setLoading(true);
+   try {
+     if (tagForm.editing) {
+       await updateTag(tagForm.data.id, tagForm.data);
+       setSuccess('Tag updated successfully!');
+     } else {
+       await createTag(tagForm.data);
+       setSuccess('Tag created successfully!');
+     }
+     closeTagForm();
+     loadTags();
+   } catch (error) {
+     setError(`Failed to ${tagForm.editing ? 'update' : 'create'} tag`);
+   } finally {
+     setLoading(false);
+   }
+ };
+
+ const deleteTagHandler = async (tagId) => {
+   if (!window.confirm('Are you sure you want to delete this tag?')) return;
+
+   setLoading(true);
+   try {
+     await deleteTag(tagId);
+     setSuccess('Tag deleted successfully!');
+     loadTags();
+   } catch (error) {
+     setError('Failed to delete tag');
+   } finally {
+     setLoading(false);
+   }
+ };
+
+ // Filter handlers
+ const handleFilterChange = (key, value) => {
+   setFilters(prev => ({ ...prev, [key]: value }));
+   setPagination(prev => ({ ...prev, page: 0 }));
+ };
+
+ const clearFilters = () => {
+   setFilters({
+     search: '',
+     category: '',
+     dateFrom: '',
+     dateTo: '',
+     amountMin: '',
+     amountMax: '',
+     tags: []
+   });
+ };
+
+ // Menu handlers
+ const handleMenuOpen = (event, type, item) => {
+   setAnchorEl(event.currentTarget);
+   setMenuType({ type, item });
+ };
+
+ const handleMenuClose = () => {
+   setAnchorEl(null);
+   setMenuType(null);
+ };
+
+ const formatCurrency = (amount) => {
+   return new Intl.NumberFormat('en-US', {
+     style: 'currency',
+     currency: 'USD'
+   }).format(amount || 0);
+ };
+
+ const formatDate = (date) => {
+   return new Date(date).toLocaleDateString();
+ };
+
+ // Keyboard shortcuts
+ useEffect(() => {
+   const handleKeyDown = (event) => {
+     if (event.ctrlKey || event.metaKey) {
+       switch (event.key) {
+         case 'n':
+           event.preventDefault();
+           openExpenseForm();
+           break;
+         case 'r':
+           event.preventDefault();
+           loadAllData();
+           break;
+         case '/':
+           event.preventDefault();
+           document.getElementById('search-input')?.focus();
+           break;
+         default:
+           break;
+       }
+     }
+   };
+
+   document.addEventListener('keydown', handleKeyDown);
+   return () => document.removeEventListener('keydown', handleKeyDown);
+ }, []);
+
+ if (!authChecked) {
+   return (
+     <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+       <Typography>Loading...</Typography>
+     </Box>
+   );
+ }
+
+ if (!isAuthenticated) {
+   return (
+     <Container maxWidth="sm" sx={{ mt: 8 }}>
+       <Paper elevation={3} sx={{ p: 4 }}>
+         <Typography variant="h4" gutterBottom align="center">
+           Expense Tracker Login
+         </Typography>
+         <Box sx={{ mt: 3 }}>
+           <TextField
+             fullWidth
+             label="Username"
+             value={loginCredentials.username}
+             onChange={(e) => setLoginCredentials(prev => ({ ...prev, username: e.target.value }))}
+             sx={{ mb: 2 }}
+           />
+           <TextField
+             fullWidth
+             type="password"
+             label="Password"
+             value={loginCredentials.password}
+             onChange={(e) => setLoginCredentials(prev => ({ ...prev, password: e.target.value }))}
+             sx={{ mb: 3 }}
+             onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+           />
+           <Button
+             fullWidth
+             variant="contained"
+             size="large"
+             onClick={handleLogin}
+             disabled={loading}
+             startIcon={<LoginIcon />}
+           >
+             {loading ? 'Logging in...' : 'Login'}
+           </Button>
+         </Box>
+       </Paper>
+     </Container>
+   );
+ }
+
+ return (
+   <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
+     {/* Header */}
+     <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+       <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
+         <Box display="flex" alignItems="center" gap={2}>
+           <DashboardIcon sx={{ fontSize: 32, color: 'primary.main' }} />
+           <Box>
+             <Typography variant="h4" component="h1">
+               Expense Tracker
+             </Typography>
+             <Typography variant="body2" color="text.secondary">
+               Manage your expenses efficiently
+             </Typography>
+           </Box>
+         </Box>
+         <Box display="flex" alignItems="center" gap={2}>
+           <Tooltip title="Refresh data (Ctrl+R)">
+             <IconButton onClick={loadAllData} disabled={loading}>
+               <RefreshIcon />
+             </IconButton>
+           </Tooltip>
+           <Tooltip title="Add expense (Ctrl+N)">
+             <Button
+               variant="contained"
+               startIcon={<AddIcon />}
+               onClick={() => openExpenseForm()}
+             >
+               Add Expense
+             </Button>
+           </Tooltip>
+           <Tooltip title="Logout">
+             <IconButton onClick={handleLogout} color="error">
+               <LogoutIcon />
+             </IconButton>
+           </Tooltip>
+         </Box>
+       </Box>
+     </Paper>
+
+     {/* Error/Success Messages */}
+     <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)}>
+       <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+         {error}
+       </Alert>
+     </Snackbar>
+     <Snackbar open={!!success} autoHideDuration={4000} onClose={() => setSuccess(null)}>
+       <Alert onClose={() => setSuccess(null)} severity="success" sx={{ width: '100%' }}>
+         {success}
+       </Alert>
+     </Snackbar>
+
+     {/* Loading Progress */}
+     {loading && <LinearProgress sx={{ mb: 2 }} />}
+
+     {/* Summary Dashboard */}
+     {summary && (
+       <Grid container spacing={3} sx={{ mb: 3 }}>
+         <Grid item xs={12} sm={6} md={3}>
+           <Card>
+             <CardContent>
+               <Box display="flex" alignItems="center" justifyContent="space-between">
+                 <Box>
+                   <Typography color="text.secondary" gutterBottom variant="overline">
+                     Total Expenses
+                   </Typography>
+                   <Typography variant="h5">
+                     {formatCurrency(summary.totalExpenses)}
+                   </Typography>
+                 </Box>
+                 <TrendingUpIcon color="error" sx={{ fontSize: 32 }} />
+               </Box>
+             </CardContent>
+           </Card>
+         </Grid>
+         <Grid item xs={12} sm={6} md={3}>
+           <Card>
+             <CardContent>
+               <Box display="flex" alignItems="center" justifyContent="space-between">
+                 <Box>
+                   <Typography color="text.secondary" gutterBottom variant="overline">
+                     Total Income
+                   </Typography>
+                   <Typography variant="h5">
+                     {formatCurrency(summary.totalIncome)}
+                   </Typography>
+                 </Box>
+                 <TrendingDownIcon color="success" sx={{ fontSize: 32 }} />
+               </Box>
+             </CardContent>
+           </Card>
+         </Grid>
+         <Grid item xs={12} sm={6} md={3}>
+           <Card>
+             <CardContent>
+               <Box display="flex" alignItems="center" justifyContent="space-between">
+                 <Box>
+                   <Typography color="text.secondary" gutterBottom variant="overline">
+                     Net Balance
+                   </Typography>
+                   <Typography variant="h5">
+                     {formatCurrency(summary.netBalance)}
+                   </Typography>
+                 </Box>
+                 <BalanceIcon color="primary" sx={{ fontSize: 32 }} />
+               </Box>
+             </CardContent>
+           </Card>
+         </Grid>
+         <Grid item xs={12} sm={6} md={3}>
+           <Card>
+             <CardContent>
+               <Box display="flex" alignItems="center" justifyContent="space-between">
+                 <Box>
+                   <Typography color="text.secondary" gutterBottom variant="overline">
+                     Transactions
+                   </Typography>
+                   <Typography variant="h5">
+                     {summary.transactionCount}
+                   </Typography>
+                 </Box>
+                 <DashboardIcon color="info" sx={{ fontSize: 32 }} />
+               </Box>
+             </CardContent>
+           </Card>
+         </Grid>
+       </Grid>
+     )}
+
+     {/* Main Content Tabs */}
+     <Paper elevation={2}>
+       <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ borderBottom: 1, borderColor: 'divider' }}>
+         <Tab icon={<DashboardIcon />} label="Expenses" />
+         <Tab icon={<CategoryIcon />} label="Categories" />
+         <Tab icon={<TagIcon />} label="Tags" />
+       </Tabs>
+
+       {/* Expenses Tab */}
+       {activeTab === 0 && (
+         <Box sx={{ p: 3 }}>
+           {/* Filters */}
+           <Grid container spacing={2} sx={{ mb: 3 }}>
+             <Grid item xs={12} md={4}>
+               <TextField
+                 id="search-input"
+                 fullWidth
+                 label="Search expenses"
+                 value={filters.search}
+                 onChange={(e) => handleFilterChange('search', e.target.value)}
+                 InputProps={{
+                   startAdornment: (
+                     <InputAdornment position="start">
+                       <SearchIcon />
+                     </InputAdornment>
+                   ),
+                 }}
+                 placeholder="Search by description, location..."
+               />
+             </Grid>
+             <Grid item xs={12} md={2}>
+               <AutocompleteComponent
+                 options={categories.map(cat => ({ label: cat.name, id: cat.id }))}
+                 label="Category"
+                 value={filters.category}
+                 onChange={(value) => handleFilterChange('category', value)}
+               />
+             </Grid>
+             <Grid item xs={12} md={2}>
+               <TextField
+                 fullWidth
+                 type="date"
+                 label="From Date"
+                 value={filters.dateFrom}
+                 onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                 InputLabelProps={{ shrink: true }}
+               />
+             </Grid>
+             <Grid item xs={12} md={2}>
+               <TextField
+                 fullWidth
+                 type="date"
+                 label="To Date"
+                 value={filters.dateTo}
+                 onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                 InputLabelProps={{ shrink: true }}
+               />
+             </Grid>
+             <Grid item xs={12} md={2}>
+               <Box display="flex" gap={1}>
+                 <Tooltip title="Clear filters">
+                   <IconButton onClick={clearFilters}>
+                     <CloseIcon />
+                   </IconButton>
+                 </Tooltip>
+                 <Tooltip title="More filters">
+                   <IconButton onClick={(e) => handleMenuOpen(e, 'filter', null)}>
+                     <FilterIcon />
+                   </IconButton>
+                 </Tooltip>
+               </Box>
+             </Grid>
+           </Grid>
+
+           {/* Expenses Table */}
+           <TableContainer>
+             <Table>
+               <TableHead>
+                 <TableRow>
+                   <TableCell>Date</TableCell>
+                   <TableCell>Description</TableCell>
+                   <TableCell>Category</TableCell>
+                   <TableCell>Amount</TableCell>
+                   <TableCell>Tags</TableCell>
+                   <TableCell>Actions</TableCell>
+                 </TableRow>
+               </TableHead>
+               <TableBody>
+                 {expenses.map((expense) => (
+                   <TableRow key={expense.id} hover>
+                     <TableCell>{formatDate(expense.date)}</TableCell>
+                     <TableCell>
+                       <Box>
+                         <Typography variant="body2">{expense.description}</Typography>
+                         {expense.location && (
+                           <Typography variant="caption" color="text.secondary">
+                             📍 {expense.location}
+                           </Typography>
+                         )}
+                       </Box>
+                     </TableCell>
+                     <TableCell>
+                       {expense.category && (
+                         <Chip
+                           label={expense.category.name}
+                           sx={{
+                             backgroundColor: expense.category.color,
+                             color: 'white',
+                             fontSize: '0.75rem'
+                           }}
+                           size="small"
+                         />
+                       )}
+                     </TableCell>
+                     <TableCell>
+                       <Typography
+                         variant="body2"
+                         color={expense.type === 'income' ? 'success.main' : 'error.main'}
+                         fontWeight="medium"
+                       >
+                         {expense.type === 'income' ? '+' : '-'}{formatCurrency(expense.amount)}
+                       </Typography>
+                     </TableCell>
+                     <TableCell>
+                       <Box display="flex" flexWrap="wrap" gap={0.5}>
+                         {expense.tags?.slice(0, 2).map((tag) => (
+                           <Chip
+                             key={tag.id}
+                             label={tag.name}
+                             size="small"
+                             sx={{
+                               backgroundColor: tag.color,
+                               color: 'white',
+                               fontSize: '0.7rem'
+                             }}
+                           />
+                         ))}
+                         {expense.tags?.length > 2 && (
+                           <Chip
+                             label={`+${expense.tags.length - 2}`}
+                             size="small"
+                             variant="outlined"
+                           />
+                         )}
+                       </Box>
+                     </TableCell>
+                     <TableCell>
+                       <IconButton
+                         size="small"
+                         onClick={(e) => handleMenuOpen(e, 'expense', expense)}
+                       >
+                         <MoreVertIcon />
+                       </IconButton>
+                     </TableCell>
+                   </TableRow>
+                 ))}
+               </TableBody>
+             </Table>
+           </TableContainer>
+
+           {/* Pagination */}
+           <TablePagination
+             component="div"
+             count={pagination.total}
+             page={pagination.page}
+             onPageChange={(e, newPage) => setPagination(prev => ({ ...prev, page: newPage }))}
+             rowsPerPage={pagination.pageSize}
+             onRowsPerPageChange={(e) => setPagination(prev => ({ ...prev, pageSize: parseInt(e.target.value, 10), page: 0 }))}
+             rowsPerPageOptions={[5, 10, 25, 50]}
+           />
+         </Box>
+       )}
+
+       {/* Categories Tab */}
+       {activeTab === 1 && (
+         <Box sx={{ p: 3 }}>
+           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+             <Typography variant="h6">Categories</Typography>
+             <Button
+               variant="contained"
+               startIcon={<AddIcon />}
+               onClick={() => openCategoryForm()}
+             >
+               Add Category
+             </Button>
+           </Box>
+           <Grid container spacing={2}>
+             {categories.map((category) => (
+               <Grid item xs={12} sm={6} md={4} key={category.id}>
+                 <Card>
+                   <CardContent>
+                     <Box display="flex" justifyContent="space-between" alignItems="center">
+                       <Box display="flex" alignItems="center" gap={2}>
+                         <Box
+                           sx={{
+                             width: 20,
+                             height: 20,
+                             borderRadius: '50%',
+                             backgroundColor: category.color
+                           }}
+                         />
+                         <Box>
+                           <Typography variant="h6">{category.name}</Typography>
+                           <Typography variant="body2" color="text.secondary">
+                             {category.description}
+                           </Typography>
+                         </Box>
+                       </Box>
+                       <IconButton
+                         size="small"
+                         onClick={(e) => handleMenuOpen(e, 'category', category)}
+                       >
+                         <MoreVertIcon />
+                       </IconButton>
+                     </Box>
+                   </CardContent>
+                 </Card>
+               </Grid>
+             ))}
+           </Grid>
+         </Box>
+       )}
+
+       {/* Tags Tab */}
+       {activeTab === 2 && (
+         <Box sx={{ p: 3 }}>
+           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+             <Typography variant="h6">Tags</Typography>
+             <Button
+               variant="contained"
+               startIcon={<AddIcon />}
+               onClick={() => openTagForm()}
+             >
+               Add Tag
+             </Button>
+           </Box>
+           <Grid container spacing={2}>
+             {tags.map((tag) => (
+               <Grid item xs={12} sm={6} md={4} key={tag.id}>
+                 <Card>
+                   <CardContent>
+                     <Box display="flex" justifyContent="space-between" alignItems="center">
+                       <Box display="flex" alignItems="center" gap={2}>
+                         <Box
+                           sx={{
+                             width: 20,
+                             height: 20,
+                             borderRadius: '50%',
+                             backgroundColor: tag.color
+                           }}
+                         />
+                         <Typography variant="h6">{tag.name}</Typography>
+                       </Box>
+                       <IconButton
+                         size="small"
+                         onClick={(e) => handleMenuOpen(e, 'tag', tag)}
+                       >
+                         <MoreVertIcon />
+                       </IconButton>
+                     </Box>
+                   </CardContent>
+                 </Card>
+               </Grid>
+             ))}
+           </Grid>
+         </Box>
+       )}
+     </Paper>
+
+     {/* Context Menu */}
+     <Menu
+       anchorEl={anchorEl}
+       open={!!anchorEl}
+       onClose={handleMenuClose}
+     >
+       {menuType?.type === 'expense' && (
+         <>
+           <MenuItem onClick={() => { handleMenuClose(); openExpenseForm(menuType.item); }}>
+             <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
+             <ListItemText>Edit</ListItemText>
+           </MenuItem>
+           <MenuItem onClick={() => { handleMenuClose(); deleteExpenseHandler(menuType.item.id); }}>
+             <ListItemIcon><DeleteIcon fontSize="small" /></ListItemIcon>
+             <ListItemText>Delete</ListItemText>
+           </MenuItem>
+         </>
+       )}
+       {menuType?.type === 'category' && (
+         <>
+           <MenuItem onClick={() => { handleMenuClose(); openCategoryForm(menuType.item); }}>
+             <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
+             <ListItemText>Edit</ListItemText>
+           </MenuItem>
+           <MenuItem onClick={() => { handleMenuClose(); deleteCategoryHandler(menuType.item.id); }}>
+             <ListItemIcon><DeleteIcon fontSize="small" /></ListItemIcon>
+             <ListItemText>Delete</ListItemText>
+           </MenuItem>
+         </>
+       )}
+       {menuType?.type === 'tag' && (
+         <>
+           <MenuItem onClick={() => { handleMenuClose(); openTagForm(menuType.item); }}>
+             <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
+             <ListItemText>Edit</ListItemText>
+           </MenuItem>
+           <MenuItem onClick={() => { handleMenuClose(); deleteTagHandler(menuType.item.id); }}>
+             <ListItemIcon><DeleteIcon fontSize="small" /></ListItemIcon>
+             <ListItemText>Delete</ListItemText>
+           </MenuItem>
+         </>
+       )}
+       {menuType?.type === 'filter' && (
+         <>
+           <MenuItem onClick={() => { handleMenuClose(); handleFilterChange('amountMin', ''); handleFilterChange('amountMax', ''); }}>
+             <ListItemText>Amount Range</ListItemText>
+           </MenuItem>
+           <MenuItem onClick={() => { handleMenuClose(); handleFilterChange('tags', []); }}>
+             <ListItemText>Tag Filter</ListItemText>
+           </MenuItem>
+         </>
+       )}
+     </Menu>
+
+     {/* Expense Form Dialog */}
+     <Dialog open={expenseForm.open} onClose={closeExpenseForm} maxWidth="md" fullWidth>
+       <DialogTitle>
+         {expenseForm.editing ? 'Edit Expense' : 'Add New Expense'}
+       </DialogTitle>
+       <DialogContent>
+         <Grid container spacing={3} sx={{ mt: 1 }}>
+           <Grid item xs={12} md={6}>
+             <TextField
+               fullWidth
+               label="Amount *"
+               type="number"
+               value={expenseForm.data.amount}
+               onChange={(e) => setExpenseForm(prev => ({
+                 ...prev,
+                 data: { ...prev.data, amount: e.target.value }
+               }))}
+               InputProps={{
+                 startAdornment: <InputAdornment position="start">$</InputAdornment>,
+               }}
+             />
+           </Grid>
+           <Grid item xs={12} md={6}>
+             <AutocompleteComponent
+               options={[
+                 { label: 'Expense', id: 'expense' },
+                 { label: 'Income', id: 'income' },
+                 { label: 'Debt', id: 'debt' },
+                 { label: 'Credit', id: 'credit' }
+               ]}
+               label="Transaction Type"
+               value={expenseForm.data.transactionType}
+               onChange={(value) => setExpenseForm(prev => ({
+                 ...prev,
+                 data: { ...prev.data, transactionType: value }
+               }))}
+             />
+           </Grid>
+           <Grid item xs={12} md={6}>
+             <AutocompleteComponent
+               options={categories.map(cat => ({ label: cat.name, id: cat.id }))}
+               label="Category *"
+               value={expenseForm.data.categoryId}
+               onChange={(value) => setExpenseForm(prev => ({
+                 ...prev,
+                 data: { ...prev.data, categoryId: value }
+               }))}
+             />
+           </Grid>
+           <Grid item xs={12} md={6}>
+             <DatePickerComponent
+               value={expenseForm.data.date}
+               onChange={(date) => setExpenseForm(prev => ({
+                 ...prev,
+                 data: { ...prev.data, date }
+               }))}
+             />
+           </Grid>
+           <Grid item xs={12}>
+             <TextField
+               fullWidth
+               label="Description *"
+               multiline
+               rows={2}
+               value={expenseForm.data.description}
+               onChange={(e) => setExpenseForm(prev => ({
+                 ...prev,
+                 data: { ...prev.data, description: e.target.value }
+               }))}
+             />
+           </Grid>
+           <Grid item xs={12} md={6}>
+             <TextField
+               fullWidth
+               label="Location"
+               value={expenseForm.data.location}
+               onChange={(e) => setExpenseForm(prev => ({
+                 ...prev,
+                 data: { ...prev.data, location: e.target.value }
+               }))}
+             />
+           </Grid>
+           <Grid item xs={12} md={6}>
+             <TextField
+               fullWidth
+               label="Payment Method"
+               value={expenseForm.data.paymentMethod}
+               onChange={(e) => setExpenseForm(prev => ({
+                 ...prev,
+                 data: { ...prev.data, paymentMethod: e.target.value }
+               }))}
+             />
+           </Grid>
+           <Grid item xs={12}>
+             <FormControlLabel
+               control={
+                 <Switch
+                   checked={expenseForm.data.isRecurring}
+                   onChange={(e) => setExpenseForm(prev => ({
+                     ...prev,
+                     data: { ...prev.data, isRecurring: e.target.checked }
+                   }))}
+                 />
+               }
+               label="Recurring expense"
+             />
+           </Grid>
+           <Grid item xs={12}>
+             <AutocompleteComponent
+               options={tags.map(tag => ({ label: tag.name, id: tag.id }))}
+               label="Tags"
+               value={expenseForm.data.tagIds}
+               onChange={(value) => setExpenseForm(prev => ({
+                 ...prev,
+                 data: { ...prev.data, tagIds: value }
+               }))}
+               multiple
+             />
+           </Grid>
+         </Grid>
+       </DialogContent>
+       <DialogActions>
+         <Button onClick={closeExpenseForm}>Cancel</Button>
+         <Button onClick={saveExpense} variant="contained">
+           {expenseForm.editing ? 'Update' : 'Add'} Expense
+         </Button>
+       </DialogActions>
+     </Dialog>
+
+     {/* Category Form Dialog */}
+     <Dialog open={categoryForm.open} onClose={closeCategoryForm} maxWidth="sm" fullWidth>
+       <DialogTitle>
+         {categoryForm.editing ? 'Edit Category' : 'Add New Category'}
+       </DialogTitle>
+       <DialogContent>
+         <Grid container spacing={3} sx={{ mt: 1 }}>
+           <Grid item xs={12}>
+             <TextField
+               fullWidth
+               label="Name *"
+               value={categoryForm.data.name}
+               onChange={(e) => setCategoryForm(prev => ({
+                 ...prev,
+                 data: { ...prev.data, name: e.target.value }
+               }))}
+             />
+           </Grid>
+           <Grid item xs={12}>
+             <TextField
+               fullWidth
+               label="Description"
+               multiline
+               rows={2}
+               value={categoryForm.data.description}
+               onChange={(e) => setCategoryForm(prev => ({
+                 ...prev,
+                 data: { ...prev.data, description: e.target.value }
+               }))}
+             />
+           </Grid>
+           <Grid item xs={12} md={6}>
+             <TextField
+               fullWidth
+               type="color"
+               label="Color"
+               value={categoryForm.data.color}
+               onChange={(e) => setCategoryForm(prev => ({
+                 ...prev,
+                 data: { ...prev.data, color: e.target.value }
+               }))}
+             />
+           </Grid>
+           <Grid item xs={12} md={6}>
+             <AutocompleteComponent
+               options={[
+                 { label: 'Expense', id: 'expense' },
+                 { label: 'Income', id: 'income' },
+                 { label: 'Both', id: 'both' }
+               ]}
+               label="Transaction Type"
+               value={categoryForm.data.transactionType}
+               onChange={(value) => setCategoryForm(prev => ({
+                 ...prev,
+                 data: { ...prev.data, transactionType: value }
+               }))}
+             />
+           </Grid>
+         </Grid>
+       </DialogContent>
+       <DialogActions>
+         <Button onClick={closeCategoryForm}>Cancel</Button>
+         <Button onClick={saveCategory} variant="contained">
+           {categoryForm.editing ? 'Update' : 'Add'} Category
+         </Button>
+       </DialogActions>
+     </Dialog>
+
+     {/* Tag Form Dialog */}
+     <Dialog open={tagForm.open} onClose={closeTagForm} maxWidth="sm" fullWidth>
+       <DialogTitle>
+         {tagForm.editing ? 'Edit Tag' : 'Add New Tag'}
+       </DialogTitle>
+       <DialogContent>
+         <Grid container spacing={3} sx={{ mt: 1 }}>
+           <Grid item xs={12}>
+             <TextField
+               fullWidth
+               label="Name *"
+               value={tagForm.data.name}
+               onChange={(e) => setTagForm(prev => ({
+                 ...prev,
+                 data: { ...prev.data, name: e.target.value }
+               }))}
+             />
+           </Grid>
+           <Grid item xs={12}>
+             <TextField
+               fullWidth
+               type="color"
+               label="Color"
+               value={tagForm.data.color}
+               onChange={(e) => setTagForm(prev => ({
+                 ...prev,
+                 data: { ...prev.data, color: e.target.value }
+               }))}
+             />
+           </Grid>
+         </Grid>
+       </DialogContent>
+       <DialogActions>
+         <Button onClick={closeTagForm}>Cancel</Button>
+         <Button onClick={saveTag} variant="contained">
+           {tagForm.editing ? 'Update' : 'Add'} Tag
+         </Button>
+       </DialogActions>
+     </Dialog>
+
+     {/* Floating Action Button for mobile */}
+     <Fab
+       color="primary"
+       aria-label="add"
+       sx={{ position: 'fixed', bottom: 16, right: 16 }}
+       onClick={() => openExpenseForm()}
+     >
+       <AddIcon />
+     </Fab>
+   </Container>
+ );
 }

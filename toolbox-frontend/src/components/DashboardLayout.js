@@ -5,6 +5,8 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import DescriptionIcon from '@mui/icons-material/Description';
 import LayersIcon from '@mui/icons-material/Layers';
+import PersonIcon from '@mui/icons-material/Person';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { AppProvider } from '@toolpad/core/AppProvider';
 import { DashboardLayout } from '@toolpad/core/DashboardLayout';
 import { PageContainer } from '@toolpad/core/PageContainer';
@@ -12,10 +14,10 @@ import Grid from '@mui/material/Grid2';
 import ExpenseTrackerPage from './screens/ExpenseTrackerPage';
 import HobbyTracker from './screens/HobbyTracker.js';
 import ArraySumDemo from './ArraySumDemo';
-import { BrowserRouter, Routes, Route, useNavigate, RouterProvider } from 'react-router-dom'
 import LandingPage from './screens/LandingPage'
-import Router from './Router.js';
 import QRCodeGenerator from './screens/QRCodeGenerator.js';
+import UserProfilePage from './screens/UserProfilePage';
+import NavbarComponent from './NavbarComponent';
 const NAVIGATION = [
   {
     kind: 'header',
@@ -27,13 +29,18 @@ const NAVIGATION = [
     icon: <DashboardIcon />,
   },
   {
-    segment: 'orders',
-    title: 'Orders',
-    icon: <ShoppingCartIcon />,
-  },
-  {
     segment: 'expense-tracker',
     title: 'Expenses',
+    icon: <BarChartIcon />,
+  },
+  {
+    segment: 'hobby-tracker',
+    title: 'Habit Tracker',
+    icon: <LayersIcon />,
+  },
+  {
+    segment: 'array-sum',
+    title: 'Array Sum Demo',
     icon: <BarChartIcon />,
   },
   {
@@ -41,7 +48,24 @@ const NAVIGATION = [
   },
   {
     kind: 'header',
-    title: 'Analytics',
+    title: 'User Management',
+  },
+  {
+    segment: 'profile',
+    title: 'My Profile',
+    icon: <AccountCircleIcon />,
+  },
+  {
+    kind: 'divider',
+  },
+  {
+    kind: 'header',
+    title: 'Legacy Items',
+  },
+  {
+    segment: 'orders',
+    title: 'Orders',
+    icon: <ShoppingCartIcon />,
   },
   {
     segment: 'reports',
@@ -65,18 +89,6 @@ const NAVIGATION = [
     title: 'Integrations',
     icon: <LayersIcon />,
   },
-  {
-    segment: 'hobby-tracker',
-    title: 'Habit Tracker',
-    icon: <LayersIcon />,
-    component: HobbyTracker ,
-  },
-  {
-    segment: 'array-sum',
-    title: 'Array Sum Demo',
-    icon: <BarChartIcon />,
-    component: ArraySumDemo ,
-  },
 ];
 const demoTheme = extendTheme({
   colorSchemes: { light: true, dark: true },
@@ -93,56 +105,30 @@ const demoTheme = extendTheme({
 });
 
 
-function useDemoRouter(initialPath) {
-  const [pathname, setPathname] = React.useState(initialPath);
-  const navigate = useNavigate();
-  const router = React.useMemo(() => {
-    return {
-      pathname,
-      searchParams: new URLSearchParams(),
-      navigate: (path) =>    {setPathname(path);
-         navigate(path);
-        },
-    };
-  }, [pathname]);
-
-  return router;
-}
-
-const Skeleton = styled('div')(({ theme, height }) => ({
-  backgroundColor: theme.palette.action.hover,
-  borderRadius: theme.shape.borderRadius,
-  height,
-  content: '" "',
-}));
-
 export default function DashboardLayoutBasic(props) {
   const { window } = props;
-  const [component, setComponent] = React.useState(HobbyTracker);
 
-  const router = useDemoRouter('');
-  React.useEffect(() => {
-    router.navigate(router.pathname);
-  }, [router.pathname]);
-
-  
   // Remove this const when copying and pasting into your project.
-
   const demoWindow = window ? window() : undefined;
-  
+
   return (
     <AppProvider
       navigation={NAVIGATION}
-      router={router}
       theme={demoTheme}
       window={demoWindow}
     >
-
-      <DashboardLayout>
-      <Router />
-
-      </DashboardLayout>
-
+      <div>
+        <NavbarComponent />
+        <DashboardLayout>
+          <PageContainer>
+            <Grid container spacing={2}>
+              <Grid xs={12}>
+                <LandingPage />
+              </Grid>
+            </Grid>
+          </PageContainer>
+        </DashboardLayout>
+      </div>
     </AppProvider>
   );
 }

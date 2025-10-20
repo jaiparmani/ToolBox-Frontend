@@ -7,10 +7,10 @@ redirects = []
 [functions."*"]
 
 [build]
-publish = "/Users/jaiparmani/Desktop/TECH/DEVELOPMENT/ToolBoxFrontend/toolbox-frontend/build"
+publish = "/Users/jaiparmani/Desktop/TECH/DEVELOPMENT/ToolBoxProject/ToolBoxFrontend/toolbox-frontend/build"
 publishOrigin = "ui"
 commandOrigin = "ui"
-base = "/Users/jaiparmani/Desktop/TECH/DEVELOPMENT/ToolBoxFrontend/toolbox-frontend"
+base = "/Users/jaiparmani/Desktop/TECH/DEVELOPMENT/ToolBoxProject/ToolBoxFrontend/toolbox-frontend"
 command = "npm run build"
 
 [build.environment]

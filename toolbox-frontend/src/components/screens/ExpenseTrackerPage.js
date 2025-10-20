@@ -1,49 +1,43 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import {
- Box, Container, Typography, Paper, Grid, Card, CardContent,
- Button, Dialog, DialogTitle, DialogContent, DialogActions,
- TextField, Alert, Snackbar, Chip, IconButton, Tooltip,
- Fab, Switch, FormControlLabel, Divider, Tab, Tabs,
- Table, TableBody, TableCell, TableContainer, TableHead,
- TableRow, TablePagination, InputAdornment, Menu, MenuItem,
- ListItemIcon, ListItemText, Badge, LinearProgress
+  Box, Container, Typography, Paper, Grid, Card, CardContent,
+  Button, Dialog, DialogTitle, DialogContent, DialogActions,
+  TextField, Alert, Snackbar, Chip, IconButton, Tooltip,
+  Fab, Switch, FormControlLabel, Tab, Tabs,
+  Table, TableBody, TableCell, TableContainer, TableHead,
+  TableRow, TablePagination, InputAdornment, Menu, MenuItem,
+  ListItemIcon, ListItemText, LinearProgress
 } from '@mui/material';
 import {
- Add as AddIcon,
- Edit as EditIcon,
- Delete as DeleteIcon,
- Search as SearchIcon,
- FilterList as FilterIcon,
- MoreVert as MoreVertIcon,
- Dashboard as DashboardIcon,
- Category as CategoryIcon,
- Tag as TagIcon,
- TrendingUp as TrendingUpIcon,
- TrendingDown as TrendingDownIcon,
- AccountBalance as BalanceIcon,
- Refresh as RefreshIcon,
- Close as CloseIcon,
- CheckCircle as CheckCircleIcon,
- Error as ErrorIcon,
- Logout as LogoutIcon,
- Login as LoginIcon,
- KeyboardArrowDown as ArrowDownIcon
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Search as SearchIcon,
+  FilterList as FilterIcon,
+  MoreVert as MoreVertIcon,
+  Dashboard as DashboardIcon,
+  Category as CategoryIcon,
+  Tag as TagIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  AccountBalance as BalanceIcon,
+  Refresh as RefreshIcon,
+  Close as CloseIcon,
+  Logout as LogoutIcon
 } from '@mui/icons-material';
 
 // Import API functions and reusable components
 import {
- addExpenseApi, getExpenses, updateExpense, deleteExpense,
- getCategories, createCategory, updateCategory, deleteCategory,
- getTags, createTag, updateTag, deleteTag,
- getExpenseSummary, getAuthCredentials, clearAuthCredentials,
- setAuthCredentials, getAuthHeaders, handleApiError,
- transformExpenseForUI
+  addExpenseApi, getExpenses, updateExpense, deleteExpense,
+  getCategories, createCategory, updateCategory, deleteCategory,
+  getTags, createTag, updateTag, deleteTag,
+  getExpenseSummary
 } from '../rest/expenseTrackerApis';
 
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
-import FormTextFieldComponent from '../ReusableComponents/FormTextFieldComponent';
 import AutocompleteComponent from '../ReusableComponents/AutocompleteComponent';
-import SubmitButton from '../ReusableComponents/Buttons/SubmitButton';
+import NavbarComponent from '../NavbarComponent';
 
 // Color palette for categories
 const categoryColors = [
@@ -54,10 +48,8 @@ const categoryColors = [
 ];
 
 export default function ExpenseTrackerPage() {
- // Authentication state
- const [isAuthenticated, setIsAuthenticated] = useState(false);
- const [authChecked, setAuthChecked] = useState(false);
- const [loginCredentials, setLoginCredentials] = useState({ username: '', password: '' });
+  // Use global authentication state
+  const { isAuthenticated, isLoading, logout, user } = useAuth();
 
  // Main data state
  const [expenses, setExpenses] = useState([]);
@@ -133,11 +125,6 @@ export default function ExpenseTrackerPage() {
  const [anchorEl, setAnchorEl] = useState(null);
  const [menuType, setMenuType] = useState(null);
 
- // Check authentication on component mount
- useEffect(() => {
-   checkAuthentication();
- }, []);
-
  // Load data when authenticated
  useEffect(() => {
    if (isAuthenticated) {
@@ -145,44 +132,16 @@ export default function ExpenseTrackerPage() {
    }
  }, [isAuthenticated, filters, pagination.page, pagination.pageSize, sortBy]);
 
- const checkAuthentication = () => {
+ const handleLogout = async () => {
    try {
-     const credentials = getAuthCredentials();
-     setIsAuthenticated(!!credentials);
+     await logout();
+     setExpenses([]);
+     setCategories([]);
+     setTags([]);
+     setSummary(null);
    } catch (error) {
-     setIsAuthenticated(false);
-     setError('Authentication check failed');
-   } finally {
-     setAuthChecked(true);
+     setError('Logout failed');
    }
- };
-
- const handleLogin = async () => {
-   if (!loginCredentials.username || !loginCredentials.password) {
-     setError('Please enter both username and password');
-     return;
-   }
-
-   setLoading(true);
-   try {
-     setAuthCredentials(loginCredentials.username, loginCredentials.password);
-     setIsAuthenticated(true);
-     setSuccess('Login successful!');
-     setLoginCredentials({ username: '', password: '' });
-   } catch (error) {
-     setError('Login failed. Please check your credentials.');
-   } finally {
-     setLoading(false);
-   }
- };
-
- const handleLogout = () => {
-   clearAuthCredentials();
-   setIsAuthenticated(false);
-   setExpenses([]);
-   setCategories([]);
-   setTags([]);
-   setSummary(null);
  };
 
  const loadAllData = async () => {
@@ -562,7 +521,7 @@ export default function ExpenseTrackerPage() {
    return () => document.removeEventListener('keydown', handleKeyDown);
  }, []);
 
- if (!authChecked) {
+ if (isLoading) {
    return (
      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
        <Typography>Loading...</Typography>
@@ -575,43 +534,23 @@ export default function ExpenseTrackerPage() {
      <Container maxWidth="sm" sx={{ mt: 8 }}>
        <Paper elevation={3} sx={{ p: 4 }}>
          <Typography variant="h4" gutterBottom align="center">
-           Expense Tracker Login
+           Authentication Required
          </Typography>
-         <Box sx={{ mt: 3 }}>
-           <TextField
-             fullWidth
-             label="Username"
-             value={loginCredentials.username}
-             onChange={(e) => setLoginCredentials(prev => ({ ...prev, username: e.target.value }))}
-             sx={{ mb: 2 }}
-           />
-           <TextField
-             fullWidth
-             type="password"
-             label="Password"
-             value={loginCredentials.password}
-             onChange={(e) => setLoginCredentials(prev => ({ ...prev, password: e.target.value }))}
-             sx={{ mb: 3 }}
-             onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
-           />
-           <Button
-             fullWidth
-             variant="contained"
-             size="large"
-             onClick={handleLogin}
-             disabled={loading}
-             startIcon={<LoginIcon />}
-           >
-             {loading ? 'Logging in...' : 'Login'}
-           </Button>
-         </Box>
+         <Typography variant="body1" align="center" sx={{ mt: 2, mb: 3 }}>
+           Please log in to access the Expense Tracker.
+         </Typography>
+         <Typography variant="body2" align="center" color="text.secondary">
+           You'll be redirected to the login page automatically.
+         </Typography>
        </Paper>
      </Container>
    );
  }
 
  return (
-   <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
+   <>
+     <NavbarComponent />
+     <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
      {/* Header */}
      <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
        <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
@@ -1309,5 +1248,6 @@ export default function ExpenseTrackerPage() {
        <AddIcon />
      </Fab>
    </Container>
+   </>
  );
 }

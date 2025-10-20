@@ -1,4 +1,6 @@
 // API Configuration - Dynamic base URL with environment detection
+import { getCsrfHeaders, requiresCsrfProtection } from './csrfUtils.js';
+
 const getApiBaseUrl = () => {
     const hostname = window.location.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local');
@@ -44,14 +46,26 @@ export const getAuthHeaders = () => {
 
 // Utility function for making authenticated requests
 const authenticatedFetch = async (url, options = {}) => {
+    const method = options.method || 'GET';
     const headers = {
         ...getAuthHeaders(),
         ...options.headers
     };
 
+    // Add CSRF token for state-changing requests
+    if (requiresCsrfProtection(method)) {
+        try {
+            const csrfHeaders = await getCsrfHeaders(headers);
+            Object.assign(headers, csrfHeaders);
+        } catch (error) {
+            console.warn('Failed to get CSRF token:', error);
+        }
+    }
+
     const response = await fetch(url, {
         ...options,
-        headers
+        headers,
+        credentials: 'include' // Include credentials for CSRF token cookies
     });
 
     if (response.status === 401) {

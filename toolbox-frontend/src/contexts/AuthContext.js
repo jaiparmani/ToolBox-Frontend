@@ -190,7 +190,23 @@ export const AuthProvider = ({ children }) => {
     try {
       // For session-based authentication, we'll use a direct fetch to get the session cookie
       // Login endpoint is CSRF exempt since users need to login before getting CSRF tokens
-      const response = await fetch('http://localhost:8000/api/users/login/', {
+      // use api base url below
+const getApiBaseUrl = () => {
+    const hostname = window.location.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local');
+
+    const baseUrl = isLocalhost
+        ? 'http://localhost:8000'
+        : 'https://jaiparmani.pythonanywhere.com';
+
+    // Environment indicator for debugging
+    console.log(`🔗 API Environment: ${isLocalhost ? 'DEVELOPMENT' : 'PRODUCTION'} | Base URL: ${baseUrl}`);
+
+    return baseUrl;
+};
+
+const API_BASE_URL = getApiBaseUrl();
+      const response = await fetch(API_BASE_URL +'/api/users/login/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

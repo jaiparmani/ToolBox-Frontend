@@ -34,14 +34,14 @@ export const clearAuthCredentials = () => {
 };
 
 export const getAuthHeaders = () => {
-    const credentials = getAuthCredentials();
-    if (!credentials) {
-        throw new Error('No authentication credentials found. Please log in.');
-    }
-    return {
-        'Authorization': `Basic ${credentials}`,
-        'Content-Type': 'application/json'
-    };
+    // const credentials = getAuthCredentials();
+    // if (!credentials) {
+    //     throw new Error('No authentication credentials found. Please log in.');
+    // }
+    // return {
+    //     'Authorization': `Basic ${credentials}`,
+    //     'Content-Type': 'application/json'
+    // };
 };
 
 // Utility function for making authenticated requests

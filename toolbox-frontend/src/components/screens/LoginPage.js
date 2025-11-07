@@ -16,22 +16,21 @@ import {
   HowToReg
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { authUtils } from '../rest/authUtils';
 import { clearAllData } from '../rest/userApis';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, isLoading, error, clearError } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // Form state
   const [formData, setFormData] = useState({
-    username: '',
-    password: '',
+    userid: '',
     rememberMe: false
   });
 
   // UI state
-  const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [success, setSuccess] = useState(false);
   const [clearingSession, setClearingSession] = useState(false);
@@ -57,14 +56,9 @@ export default function LoginPage() {
   const validateForm = () => {
     const errors = {};
 
-    // Username validation
-    if (!formData.username.trim()) {
-      errors.username = 'Username is required';
-    }
-
-    // Password validation
-    if (!formData.password) {
-      errors.password = 'Password is required';
+    // Userid validation
+    if (!formData.userid.trim()) {
+      errors.userid = 'User ID is required';
     }
 
     setFormErrors(errors);
@@ -74,24 +68,73 @@ export default function LoginPage() {
   // Handle form submission
   const handleSubmit = async (event) => {
     event.preventDefault();
-    clearError();
+    setError(null);
 
     if (!validateForm()) {
       return;
     }
 
+    setIsLoading(true);
     try {
-      const result = await login(formData.username, formData.password);
-        console.log('Login result:', result);
-      if (result) {
-        setSuccess(true);
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 1500);
+      const getApiBaseUrl = () => {
+        const hostname = window.location.hostname;
+        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local');
+
+        const baseUrl = isLocalhost
+            ? 'http://localhost:8000'
+            : 'https://jaiparmani.pythonanywhere.com';
+
+        console.log(`🔗 API Environment: ${isLocalhost ? 'DEVELOPMENT' : 'PRODUCTION'} | Base URL: ${baseUrl}`);
+
+        return baseUrl;
+      };
+
+      const API_BASE_URL = getApiBaseUrl();
+
+      const response = await fetch(API_BASE_URL + `/api/users/login/?userid=${formData.userid}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({})
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
+
+      // Login successful
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Login response data:', data);
+
+      // Use the userid from the form since we're sending it explicitly
+      const userid = formData.userid;
+
+      if (!userid) {
+        throw new Error('User ID is required');
+      }
+
+      // Save to localStorage
+      authUtils.login(userid, `user${userid}`);
+
+      console.log('Login successful, userid:', userid);
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/');
+      }, 1500);
+
     } catch (error) {
-      // Error is handled by AuthContext
       console.error('Login error:', error);
+      setError({ message: error.message || 'Login failed. Please check your credentials and try again.' });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -152,7 +195,7 @@ export default function LoginPage() {
 
         {/* Error Alert */}
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={clearError}>
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
             {error.message || 'Login failed. Please check your credentials and try again.'}
           </Alert>
         )}
@@ -160,17 +203,17 @@ export default function LoginPage() {
         {/* Login Form */}
         <Box component="form" onSubmit={handleSubmit}>
           <Grid container spacing={3}>
-            {/* Username Field */}
+            {/* User ID Field */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Username"
-                value={formData.username}
-                onChange={handleInputChange('username')}
-                error={!!formErrors.username}
-                helperText={formErrors.username}
+                label="User ID"
+                value={formData.userid}
+                onChange={handleInputChange('userid')}
+                error={!!formErrors.userid}
+                helperText={formErrors.userid}
                 required
-                autoComplete="username"
+                autoComplete="userid"
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -181,38 +224,6 @@ export default function LoginPage() {
               />
             </Grid>
 
-            {/* Password Field */}
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={handleInputChange('password')}
-                error={!!formErrors.password}
-                helperText={formErrors.password}
-                required
-                autoComplete="current-password"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Lock />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="toggle password visibility"
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
 
             {/* Remember Me Checkbox */}
             <Grid item xs={12}>
@@ -264,18 +275,10 @@ export default function LoginPage() {
             </Link>
           </Box>
 
-          {/* Registration Link */}
+          {/* Info */}
           <Box textAlign="center">
             <Typography variant="body2" color="text.secondary">
-              Don't have an account?{' '}
-              <Link
-                component="button"
-                variant="body2"
-                onClick={() => navigate('/register')}
-                sx={{ textDecoration: 'none' }}
-              >
-                Create one here
-              </Link>
+              Login to access your toolbox
             </Typography>
           </Box>
         </Box>

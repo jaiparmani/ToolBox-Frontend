@@ -1,5 +1,6 @@
 // User API Configuration - Dynamic base URL with environment detection
 import { getCsrfHeaders, requiresCsrfProtection, clearAllAuthData } from './csrfUtils.js';
+import { apiInterceptor } from './authUtils.js';
 
 const getApiBaseUrl = () => {
     const hostname = window.location.hostname;
@@ -17,16 +18,7 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
-// Session management utilities
-export const setSessionId = (sessionId) => {
-    localStorage.setItem('sessionid', sessionId);
-    return sessionId;
-};
-
-export const getSessionId = () => {
-    return localStorage.getItem('sessionid');
-};
-
+// Session management utilities - simplified for Django session cookies
 export const clearSession = () => {
     localStorage.removeItem('sessionid');
 };
@@ -60,24 +52,14 @@ export const clearAllData = async (onSuccess, onError) => {
     }
 };
 
-export const getSessionCookie = () => {
-    const sessionId = getSessionId();
-    return sessionId ? `sessionid=${sessionId}` : null;
-};
 
 // Utility function for making authenticated requests with session cookies
 const authenticatedFetch = async (url, options = {}) => {
     const method = options.method || 'GET';
     const headers = {
         'Content-Type': 'application/json',
-        ...options.headers
+        ...options.headers,
     };
-
-    // Add session cookie if available
-    const cookieHeader = getSessionCookie();
-    if (cookieHeader) {
-        headers.Cookie = cookieHeader;
-    }
 
     // Add CSRF token for state-changing requests (authenticated requests only)
     if (requiresCsrfProtection(method)) {
@@ -86,14 +68,23 @@ const authenticatedFetch = async (url, options = {}) => {
             Object.assign(headers, csrfHeaders);
         } catch (error) {
             console.warn('Failed to get CSRF token for authenticated request:', error);
-            // For authenticated requests, CSRF token failure should not block the request
-            // but we should log it for debugging
         }
     }
 
-    const response = await fetch(url, {
+    // Add userid to URL using interceptor
+    const finalUrl = apiInterceptor.addUserIdToUrl(url);
+
+    // Add userid to request body if needed
+    let body = options.body;
+    if (body && typeof body === 'object') {
+        body = apiInterceptor.addUserIdToBody(JSON.parse(body), method);
+        body = JSON.stringify(body);
+    }
+
+    const response = await fetch(finalUrl, {
         ...options,
         headers,
+        body,
         credentials: 'include' // Important for session cookie handling
     });
 
@@ -263,6 +254,7 @@ export const registerUser = async (userData, onSuccess, onError) => {
  */
 export const getUserProfile = async (onSuccess, onError) => {
     try {
+        console.log("Fetching user profile with Django session authentication");
         const response = await authenticatedFetch(`${API_BASE_URL}/profile/`);
         const data = await response.json();
         const transformedData = transformUserForUI(data);

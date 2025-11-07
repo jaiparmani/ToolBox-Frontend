@@ -1,5 +1,6 @@
 // API Configuration - Dynamic base URL with environment detection
 import { getCsrfHeaders, requiresCsrfProtection } from './csrfUtils.js';
+import { apiInterceptor } from './authUtils.js';
 
 const getApiBaseUrl = () => {
     const hostname = window.location.hostname;
@@ -18,65 +19,72 @@ const getApiBaseUrl = () => {
 const API_BASE_URL = getApiBaseUrl();
 const ARRAY_SUM_API_URL = 'https://jaiparmani.pythonanywhere.com/api/tools/array-sum';
 
-// Authentication utilities
-export const setAuthCredentials = (username, password) => {
-    const credentials = btoa(`${username}:${password}`);
-    localStorage.setItem('apiCredentials', credentials);
-    return credentials;
-};
-
-export const getAuthCredentials = () => {
-    return localStorage.getItem('apiCredentials');
-};
-
+// Session-based authentication utilities
 export const clearAuthCredentials = () => {
     localStorage.removeItem('apiCredentials');
 };
 
-export const getAuthHeaders = () => {
-    // const credentials = getAuthCredentials();
-    // if (!credentials) {
-    //     throw new Error('No authentication credentials found. Please log in.');
-    // }
-    // return {
-    //     'Authorization': `Basic ${credentials}`,
-    //     'Content-Type': 'application/json'
-    // };
-};
-
-// Utility function for making authenticated requests
+// Utility function for making authenticated requests with Django session cookies
 const authenticatedFetch = async (url, options = {}) => {
     const method = options.method || 'GET';
     const headers = {
-        ...getAuthHeaders(),
+        'Content-Type': 'application/json',
         ...options.headers
     };
 
-    // Add CSRF token for state-changing requests
+    // Add CSRF token for state-changing requests (Django handles this via cookies for session auth)
     if (requiresCsrfProtection(method)) {
         try {
             const csrfHeaders = await getCsrfHeaders(headers);
             Object.assign(headers, csrfHeaders);
         } catch (error) {
-            console.warn('Failed to get CSRF token:', error);
+            console.warn('Failed to get CSRF token for expenses API:', error);
+            // For session authentication, CSRF should be handled via cookies
+            // This warning is expected and normal for session-based auth
         }
     }
 
-    const response = await fetch(url, {
+    // Add userid to URL using interceptor
+    const finalUrl = apiInterceptor.addUserIdToUrl(url);
+
+    // Add userid to request body if needed
+    let body = options.body;
+    if (body && typeof body === 'string') {
+        try {
+            const parsedBody = JSON.parse(body);
+            body = apiInterceptor.addUserIdToBody(parsedBody, method);
+            body = JSON.stringify(body);
+        } catch (error) {
+            // If body is not JSON, leave it as is
+            console.warn('Could not parse request body as JSON for userid injection:', error);
+        }
+    }
+
+    const response = await fetch(finalUrl, {
         ...options,
         headers,
-        credentials: 'include' // Include credentials for CSRF token cookies
+        body,
+        credentials: 'include' // Include credentials for Django session cookie authentication
     });
 
     if (response.status === 401) {
+        console.error(`🚫 Authentication failed for ${method} ${url} - Status: ${response.status}`);
         clearAuthCredentials();
         throw new Error('Authentication failed. Please log in again.');
     }
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error(`🚫 API Error for ${method} ${url}:`, {
+            status: response.status,
+            statusText: response.statusText,
+            errorData: errorData,
+            url: url
+        });
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
     }
+
+    console.log(`✅ API Success: ${method} ${finalUrl} - Status: ${response.status}`);
 
     return response;
 };

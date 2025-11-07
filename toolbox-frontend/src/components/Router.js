@@ -1,11 +1,10 @@
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { authUtils } from './rest/authUtils'
 import DashboardLayoutBasic from './DashboardLayout'
 import HobbyTracker from './screens/HobbyTracker'
 import ExpenseTrackerPage from './screens/ExpenseTrackerPage'
 import ArraySumDemo from './ArraySumDemo'
-import UserRegistrationPage from './screens/UserRegistrationPage'
 import LoginPage from './screens/LoginPage'
 import UserProfilePage from './screens/UserProfilePage'
 import LandingPage from './screens/LandingPage'
@@ -31,22 +30,14 @@ const LoadingSpinner = () => (
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth()
+   const isAuthenticated = authUtils.isAuthenticated()
 
-  if (isLoading) {
-    return <LoadingSpinner />
-  }
-
-  return isAuthenticated ? children : <Navigate to="/register" replace />
-}
+   return isAuthenticated ? children : <Navigate to="/login" replace />
+ }
 
 // Public Route Component (redirects to dashboard if already authenticated)
 const PublicRoute = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth()
-
-  if (isLoading) {
-    return <LoadingSpinner />
-  }
+  const isAuthenticated = authUtils.isAuthenticated()
 
   return !isAuthenticated ? children : <Navigate to="/" replace />
 }
@@ -61,11 +52,6 @@ export default function Router() {
         </PublicRoute>
       } />
 
-      <Route path="/register" element={
-        <PublicRoute>
-          <UserRegistrationPage />
-        </PublicRoute>
-      } />
 
       {/* Protected Routes */}
       <Route path="/" element={

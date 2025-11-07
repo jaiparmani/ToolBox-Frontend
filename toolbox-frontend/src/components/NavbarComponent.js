@@ -16,13 +16,13 @@ import {
   Tooltip,
   CircularProgress
 } from '@mui/material';
-import { useAuth } from '../contexts/AuthContext';
+import { authUtils } from './rest/authUtils';
 import { clearAllData } from './rest/userApis';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import LogoutIcon from '@mui/icons-material/Logout';
 
 export default function NavbarComponent() {
-  const { user, logout } = useAuth();
+  const user = authUtils.getUser();
   const [showSuccess, setShowSuccess] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -49,7 +49,11 @@ export default function NavbarComponent() {
 
   const handleLogout = async () => {
     try {
-      await logout();
+      authUtils.logout();
+      // Clear all cookies and data as well
+      await clearAllData();
+      // Redirect to login page
+      window.location.href = '/login';
     } catch (error) {
       console.error('Logout failed:', error);
     }

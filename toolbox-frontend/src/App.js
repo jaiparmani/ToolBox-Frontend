@@ -1,10 +1,10 @@
 import './App.css';
-import { AuthProvider } from './contexts/AuthContext';
 import Router from './components/Router';
 import ErrorBoundary from './components/ErrorBoundary';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { AuthProvider } from './contexts/AuthContext';
 
 const theme = createTheme({
   palette: {
@@ -24,11 +24,11 @@ function App() {
       <div className="App">
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <BrowserRouter>
-            <AuthProvider>
+          <AuthProvider>
+            <BrowserRouter>
               <Router />
-            </AuthProvider>
-          </BrowserRouter>
+            </BrowserRouter>
+          </AuthProvider>
         </ThemeProvider>
       </div>
     </ErrorBoundary>

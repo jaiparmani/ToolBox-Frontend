@@ -5,8 +5,6 @@ import {
   logout as apiLogout,
   changePassword as apiChangePassword,
   clearAllData,
-  getSessionId,
-  setSessionId,
   clearSession,
   handleApiError,
   transformUserForUI
@@ -18,8 +16,7 @@ const initialState = {
   isAuthenticated: false,
   isLoading: true,
   isInitialized: false,
-  error: null,
-  sessionId: null
+  error: null
 };
 
 // Auth Actions
@@ -46,8 +43,7 @@ const authReducer = (state, action) => {
         isAuthenticated: action.payload.isAuthenticated,
         user: action.payload.user,
         isLoading: false,
-        isInitialized: true,
-        sessionId: action.payload.sessionId
+        isInitialized: true
       };
 
     case AUTH_ACTIONS.LOGIN_SUCCESS:
@@ -56,8 +52,7 @@ const authReducer = (state, action) => {
         user: action.payload.user,
         isAuthenticated: true,
         isLoading: false,
-        error: null,
-        sessionId: action.payload.sessionId
+        error: null
       };
 
     case AUTH_ACTIONS.LOGIN_FAILURE:
@@ -82,8 +77,7 @@ const authReducer = (state, action) => {
         user: action.payload.user,
         isAuthenticated: true,
         isLoading: false,
-        error: null,
-        sessionId: action.payload.sessionId
+        error: null
       };
 
     case AUTH_ACTIONS.REGISTER_FAILURE:
@@ -142,38 +136,22 @@ export const AuthProvider = ({ children }) => {
   // Initialize auth state on app start
   useEffect(() => {
     const initializeAuth = async () => {
-      const sessionId = getSessionId();
-
-      if (sessionId) {
-        try {
-          const userProfile = await getUserProfile();
-          dispatch({
-            type: AUTH_ACTIONS.INITIALIZE,
-            payload: {
-              isAuthenticated: true,
-              user: userProfile,
-              sessionId: sessionId
-            }
-          });
-        } catch (error) {
-          console.log('Session invalid, clearing...');
-          clearSession();
-          dispatch({
-            type: AUTH_ACTIONS.INITIALIZE,
-            payload: {
-              isAuthenticated: false,
-              user: null,
-              sessionId: null
-            }
-          });
-        }
-      } else {
+      try {
+        const userProfile = await getUserProfile();
+        dispatch({
+          type: AUTH_ACTIONS.INITIALIZE,
+          payload: {
+            isAuthenticated: true,
+            user: userProfile
+          }
+        });
+      } catch (error) {
+        console.log('No valid session found, user not authenticated');
         dispatch({
           type: AUTH_ACTIONS.INITIALIZE,
           payload: {
             isAuthenticated: false,
-            user: null,
-            sessionId: null
+            user: null
           }
         });
       }
@@ -188,25 +166,22 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
 
     try {
-      // For session-based authentication, we'll use a direct fetch to get the session cookie
-      // Login endpoint is CSRF exempt since users need to login before getting CSRF tokens
-      // use api base url below
-const getApiBaseUrl = () => {
-    const hostname = window.location.hostname;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local');
+      const getApiBaseUrl = () => {
+        const hostname = window.location.hostname;
+        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local');
 
-    const baseUrl = isLocalhost
-        ? 'http://localhost:8000'
-        : 'https://jaiparmani.pythonanywhere.com';
+        const baseUrl = isLocalhost
+            ? 'http://localhost:8000'
+            : 'https://jaiparmani.pythonanywhere.com';
 
-    // Environment indicator for debugging
-    console.log(`🔗 API Environment: ${isLocalhost ? 'DEVELOPMENT' : 'PRODUCTION'} | Base URL: ${baseUrl}`);
+        console.log(`🔗 API Environment: ${isLocalhost ? 'DEVELOPMENT' : 'PRODUCTION'} | Base URL: ${baseUrl}`);
 
-    return baseUrl;
-};
+        return baseUrl;
+      };
 
-const API_BASE_URL = getApiBaseUrl();
-      const response = await fetch(API_BASE_URL +'/api/users/login/', {
+      const API_BASE_URL = getApiBaseUrl();
+
+      const response = await fetch(API_BASE_URL + '/api/users/login/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -217,46 +192,36 @@ const API_BASE_URL = getApiBaseUrl();
           password
         })
       });
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json(); 
-      setSessionId(data.sessionId);
-      // If login successful, get the session ID from cookies/localStorage
-      // and fetch user profile
-      while(!getSessionId()){
-        await new Promise(resolve => setTimeout(resolve, 100));
+      // Login successful, fetch user profile using Django session authentication
+      // Add a small delay to ensure Django session cookie is properly set
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      let userProfile;
+      try {
+        userProfile = await getUserProfile();
+        console.log('✅ Profile fetched successfully after login');
+      } catch (profileError) {
+        console.warn('⚠️ Initial profile fetch failed, retrying once:', profileError);
+        // Retry once after a longer delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+        userProfile = await getUserProfile();
+        console.log('✅ Profile fetched successfully on retry');
       }
 
-      const currentSessionId = getSessionId();
-      // wait for 2 seconds to ensure session cookie is set
-      console.log('Current Session ID after login:', currentSessionId);
-       const getAllCookies = (domain) => {
-                const cookies = document.cookie.split(';');
-                const cookieNames = cookies.map(cookie => {
-                    const eqPos = cookie.indexOf('=');
-                    return eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-                });
-                return cookieNames;
-            }
-        console.log('All Cookies after login:', getAllCookies(window.location.hostname));
-      if (currentSessionId) {
-        const userProfile = await getUserProfile();
+      dispatch({
+        type: AUTH_ACTIONS.LOGIN_SUCCESS,
+        payload: {
+          user: userProfile
+        }
+      });
 
-        dispatch({
-          type: AUTH_ACTIONS.LOGIN_SUCCESS,
-          payload: {
-            user: userProfile,
-            sessionId: currentSessionId
-          }
-        });
-
-        return { success: true, user: userProfile };
-      } else {
-        throw new Error('Failed to establish session');
-      }
+      return { success: true, user: userProfile };
     } catch (error) {
       const handledError = handleApiError(error, 'login');
       dispatch({
@@ -277,13 +242,10 @@ const API_BASE_URL = getApiBaseUrl();
     try {
       const registeredUser = await apiRegisterUser(userData);
 
-      // After successful registration, automatically log in the user
-      const currentSessionId = getSessionId();
       dispatch({
         type: AUTH_ACTIONS.REGISTER_SUCCESS,
         payload: {
-          user: registeredUser,
-          sessionId: currentSessionId
+          user: registeredUser
         }
       });
 
@@ -415,7 +377,6 @@ const API_BASE_URL = getApiBaseUrl();
     isLoading: state.isLoading,
     isInitialized: state.isInitialized,
     error: state.error,
-    sessionId: state.sessionId,
 
     // Actions
     login,

@@ -9,6 +9,7 @@ import {
   handleApiError,
   transformUserForUI
 } from '../components/rest/userApis.js';
+import { authUtils } from '../components/rest/authUtils.js';
 
 // Auth Context State
 const initialState = {
@@ -241,6 +242,9 @@ export const AuthProvider = ({ children }) => {
 
     try {
       const registeredUser = await apiRegisterUser(userData);
+
+      // Establish the localStorage session route guards rely on (authUtils.isAuthenticated)
+      authUtils.login(registeredUser.id, registeredUser.username);
 
       dispatch({
         type: AUTH_ACTIONS.REGISTER_SUCCESS,

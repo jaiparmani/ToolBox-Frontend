@@ -6,6 +6,7 @@ import HobbyTracker from './screens/HobbyTracker'
 import ExpenseTrackerPage from './screens/ExpenseTrackerPage'
 import ArraySumDemo from './ArraySumDemo'
 import LoginPage from './screens/LoginPage'
+import UserRegistrationPage from './screens/UserRegistrationPage'
 import UserProfilePage from './screens/UserProfilePage'
 import LandingPage from './screens/LandingPage'
 import QRCodeGenerator from './screens/QRCodeGenerator'
@@ -49,6 +50,12 @@ export default function Router() {
       <Route path="/login" element={
         <PublicRoute>
           <LoginPage />
+        </PublicRoute>
+      } />
+
+      <Route path="/register" element={
+        <PublicRoute>
+          <UserRegistrationPage />
         </PublicRoute>
       } />
 

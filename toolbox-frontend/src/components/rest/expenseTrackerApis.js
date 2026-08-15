@@ -81,7 +81,7 @@ const authenticatedFetch = async (url, options = {}) => {
             errorData: errorData,
             url: url
         });
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        throwHttpError(errorData, response.status);
     }
 
     console.log(`✅ API Success: ${method} ${finalUrl} - Status: ${response.status}`);
@@ -89,23 +89,52 @@ const authenticatedFetch = async (url, options = {}) => {
     return response;
 };
 
+/**
+ * DRF error bodies aren't always {"detail": "..."} - validation errors come back
+ * field-keyed, e.g. {"category_id": ["Category is required."]}. Pull a human-readable
+ * message out of whatever shape comes back, and carry the real status on the Error
+ * so handleApiError doesn't have to string-sniff the message for digits.
+ */
+const throwHttpError = (errorData, status) => {
+    let message = `HTTP error! status: ${status}`;
+    if (errorData && typeof errorData === 'object') {
+        if (errorData.detail) {
+            message = errorData.detail;
+        } else {
+            const fieldMessages = Object.entries(errorData)
+                .filter(([, value]) => Array.isArray(value) || typeof value === 'string')
+                .map(([field, value]) => {
+                    const text = Array.isArray(value) ? value.join(' ') : value;
+                    return field === 'non_field_errors' ? text : `${field}: ${text}`;
+                });
+            if (fieldMessages.length > 0) {
+                message = fieldMessages.join(' ');
+            }
+        }
+    }
+    const error = new Error(message);
+    error.status = status;
+    throw error;
+};
+
 // Error handling utility
 export const handleApiError = (error, operation) => {
     console.error(`Error ${operation}:`, error);
+    const status = error.status;
 
-    if (error.message.includes('Authentication failed')) {
+    if (status === 401 || error.message.includes('Authentication failed')) {
         // Redirect to login or trigger re-authentication
         return { type: 'auth_error', message: 'Please log in again.' };
-    } else if (error.message.includes('400')) {
+    } else if (status === 400) {
         return { type: 'validation_error', message: error.message };
-    } else if (error.message.includes('403')) {
+    } else if (status === 403) {
         return { type: 'permission_error', message: 'You do not have permission to perform this action.' };
-    } else if (error.message.includes('404')) {
+    } else if (status === 404) {
         return { type: 'not_found', message: 'Resource not found.' };
-    } else if (error.message.includes('429')) {
+    } else if (status === 429) {
         return { type: 'rate_limit', message: 'Too many requests. Please try again later.' };
     } else {
-        return { type: 'network_error', message: `Failed to ${operation}. Please try again.` };
+        return { type: 'network_error', message: error.message || `Failed to ${operation}. Please try again.` };
     }
 };
 

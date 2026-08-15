@@ -95,10 +95,40 @@ const authenticatedFetch = async (url, options = {}) => {
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        throwHttpError(errorData, response.status);
     }
 
     return response;
+};
+
+/**
+ * DRF error bodies aren't always {"detail": "..."} - validation errors come back
+ * field-keyed, e.g. {"username": ["A user with that username already exists."]}.
+ * Pull a human-readable message out of whatever shape comes back.
+ */
+const extractErrorMessage = (errorData, status) => {
+    if (errorData && typeof errorData === 'object') {
+        if (errorData.detail) {
+            return errorData.detail;
+        }
+        const fieldMessages = Object.entries(errorData)
+            .filter(([, value]) => Array.isArray(value) || typeof value === 'string')
+            .map(([field, value]) => {
+                const text = Array.isArray(value) ? value.join(' ') : value;
+                return field === 'non_field_errors' ? text : `${field}: ${text}`;
+            });
+        if (fieldMessages.length > 0) {
+            return fieldMessages.join(' ');
+        }
+    }
+    return `HTTP error! status: ${status}`;
+};
+
+/** Throw an Error carrying the real HTTP status so callers don't have to string-sniff the message for digits. */
+const throwHttpError = (errorData, status) => {
+    const error = new Error(extractErrorMessage(errorData, status));
+    error.status = status;
+    throw error;
 };
 
 // Utility function for making public requests (no authentication required)
@@ -127,7 +157,7 @@ const publicFetch = async (url, options = {}) => {
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        throwHttpError(errorData, response.status);
     }
 
     return response;
@@ -136,21 +166,22 @@ const publicFetch = async (url, options = {}) => {
 // Error handling utility
 export const handleApiError = (error, operation) => {
     console.error(`Error ${operation}:`, error);
+    const status = error.status;
 
-    if (error.message.includes('Session expired') || error.message.includes('401')) {
+    if (status === 401 || error.message.includes('Session expired')) {
         return { type: 'auth_error', message: 'Please log in again.' };
-    } else if (error.message.includes('400')) {
+    } else if (status === 400) {
         return { type: 'validation_error', message: error.message };
-    } else if (error.message.includes('403')) {
+    } else if (status === 403) {
         return { type: 'permission_error', message: 'You do not have permission to perform this action.' };
-    } else if (error.message.includes('404')) {
+    } else if (status === 404) {
         return { type: 'not_found', message: 'Resource not found.' };
-    } else if (error.message.includes('409')) {
+    } else if (status === 409) {
         return { type: 'conflict_error', message: 'Username or email already exists.' };
-    } else if (error.message.includes('429')) {
+    } else if (status === 429) {
         return { type: 'rate_limit', message: 'Too many requests. Please try again later.' };
     } else {
-        return { type: 'network_error', message: `Failed to ${operation}. Please try again.` };
+        return { type: 'network_error', message: error.message || `Failed to ${operation}. Please try again.` };
     }
 };
 

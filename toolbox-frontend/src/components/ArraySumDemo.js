@@ -10,6 +10,7 @@ import {
   Grid
 } from '@mui/material';
 import { getArraySumApi } from './rest/expenseTrackerApis';
+import NavbarComponent from './NavbarComponent';
 
 const ArraySumDemo = () => {
   const [inputValue, setInputValue] = useState('');
@@ -81,6 +82,8 @@ const ArraySumDemo = () => {
   };
 
   return (
+    <>
+    <NavbarComponent />
     <Box sx={{ p: 3, maxWidth: 800, mx: 'auto' }}>
       <Typography variant="h4" gutterBottom>
         Array Sum Calculator
@@ -146,6 +149,7 @@ const ArraySumDemo = () => {
         </Typography>
       </Paper>
     </Box>
+    </>
   );
 };
 

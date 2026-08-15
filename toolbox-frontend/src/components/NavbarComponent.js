@@ -16,12 +16,16 @@ import {
   Tooltip,
   CircularProgress
 } from '@mui/material';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { authUtils } from './rest/authUtils';
 import { clearAllData } from './rest/userApis';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import LogoutIcon from '@mui/icons-material/Logout';
+import HomeIcon from '@mui/icons-material/Home';
 
 export default function NavbarComponent() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const user = authUtils.getUser();
   const [showSuccess, setShowSuccess] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -71,7 +75,20 @@ export default function NavbarComponent() {
         }}
       >
         <Toolbar>
-          <Box sx={{ flexGrow: 1 }}>
+          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+            {location.pathname !== '/' && location.pathname !== '/dashboard' && (
+              <Tooltip title="Back to Dashboard">
+                <IconButton
+                  onClick={() => navigate('/dashboard')}
+                  sx={{
+                    color: 'primary.contrastText',
+                    '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.1)' }
+                  }}
+                >
+                  <HomeIcon />
+                </IconButton>
+              </Tooltip>
+            )}
             <Typography
               variant="h6"
               component="div"

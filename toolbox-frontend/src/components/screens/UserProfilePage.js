@@ -26,6 +26,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { clearAllData } from '../rest/userApis.js';
+import NavbarComponent from '../NavbarComponent';
 
 export default function UserProfilePage() {
   const navigate = useNavigate();
@@ -328,6 +329,8 @@ export default function UserProfilePage() {
   // Authentication check
   if (!isAuthenticated) {
     return (
+      <>
+      <NavbarComponent />
       <Container maxWidth="sm" sx={{ mt: 8 }}>
         <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
           <ErrorIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
@@ -346,12 +349,15 @@ export default function UserProfilePage() {
           </Button>
         </Paper>
       </Container>
+      </>
     );
   }
 
   // Loading state
   if (isLoading && !user) {
     return (
+      <>
+      <NavbarComponent />
       <Container maxWidth="md" sx={{ mt: 4 }}>
         <Paper elevation={3} sx={{ p: 4 }}>
           <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -359,10 +365,13 @@ export default function UserProfilePage() {
           </Box>
         </Paper>
       </Container>
+      </>
     );
   }
 
   return (
+    <>
+    <NavbarComponent />
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
       <Paper elevation={3} sx={{ p: 4 }}>
         {/* Header */}
@@ -806,5 +815,6 @@ export default function UserProfilePage() {
         {isLoading && <LinearProgress sx={{ mt: 2 }} />}
       </Paper>
     </Container>
+    </>
   );
 }

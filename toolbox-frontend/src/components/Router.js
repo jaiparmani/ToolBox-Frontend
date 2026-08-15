@@ -4,6 +4,8 @@ import { authUtils } from './rest/authUtils'
 import DashboardLayoutBasic from './DashboardLayout'
 import HobbyTracker from './screens/HobbyTracker'
 import ExpenseTrackerPage from './screens/ExpenseTrackerPage'
+import ReportsPage from './screens/ReportsPage'
+import HealthTrackerPage from './screens/HealthTrackerPage'
 import ArraySumDemo from './ArraySumDemo'
 import LoginPage from './screens/LoginPage'
 import UserRegistrationPage from './screens/UserRegistrationPage'
@@ -88,6 +90,18 @@ export default function Router() {
       <Route path="/expense-tracker" element={
         <ProtectedRoute>
           <ExpenseTrackerPage />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/reports" element={
+        <ProtectedRoute>
+          <ReportsPage />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/health-tracker" element={
+        <ProtectedRoute>
+          <HealthTrackerPage />
         </ProtectedRoute>
       } />
 

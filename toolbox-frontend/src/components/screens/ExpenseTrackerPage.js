@@ -552,10 +552,34 @@ export default function ExpenseTrackerPage() {
      <NavbarComponent />
      <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
      {/* Header */}
-     <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-       <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
+     <Paper
+       elevation={0}
+       sx={{
+         p: 3, mb: 3,
+         position: 'relative',
+         overflow: 'hidden',
+         border: '1px solid',
+         borderColor: 'divider',
+         '&::before': {
+           content: '""',
+           position: 'absolute',
+           inset: 0,
+           background: 'radial-gradient(circle at 0% 0%, rgba(10,132,255,0.18), transparent 55%)',
+         },
+       }}
+     >
+       <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} sx={{ position: 'relative' }}>
          <Box display="flex" alignItems="center" gap={2}>
-           <DashboardIcon sx={{ fontSize: 32, color: 'primary.main' }} />
+           <Box
+             sx={{
+               width: 48, height: 48, borderRadius: '14px',
+               background: 'linear-gradient(135deg, #0A84FF, #64D2FF)',
+               display: 'flex', alignItems: 'center', justifyContent: 'center',
+               boxShadow: '0 8px 20px rgba(10,132,255,0.4)',
+             }}
+           >
+             <DashboardIcon sx={{ fontSize: 26, color: '#fff' }} />
+           </Box>
            <Box>
              <Typography variant="h4" component="h1">
                Expense Tracker
@@ -607,74 +631,49 @@ export default function ExpenseTrackerPage() {
      {/* Summary Dashboard */}
      {summary && (
        <Grid container spacing={3} sx={{ mb: 3 }}>
-         <Grid item xs={12} sm={6} md={3}>
-           <Card>
-             <CardContent>
-               <Box display="flex" alignItems="center" justifyContent="space-between">
-                 <Box>
-                   <Typography color="text.secondary" gutterBottom variant="overline">
-                     Total Expenses
-                   </Typography>
-                   <Typography variant="h5">
-                     {formatCurrency(summary.totalExpenses)}
-                   </Typography>
+         {[
+           { label: 'Total Expenses', value: formatCurrency(summary.totalExpenses), icon: TrendingUpIcon, color: '#FF453A' },
+           { label: 'Total Income', value: formatCurrency(summary.totalIncome), icon: TrendingDownIcon, color: '#30D158' },
+           { label: 'Net Balance', value: formatCurrency(summary.netBalance), icon: BalanceIcon, color: '#0A84FF' },
+           { label: 'Transactions', value: summary.transactionCount, icon: DashboardIcon, color: '#BF5AF2' },
+         ].map((stat) => (
+           <Grid item xs={12} sm={6} md={3} key={stat.label}>
+             <Card
+               elevation={0}
+               sx={{
+                 border: '1px solid',
+                 borderColor: 'divider',
+                 backgroundColor: (theme) =>
+                   theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+                 backdropFilter: 'blur(20px)',
+                 transition: 'transform 0.2s ease, border-color 0.2s ease',
+                 '&:hover': { transform: 'translateY(-3px)', borderColor: stat.color },
+               }}
+             >
+               <CardContent>
+                 <Box display="flex" alignItems="center" justifyContent="space-between">
+                   <Box>
+                     <Typography color="text.secondary" gutterBottom variant="overline">
+                       {stat.label}
+                     </Typography>
+                     <Typography variant="h5">
+                       {stat.value}
+                     </Typography>
+                   </Box>
+                   <Box
+                     sx={{
+                       width: 44, height: 44, borderRadius: '12px',
+                       backgroundColor: `${stat.color}1f`,
+                       display: 'flex', alignItems: 'center', justifyContent: 'center',
+                     }}
+                   >
+                     <stat.icon sx={{ color: stat.color, fontSize: 22 }} />
+                   </Box>
                  </Box>
-                 <TrendingUpIcon color="error" sx={{ fontSize: 32 }} />
-               </Box>
-             </CardContent>
-           </Card>
-         </Grid>
-         <Grid item xs={12} sm={6} md={3}>
-           <Card>
-             <CardContent>
-               <Box display="flex" alignItems="center" justifyContent="space-between">
-                 <Box>
-                   <Typography color="text.secondary" gutterBottom variant="overline">
-                     Total Income
-                   </Typography>
-                   <Typography variant="h5">
-                     {formatCurrency(summary.totalIncome)}
-                   </Typography>
-                 </Box>
-                 <TrendingDownIcon color="success" sx={{ fontSize: 32 }} />
-               </Box>
-             </CardContent>
-           </Card>
-         </Grid>
-         <Grid item xs={12} sm={6} md={3}>
-           <Card>
-             <CardContent>
-               <Box display="flex" alignItems="center" justifyContent="space-between">
-                 <Box>
-                   <Typography color="text.secondary" gutterBottom variant="overline">
-                     Net Balance
-                   </Typography>
-                   <Typography variant="h5">
-                     {formatCurrency(summary.netBalance)}
-                   </Typography>
-                 </Box>
-                 <BalanceIcon color="primary" sx={{ fontSize: 32 }} />
-               </Box>
-             </CardContent>
-           </Card>
-         </Grid>
-         <Grid item xs={12} sm={6} md={3}>
-           <Card>
-             <CardContent>
-               <Box display="flex" alignItems="center" justifyContent="space-between">
-                 <Box>
-                   <Typography color="text.secondary" gutterBottom variant="overline">
-                     Transactions
-                   </Typography>
-                   <Typography variant="h5">
-                     {summary.transactionCount}
-                   </Typography>
-                 </Box>
-                 <DashboardIcon color="info" sx={{ fontSize: 32 }} />
-               </Box>
-             </CardContent>
-           </Card>
-         </Grid>
+               </CardContent>
+             </Card>
+           </Grid>
+         ))}
        </Grid>
      )}
 

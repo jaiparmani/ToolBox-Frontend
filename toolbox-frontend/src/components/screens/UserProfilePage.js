@@ -376,7 +376,16 @@ export default function UserProfilePage() {
       <Paper elevation={3} sx={{ p: 4 }}>
         {/* Header */}
         <Box display="flex" alignItems="center" gap={2} mb={3}>
-          <AccountIcon sx={{ fontSize: 32, color: 'primary.main' }} />
+          <Box
+            sx={{
+              width: 48, height: 48, borderRadius: '14px',
+              background: 'linear-gradient(135deg, #0A84FF, #BF5AF2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 8px 20px rgba(10,132,255,0.4)',
+            }}
+          >
+            <AccountIcon sx={{ fontSize: 26, color: '#fff' }} />
+          </Box>
           <Box>
             <Typography variant="h4" component="h1">
               User Profile
@@ -410,15 +419,25 @@ export default function UserProfilePage() {
         </Snackbar>
 
         {/* Profile Header Card */}
-        <Card sx={{ mb: 3 }}>
+        <Card
+          sx={{
+            mb: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            backgroundColor: (theme) =>
+              theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+            backdropFilter: 'blur(20px)',
+          }}
+        >
           <CardContent>
             <Box display="flex" alignItems="center" gap={3}>
               <Avatar
                 sx={{
                   width: 80,
                   height: 80,
-                  bgcolor: 'primary.main',
-                  fontSize: '2rem'
+                  background: 'linear-gradient(135deg, #0A84FF, #BF5AF2)',
+                  fontSize: '2rem',
+                  boxShadow: '0 8px 24px rgba(10,132,255,0.35)',
                 }}
               >
                 {user?.displayName?.charAt(0)?.toUpperCase() || user?.username?.charAt(0)?.toUpperCase() || 'U'}

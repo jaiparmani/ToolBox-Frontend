@@ -66,11 +66,17 @@ export default function NavbarComponent() {
     <>
       <AppBar
         position="static"
-        elevation={1}
+        elevation={0}
         sx={{
-          backgroundColor: 'primary.main',
-          borderBottom: '1px solid',
-          borderColor: 'divider'
+          backgroundImage: 'linear-gradient(90deg, #0A84FF, #0071e3 60%, #2997FF)',
+          position: 'relative',
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            left: 0, right: 0, bottom: 0,
+            height: '3px',
+            backgroundImage: 'linear-gradient(90deg, #0A84FF, #BF5AF2, #FF375F)',
+          },
         }}
       >
         <Toolbar>

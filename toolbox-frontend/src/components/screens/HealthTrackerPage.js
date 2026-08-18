@@ -10,6 +10,7 @@ import {
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
+  Favorite as FavoriteIcon,
   MonitorWeight as WeightIcon,
   Opacity as WaterIcon,
   Bedtime as SleepIcon,
@@ -22,10 +23,10 @@ import NavbarComponent from '../NavbarComponent';
 // Adding a new metric later is just a new entry here - the backend already
 // accepts any metric_type in HealthMetric.METRIC_TYPE_CHOICES.
 const METRIC_CONFIG = {
-  weight: { label: 'Weight', unit: 'kg', icon: WeightIcon, color: '#1976d2' },
-  water: { label: 'Water', unit: 'ml', icon: WaterIcon, color: '#03a9f4' },
-  sleep: { label: 'Sleep', unit: 'hours', icon: SleepIcon, color: '#673ab7' },
-  steps: { label: 'Steps', unit: 'steps', icon: StepsIcon, color: '#4caf50' }
+  weight: { label: 'Weight', unit: 'kg', icon: WeightIcon, color: '#0A84FF' },
+  water: { label: 'Water', unit: 'ml', icon: WaterIcon, color: '#64D2FF' },
+  sleep: { label: 'Sleep', unit: 'hours', icon: SleepIcon, color: '#BF5AF2' },
+  steps: { label: 'Steps', unit: 'steps', icon: StepsIcon, color: '#30D158' }
 };
 const METRIC_TYPES = Object.keys(METRIC_CONFIG);
 
@@ -112,15 +113,65 @@ export default function HealthTrackerPage() {
     <>
       <NavbarComponent />
       <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>Health Tracker</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Log daily metrics and see how they trend
-        </Typography>
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3, mb: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            border: '1px solid',
+            borderColor: 'divider',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              inset: 0,
+              background: 'radial-gradient(circle at 0% 0%, rgba(255,55,95,0.18), transparent 55%)',
+            },
+          }}
+        >
+          <Box display="flex" alignItems="center" gap={2} sx={{ position: 'relative' }}>
+            <Box
+              sx={{
+                width: 48, height: 48, borderRadius: '14px',
+                background: 'linear-gradient(135deg, #FF375F, #FF9F0A)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 8px 20px rgba(255,55,95,0.4)',
+              }}
+            >
+              <FavoriteIcon sx={{ fontSize: 26, color: '#fff' }} />
+            </Box>
+            <Box>
+              <Typography variant="h4" component="h1">Health Tracker</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Log daily metrics and see how they trend
+              </Typography>
+            </Box>
+          </Box>
+        </Paper>
 
         <Tabs value={activeType} onChange={(e, val) => setActiveType(val)} sx={{ mb: 3 }}>
           {METRIC_TYPES.map((type) => {
             const Icon = METRIC_CONFIG[type].icon;
-            return <Tab key={type} value={type} label={METRIC_CONFIG[type].label} icon={<Icon />} iconPosition="start" />;
+            const color = METRIC_CONFIG[type].color;
+            return (
+              <Tab
+                key={type}
+                value={type}
+                label={METRIC_CONFIG[type].label}
+                iconPosition="start"
+                icon={
+                  <Box
+                    sx={{
+                      width: 32, height: 32, borderRadius: '10px',
+                      backgroundColor: `${color}1f`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <Icon sx={{ color, fontSize: 18 }} />
+                  </Box>
+                }
+              />
+            );
           })}
         </Tabs>
 
@@ -129,7 +180,18 @@ export default function HealthTrackerPage() {
 
         <Grid container spacing={3} sx={{ mb: 3 }}>
           <Grid item xs={12} sm={4}>
-            <Card>
+            <Card
+              elevation={0}
+              sx={{
+                border: '1px solid',
+                borderColor: 'divider',
+                backgroundColor: (theme) =>
+                  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+                backdropFilter: 'blur(20px)',
+                transition: 'transform 0.2s ease, border-color 0.2s ease',
+                '&:hover': { transform: 'translateY(-3px)', borderColor: config.color },
+              }}
+            >
               <CardContent>
                 <Typography variant="body2" color="text.secondary">Latest</Typography>
                 <Typography variant="h5">
@@ -142,7 +204,18 @@ export default function HealthTrackerPage() {
             </Card>
           </Grid>
           <Grid item xs={12} sm={4}>
-            <Card>
+            <Card
+              elevation={0}
+              sx={{
+                border: '1px solid',
+                borderColor: 'divider',
+                backgroundColor: (theme) =>
+                  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+                backdropFilter: 'blur(20px)',
+                transition: 'transform 0.2s ease, border-color 0.2s ease',
+                '&:hover': { transform: 'translateY(-3px)', borderColor: config.color },
+              }}
+            >
               <CardContent>
                 <Typography variant="body2" color="text.secondary">7-Day Average</Typography>
                 <Typography variant="h5">
@@ -155,7 +228,18 @@ export default function HealthTrackerPage() {
             </Card>
           </Grid>
           <Grid item xs={12} sm={4}>
-            <Card>
+            <Card
+              elevation={0}
+              sx={{
+                border: '1px solid',
+                borderColor: 'divider',
+                backgroundColor: (theme) =>
+                  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+                backdropFilter: 'blur(20px)',
+                transition: 'transform 0.2s ease, border-color 0.2s ease',
+                '&:hover': { transform: 'translateY(-3px)', borderColor: config.color },
+              }}
+            >
               <CardContent>
                 <Typography variant="body2" color="text.secondary">7-Day Range</Typography>
                 <Typography variant="h5">
@@ -169,7 +253,7 @@ export default function HealthTrackerPage() {
           </Grid>
         </Grid>
 
-        <Paper sx={{ p: 2 }}>
+        <Paper elevation={0} sx={{ p: 2, border: '1px solid', borderColor: 'divider' }}>
           <Typography variant="h6" gutterBottom>History</Typography>
           {entries.length === 0 ? (
             <Typography variant="body2" color="text.secondary">No {config.label.toLowerCase()} entries yet.</Typography>

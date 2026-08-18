@@ -7,7 +7,8 @@ import {
 } from '@mui/material';
 import {
   ChevronLeft, ChevronRight, TrendingUp, TrendingDown,
-  AccountBalance as BalanceIcon, Receipt as ReceiptIcon
+  AccountBalance as BalanceIcon, Receipt as ReceiptIcon,
+  Assessment as AssessmentIcon
 } from '@mui/icons-material';
 
 import { getExpenseSummary, getMonthlyReport } from '../rest/expenseTrackerApis';
@@ -77,12 +78,24 @@ export default function ReportsPage() {
     <>
       <NavbarComponent />
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
-          <Box>
-            <Typography variant="h4" component="h1">Reports</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Spending breakdown by category and day
-            </Typography>
+        <Box display="flex" alignItems="center" justifyContent="space-between" mb={3} flexWrap="wrap" gap={2}>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Box
+              sx={{
+                width: 48, height: 48, borderRadius: '14px',
+                background: 'linear-gradient(135deg, #BF5AF2, #FF375F)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 8px 20px rgba(191,90,242,0.4)',
+              }}
+            >
+              <AssessmentIcon sx={{ fontSize: 26, color: '#fff' }} />
+            </Box>
+            <Box>
+              <Typography variant="h4" component="h1">Reports</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Spending breakdown by category and day
+              </Typography>
+            </Box>
           </Box>
           <Box display="flex" alignItems="center" gap={1}>
             <IconButton onClick={() => changeMonth(-1)} aria-label="Previous month">
@@ -101,55 +114,58 @@ export default function ReportsPage() {
         {loading && <LinearProgress sx={{ mb: 3 }} />}
 
         <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography variant="body2" color="text.secondary">Total Expenses</Typography>
-                <Box display="flex" alignItems="center" justifyContent="space-between">
-                  <Typography variant="h5">₹{(summary?.totalExpenses ?? 0).toFixed(2)}</Typography>
-                  <TrendingDown color="error" />
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography variant="body2" color="text.secondary">Total Income</Typography>
-                <Box display="flex" alignItems="center" justifyContent="space-between">
-                  <Typography variant="h5">₹{(summary?.totalIncome ?? 0).toFixed(2)}</Typography>
-                  <TrendingUp color="success" />
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography variant="body2" color="text.secondary">Net Balance</Typography>
-                <Box display="flex" alignItems="center" justifyContent="space-between">
-                  <Typography variant="h5">₹{(summary?.netBalance ?? 0).toFixed(2)}</Typography>
-                  <BalanceIcon color="primary" />
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography variant="body2" color="text.secondary">Transactions</Typography>
-                <Box display="flex" alignItems="center" justifyContent="space-between">
-                  <Typography variant="h5">{report?.total_count ?? 0}</Typography>
-                  <ReceiptIcon color="action" />
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
+          {[
+            { label: 'Total Expenses', value: `₹${(summary?.totalExpenses ?? 0).toFixed(2)}`, icon: TrendingDown, color: '#FF453A' },
+            { label: 'Total Income', value: `₹${(summary?.totalIncome ?? 0).toFixed(2)}`, icon: TrendingUp, color: '#30D158' },
+            { label: 'Net Balance', value: `₹${(summary?.netBalance ?? 0).toFixed(2)}`, icon: BalanceIcon, color: '#0A84FF' },
+            { label: 'Transactions', value: report?.total_count ?? 0, icon: ReceiptIcon, color: '#BF5AF2' },
+          ].map((stat) => (
+            <Grid item xs={12} sm={6} md={3} key={stat.label}>
+              <Card
+                elevation={0}
+                sx={{
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  backgroundColor: (theme) =>
+                    theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+                  backdropFilter: 'blur(20px)',
+                  transition: 'transform 0.2s ease, border-color 0.2s ease',
+                  '&:hover': { transform: 'translateY(-3px)', borderColor: stat.color },
+                }}
+              >
+                <CardContent>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>{stat.label}</Typography>
+                  <Box display="flex" alignItems="center" justifyContent="space-between">
+                    <Typography variant="h5">{stat.value}</Typography>
+                    <Box
+                      sx={{
+                        width: 40, height: 40, borderRadius: '11px',
+                        backgroundColor: `${stat.color}1f`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      <stat.icon sx={{ color: stat.color, fontSize: 20 }} />
+                    </Box>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
         </Grid>
 
         <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 2 }}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                backgroundColor: (theme) =>
+                  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+                backdropFilter: 'blur(20px)',
+              }}
+            >
               <Typography variant="h6" gutterBottom>By Category</Typography>
               {categoryTotals.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">No expenses this month.</Typography>
@@ -184,7 +200,17 @@ export default function ReportsPage() {
           </Grid>
 
           <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 2 }}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                backgroundColor: (theme) =>
+                  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+                backdropFilter: 'blur(20px)',
+              }}
+            >
               <Typography variant="h6" gutterBottom>Daily Totals</Typography>
               {dailyTotals.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">No expenses this month.</Typography>

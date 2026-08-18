@@ -25,7 +25,7 @@ function App() {
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <AuthProvider>
-            <BrowserRouter>
+            <BrowserRouter basename={process.env.PUBLIC_URL}>
               <Router />
             </BrowserRouter>
           </AuthProvider>

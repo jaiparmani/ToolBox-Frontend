@@ -176,8 +176,40 @@ export default function LoginPage() {
   }
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 8, mb: 8 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        backgroundColor: 'background.default',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          inset: 0,
+          background: `
+            radial-gradient(circle at 15% 20%, rgba(10,132,255,0.35), transparent 42%),
+            radial-gradient(circle at 85% 15%, rgba(191,90,242,0.28), transparent 45%),
+            radial-gradient(circle at 50% 100%, rgba(255,55,95,0.22), transparent 55%)
+          `,
+          opacity: (theme) => (theme.palette.mode === 'dark' ? 1 : 0.5),
+        },
+      }}
+    >
+    <Container maxWidth="sm" sx={{ position: 'relative' }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: 4,
+          border: '1px solid',
+          borderColor: 'divider',
+          backgroundColor: (theme) =>
+            theme.palette.mode === 'dark' ? 'rgba(30,30,32,0.75)' : 'rgba(255,255,255,0.85)',
+          backdropFilter: 'blur(24px)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+        }}
+      >
         {/* Header */}
         <Box display="flex" alignItems="center" gap={2} mb={3}>
           <Login sx={{ fontSize: 32, color: 'primary.main' }} />
@@ -290,5 +322,6 @@ export default function LoginPage() {
         </Box>
       </Paper>
     </Container>
+    </Box>
   );
 }

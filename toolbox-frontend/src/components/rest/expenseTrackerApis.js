@@ -8,7 +8,7 @@ const getApiBaseUrl = () => {
 
     const baseUrl = isLocalhost
         ? 'http://localhost:8000/api/expenses'
-        : 'https://jaiparmani.pythonanywhere.com/api/expenses';
+        : 'https://toolbox.pythonanywhere.com/api/expenses';
 
     // Environment indicator for debugging
     console.log(`🔗 API Environment: ${isLocalhost ? 'DEVELOPMENT' : 'PRODUCTION'} | Base URL: ${baseUrl}`);
@@ -17,7 +17,7 @@ const getApiBaseUrl = () => {
 };
 
 const API_BASE_URL = getApiBaseUrl();
-const ARRAY_SUM_API_URL = 'https://jaiparmani.pythonanywhere.com/api/tools/array-sum';
+const ARRAY_SUM_API_URL = 'https://toolbox.pythonanywhere.com/api/tools/array-sum';
 
 // Session-based authentication utilities
 export const clearAuthCredentials = () => {

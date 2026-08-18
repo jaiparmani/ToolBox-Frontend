@@ -173,7 +173,7 @@ export const AuthProvider = ({ children }) => {
 
         const baseUrl = isLocalhost
             ? 'http://localhost:8000'
-            : 'https://jaiparmani.pythonanywhere.com';
+            : 'https://toolbox.pythonanywhere.com';
 
         console.log(`🔗 API Environment: ${isLocalhost ? 'DEVELOPMENT' : 'PRODUCTION'} | Base URL: ${baseUrl}`);
 

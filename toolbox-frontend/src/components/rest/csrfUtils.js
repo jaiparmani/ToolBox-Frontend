@@ -226,7 +226,7 @@ export const    clearAllAuthData = async (domain = window.location.hostname) => 
         try {
             const apiBaseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
                 ? 'http://localhost:8000/api/users'
-                : 'https://jaiparmani.pythonanywhere.com/api/users';
+                : 'https://toolbox.pythonanywhere.com/api/users';
 
             // Make a request to logout endpoint to clear server session
             // add csrf token to headers

@@ -8,7 +8,7 @@ const getApiBaseUrl = () => {
 
     const baseUrl = isLocalhost
         ? 'http://localhost:8000/api/users'
-        : 'https://jaiparmani.pythonanywhere.com/api/users';
+        : 'https://toolbox.pythonanywhere.com/api/users';
 
     // Environment indicator for debugging
     console.log(`🔗 User API Environment: ${isLocalhost ? 'DEVELOPMENT' : 'PRODUCTION'} | Base URL: ${baseUrl}`);

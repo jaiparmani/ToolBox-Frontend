@@ -8,7 +8,7 @@ const getApiBaseUrl = () => {
 
     const baseUrl = isLocalhost
         ? 'http://localhost:8000/api/health'
-        : 'https://jaiparmani.pythonanywhere.com/api/health';
+        : 'https://toolbox.pythonanywhere.com/api/health';
 
     console.log(`🔗 Health API Environment: ${isLocalhost ? 'DEVELOPMENT' : 'PRODUCTION'} | Base URL: ${baseUrl}`);
 

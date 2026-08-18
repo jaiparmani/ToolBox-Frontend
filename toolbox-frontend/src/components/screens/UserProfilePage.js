@@ -79,6 +79,7 @@ export default function UserProfilePage() {
   // Data clearing state
   const [isClearingData, setIsClearingData] = useState(false);
   const [clearDataSuccess, setClearDataSuccess] = useState(false);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
   // Initialize profile form when user data is available
   useEffect(() => {
@@ -514,6 +515,14 @@ export default function UserProfilePage() {
                         startIcon={<SaveIcon />}
                         onClick={handleProfileSave}
                         disabled={isLoading}
+                        sx={{
+                          background: 'linear-gradient(135deg, #0A84FF, #BF5AF2)',
+                          boxShadow: '0 8px 20px rgba(10,132,255,0.35)',
+                          '&:hover': {
+                            background: 'linear-gradient(135deg, #0A84FF, #BF5AF2)',
+                            boxShadow: '0 10px 24px rgba(10,132,255,0.45)',
+                          },
+                        }}
                       >
                         {isLoading ? 'Saving...' : 'Save Changes'}
                       </Button>
@@ -522,46 +531,10 @@ export default function UserProfilePage() {
                 </Box>
               </Box>
 
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Username"
-                    value={profileForm.username}
-                    onChange={handleProfileInputChange('username')}
-                    error={!!profileErrors.username}
-                    helperText={profileErrors.username}
-                    disabled={!editMode}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <PersonIcon />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                </Grid>
-
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Email Address"
-                    type="email"
-                    value={profileForm.email}
-                    onChange={handleProfileInputChange('email')}
-                    error={!!profileErrors.email}
-                    helperText={profileErrors.email}
-                    disabled={!editMode}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <EmailIcon />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                </Grid>
-
+              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1 }}>
+                Personal Details
+              </Typography>
+              <Grid container spacing={3} sx={{ mt: 0, mb: 1 }}>
                 <Grid item xs={12} md={6}>
                   <TextField
                     fullWidth
@@ -601,11 +574,55 @@ export default function UserProfilePage() {
                 </Grid>
               </Grid>
 
+              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1 }}>
+                Account Details
+              </Typography>
+              <Grid container spacing={3} sx={{ mt: 0, mb: 1 }}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Username"
+                    value={profileForm.username}
+                    onChange={handleProfileInputChange('username')}
+                    error={!!profileErrors.username}
+                    helperText={profileErrors.username}
+                    disabled={!editMode}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <PersonIcon />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Email Address"
+                    type="email"
+                    value={profileForm.email}
+                    onChange={handleProfileInputChange('email')}
+                    error={!!profileErrors.email}
+                    helperText={profileErrors.email}
+                    disabled={!editMode}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <EmailIcon />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
+              </Grid>
+
               {!editMode && (
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="body2" color="text.secondary">
+                <Box sx={{ mt: 2 }}>
+                  <FormHelperText>
                     Click "Edit Profile" to modify your information.
-                  </Typography>
+                  </FormHelperText>
                 </Box>
               )}
             </Box>
@@ -621,133 +638,173 @@ export default function UserProfilePage() {
                 Ensure your account is secure by regularly updating your password.
               </Typography>
 
-              <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Current Password"
-                    type={showPasswords.old ? 'text' : 'password'}
-                    value={passwordForm.old_password}
-                    onChange={handlePasswordInputChange('old_password')}
-                    error={!!passwordErrors.old_password}
-                    helperText={passwordErrors.old_password}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <LockIcon />
-                        </InputAdornment>
-                      ),
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
-                            aria-label="toggle current password visibility"
-                            onClick={() => togglePasswordVisibility('old')}
-                            edge="end"
-                          >
-                            {showPasswords.old ? <VisibilityOff /> : <Visibility />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                </Grid>
+              <Card
+                sx={{
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  backgroundColor: (theme) =>
+                    theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+                  backdropFilter: 'blur(20px)',
+                }}
+              >
+                <CardContent sx={{ p: 3 }}>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Current Password"
+                        type={showPasswords.old ? 'text' : 'password'}
+                        value={passwordForm.old_password}
+                        onChange={handlePasswordInputChange('old_password')}
+                        error={!!passwordErrors.old_password}
+                        helperText={passwordErrors.old_password}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <LockIcon />
+                            </InputAdornment>
+                          ),
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                aria-label="toggle current password visibility"
+                                onClick={() => togglePasswordVisibility('old')}
+                                edge="end"
+                              >
+                                {showPasswords.old ? <VisibilityOff /> : <Visibility />}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Grid>
 
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="New Password"
-                    type={showPasswords.new ? 'text' : 'password'}
-                    value={passwordForm.new_password}
-                    onChange={handlePasswordInputChange('new_password')}
-                    error={!!passwordErrors.new_password}
-                    helperText={passwordErrors.new_password}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <LockIcon />
-                        </InputAdornment>
-                      ),
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
-                            aria-label="toggle new password visibility"
-                            onClick={() => togglePasswordVisibility('new')}
-                            edge="end"
-                          >
-                            {showPasswords.new ? <VisibilityOff /> : <Visibility />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                  <PasswordStrengthIndicator />
-                </Grid>
+                    <Grid item xs={12}>
+                      <Divider sx={{ my: 0.5 }}>
+                        <Typography variant="caption" color="text.secondary">NEW PASSWORD</Typography>
+                      </Divider>
+                    </Grid>
 
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Confirm New Password"
-                    type={showPasswords.confirm ? 'text' : 'password'}
-                    value={passwordForm.new_password_confirm}
-                    onChange={handlePasswordInputChange('new_password_confirm')}
-                    error={!!passwordErrors.new_password_confirm}
-                    helperText={passwordErrors.new_password_confirm}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <LockIcon />
-                        </InputAdornment>
-                      ),
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
-                            aria-label="toggle confirm password visibility"
-                            onClick={() => togglePasswordVisibility('confirm')}
-                            edge="end"
-                          >
-                            {showPasswords.confirm ? <VisibilityOff /> : <Visibility />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                </Grid>
-              </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="New Password"
+                        type={showPasswords.new ? 'text' : 'password'}
+                        value={passwordForm.new_password}
+                        onChange={handlePasswordInputChange('new_password')}
+                        error={!!passwordErrors.new_password}
+                        helperText={passwordErrors.new_password}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <LockIcon />
+                            </InputAdornment>
+                          ),
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                aria-label="toggle new password visibility"
+                                onClick={() => togglePasswordVisibility('new')}
+                                edge="end"
+                              >
+                                {showPasswords.new ? <VisibilityOff /> : <Visibility />}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                      <PasswordStrengthIndicator />
+                    </Grid>
 
-              {/* Password Requirements */}
-              <Card variant="outlined" sx={{ mt: 3, mb: 3 }}>
-                <CardContent sx={{ py: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    New Password Requirements:
-                  </Typography>
-                  <Box display="flex" flexWrap="wrap" gap={2}>
-                    <Typography variant="caption" color={passwordForm.new_password.length >= 8 ? 'success.main' : 'text.secondary'}>
-                      ✓ 8+ characters
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Confirm New Password"
+                        type={showPasswords.confirm ? 'text' : 'password'}
+                        value={passwordForm.new_password_confirm}
+                        onChange={handlePasswordInputChange('new_password_confirm')}
+                        error={!!passwordErrors.new_password_confirm}
+                        helperText={passwordErrors.new_password_confirm}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <LockIcon />
+                            </InputAdornment>
+                          ),
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                aria-label="toggle confirm password visibility"
+                                onClick={() => togglePasswordVisibility('confirm')}
+                                edge="end"
+                              >
+                                {showPasswords.confirm ? <VisibilityOff /> : <Visibility />}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                      <FormHelperText>
+                        Your new password must be different from previously used passwords.
+                      </FormHelperText>
+                    </Grid>
+                  </Grid>
+
+                  {/* Password Requirements */}
+                  <Box
+                    sx={{
+                      mt: 3,
+                      p: 2,
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      backgroundColor: (theme) =>
+                        theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                    }}
+                  >
+                    <Typography variant="subtitle2" gutterBottom>
+                      New Password Requirements
                     </Typography>
-                    <Typography variant="caption" color={/[A-Z]/.test(passwordForm.new_password) ? 'success.main' : 'text.secondary'}>
-                      ✓ Uppercase letter
-                    </Typography>
-                    <Typography variant="caption" color={/[a-z]/.test(passwordForm.new_password) ? 'success.main' : 'text.secondary'}>
-                      ✓ Lowercase letter
-                    </Typography>
-                    <Typography variant="caption" color={/[0-9]/.test(passwordForm.new_password) ? 'success.main' : 'text.secondary'}>
-                      ✓ Number
-                    </Typography>
+                    <Box display="flex" flexWrap="wrap" gap={2}>
+                      {[
+                        { met: passwordForm.new_password.length >= 8, label: '8+ characters' },
+                        { met: /[A-Z]/.test(passwordForm.new_password), label: 'Uppercase letter' },
+                        { met: /[a-z]/.test(passwordForm.new_password), label: 'Lowercase letter' },
+                        { met: /[0-9]/.test(passwordForm.new_password), label: 'Number' },
+                      ].map((req) => (
+                        <Box key={req.label} display="flex" alignItems="center" gap={0.5}>
+                          <CheckCircleIcon
+                            sx={{ fontSize: 16, color: req.met ? 'success.main' : 'text.disabled' }}
+                          />
+                          <Typography variant="caption" color={req.met ? 'success.main' : 'text.secondary'}>
+                            {req.label}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+
+                  <Box display="flex" justifyContent="flex-end" sx={{ mt: 3 }}>
+                    <Button
+                      variant="contained"
+                      size="large"
+                      onClick={handlePasswordChange}
+                      disabled={isLoading}
+                      startIcon={<SaveIcon />}
+                      sx={{
+                        background: 'linear-gradient(135deg, #0A84FF, #BF5AF2)',
+                        boxShadow: '0 8px 20px rgba(10,132,255,0.35)',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #0A84FF, #BF5AF2)',
+                          boxShadow: '0 10px 24px rgba(10,132,255,0.45)',
+                        },
+                      }}
+                    >
+                      {isLoading ? 'Updating Password...' : 'Update Password'}
+                    </Button>
                   </Box>
                 </CardContent>
               </Card>
-
-              <Box display="flex" justifyContent="flex-end">
-                <Button
-                  variant="contained"
-                  size="large"
-                  onClick={handlePasswordChange}
-                  disabled={isLoading}
-                  startIcon={<SaveIcon />}
-                >
-                  {isLoading ? 'Changing Password...' : 'Change Password'}
-                </Button>
-              </Box>
             </Box>
           )}
 
@@ -768,21 +825,40 @@ export default function UserProfilePage() {
                 </Alert>
               </Snackbar>
 
-              {/* Clear All Data Section */}
-              <Card variant="outlined" sx={{ mb: 3 }}>
+              {/* Clear All Data Section - destructive action, error accent */}
+              <Card
+                sx={{
+                  mb: 3,
+                  border: '1px solid',
+                  borderColor: 'error.main',
+                  backgroundColor: (theme) =>
+                    theme.palette.mode === 'dark' ? 'rgba(255,69,58,0.06)' : 'rgba(255,59,48,0.04)',
+                  backdropFilter: 'blur(20px)',
+                }}
+              >
                 <CardContent>
                   <Box display="flex" alignItems="center" gap={2} mb={2}>
-                    <WarningIcon sx={{ color: 'warning.main' }} />
-                    <Typography variant="h6" color="warning.main">
+                    <Box
+                      sx={{
+                        width: 40, height: 40, borderRadius: '12px',
+                        background: 'linear-gradient(135deg, #FF453A, #FF9F0A)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 6px 16px rgba(255,69,58,0.35)',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <WarningIcon sx={{ fontSize: 22, color: '#fff' }} />
+                    </Box>
+                    <Typography variant="h6" color="error.main">
                       Clear All Data
                     </Typography>
                   </Box>
 
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                     This action will:
                   </Typography>
 
-                  <Box sx={{ pl: 2, mb: 3 }}>
+                  <Box sx={{ pl: 2, mb: 2 }}>
                     <Typography variant="body2" color="text.secondary">
                       • Clear all browser cookies and session data
                     </Typography>
@@ -797,15 +873,15 @@ export default function UserProfilePage() {
                     </Typography>
                   </Box>
 
-                  <Typography variant="body2" color="error" sx={{ mb: 3, fontWeight: 'bold' }}>
+                  <Typography variant="body2" color="error" sx={{ mb: 3, fontWeight: 600 }}>
                     This action cannot be undone.
                   </Typography>
 
                   <Button
                     variant="contained"
                     color="error"
-                    startIcon={isClearingData ? <CircularProgress size={16} /> : <DeleteIcon />}
-                    onClick={handleClearAllData}
+                    startIcon={isClearingData ? <CircularProgress size={16} color="inherit" /> : <DeleteIcon />}
+                    onClick={() => setConfirmClearOpen(true)}
                     disabled={isClearingData}
                     size="large"
                   >
@@ -814,12 +890,33 @@ export default function UserProfilePage() {
                 </CardContent>
               </Card>
 
-              {/* Privacy Information */}
-              <Card variant="outlined">
+              {/* Privacy Information - safe, informational */}
+              <Card
+                sx={{
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  backgroundColor: (theme) =>
+                    theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+                  backdropFilter: 'blur(20px)',
+                }}
+              >
                 <CardContent>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Data Retention
-                  </Typography>
+                  <Box display="flex" alignItems="center" gap={2} mb={1.5}>
+                    <Box
+                      sx={{
+                        width: 40, height: 40, borderRadius: '12px',
+                        background: 'linear-gradient(135deg, #30D158, #0A84FF)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 6px 16px rgba(48,209,88,0.3)',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <SecurityIcon sx={{ fontSize: 22, color: '#fff' }} />
+                    </Box>
+                    <Typography variant="subtitle1">
+                      Data Retention
+                    </Typography>
+                  </Box>
                   <Typography variant="body2" color="text.secondary">
                     Your personal data is stored securely and is only used to provide you with the best experience.
                     We respect your privacy and only collect information necessary for the application to function properly.
@@ -833,6 +930,44 @@ export default function UserProfilePage() {
         {/* Loading Progress */}
         {isLoading && <LinearProgress sx={{ mt: 2 }} />}
       </Paper>
+
+      {/* Confirm Clear All Data Dialog */}
+      <Dialog
+        open={confirmClearOpen}
+        onClose={() => !isClearingData && setConfirmClearOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <WarningIcon sx={{ color: 'error.main' }} />
+            Clear all data?
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            This will clear your session, cookies, and local storage, then log you out.
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmClearOpen(false)} disabled={isClearingData}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => {
+              setConfirmClearOpen(false);
+              handleClearAllData();
+            }}
+            disabled={isClearingData}
+            startIcon={isClearingData ? <CircularProgress size={16} color="inherit" /> : <DeleteIcon />}
+          >
+            {isClearingData ? 'Clearing...' : 'Yes, Clear Data'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
     </>
   );

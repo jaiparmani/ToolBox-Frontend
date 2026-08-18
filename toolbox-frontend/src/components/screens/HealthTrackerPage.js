@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   Box, Container, Typography, Paper, Grid, Card, CardContent,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Alert, Tabs, Tab, IconButton, Tooltip,
+  TextField, Alert, Tabs, Tab, IconButton, Tooltip, InputAdornment,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   LinearProgress, Fab
 } from '@mui/material';
@@ -29,6 +29,15 @@ const METRIC_CONFIG = {
   steps: { label: 'Steps', unit: 'steps', icon: StepsIcon, color: '#30D158' }
 };
 const METRIC_TYPES = Object.keys(METRIC_CONFIG);
+
+// Lightens a hex color by mixing in white - used for the Add Entry dialog's icon badge gradient.
+const lightenHex = (hex, amount) => {
+  const num = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, (num >> 16) + amount);
+  const g = Math.min(255, ((num >> 8) & 0xff) + amount);
+  const b = Math.min(255, (num & 0xff) + amount);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+};
 
 export default function HealthTrackerPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -299,26 +308,48 @@ export default function HealthTrackerPage() {
         </Fab>
 
         <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle>Add {config.label} Entry</DialogTitle>
+          <DialogTitle>
+            <Box display="flex" alignItems="center" gap={1.5}>
+              <Box
+                sx={{
+                  width: 36, height: 36, borderRadius: '10px',
+                  background: `linear-gradient(135deg, ${config.color}, ${lightenHex(config.color, 60)})`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: `0 6px 16px ${config.color}66`,
+                  flexShrink: 0,
+                }}
+              >
+                <config.icon sx={{ fontSize: 20, color: '#fff' }} />
+              </Box>
+              <Typography variant="h6" component="span">
+                Add {config.label} Entry
+              </Typography>
+            </Box>
+          </DialogTitle>
           <DialogContent>
             {formError && <Alert severity="error" sx={{ mb: 2, mt: 1 }}>{formError}</Alert>}
             <Box display="flex" flexDirection="column" gap={2} sx={{ mt: 1 }}>
-              <TextField
-                label={`Value (${config.unit})`}
-                type="number"
-                value={formData.value}
-                onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                autoFocus
-                fullWidth
-              />
-              <TextField
-                label="Date"
-                type="date"
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-                fullWidth
-              />
+              <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} gap={2}>
+                <TextField
+                  label="Value"
+                  type="number"
+                  value={formData.value}
+                  onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                  autoFocus
+                  fullWidth
+                  InputProps={{
+                    endAdornment: <InputAdornment position="end">{config.unit}</InputAdornment>,
+                  }}
+                />
+                <TextField
+                  label="Date"
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                />
+              </Box>
               <TextField
                 label="Notes (optional)"
                 value={formData.notes}
@@ -331,7 +362,19 @@ export default function HealthTrackerPage() {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setDialogOpen(false)} disabled={submitting}>Cancel</Button>
-            <Button onClick={handleAddEntry} variant="contained" disabled={submitting}>
+            <Button
+              onClick={handleAddEntry}
+              variant="contained"
+              disabled={submitting}
+              sx={{
+                backgroundColor: config.color,
+                boxShadow: `0 6px 16px ${config.color}4d`,
+                '&:hover': {
+                  backgroundColor: config.color,
+                  filter: 'brightness(0.9)',
+                },
+              }}
+            >
               {submitting ? 'Adding...' : 'Add Entry'}
             </Button>
           </DialogActions>

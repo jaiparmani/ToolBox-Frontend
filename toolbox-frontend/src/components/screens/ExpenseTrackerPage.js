@@ -678,81 +678,164 @@ export default function ExpenseTrackerPage() {
      )}
 
      {/* Main Content Tabs */}
-     <Paper elevation={2}>
-       <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-         <Tab icon={<DashboardIcon />} label="Expenses" />
-         <Tab icon={<CategoryIcon />} label="Categories" />
-         <Tab icon={<TagIcon />} label="Tags" />
+     <Paper
+       elevation={0}
+       sx={{
+         border: '1px solid',
+         borderColor: 'divider',
+         borderRadius: 3,
+         overflow: 'hidden',
+         backgroundColor: (theme) =>
+           theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+         backdropFilter: 'blur(20px)',
+       }}
+     >
+       <Tabs
+         value={activeTab}
+         onChange={(e, newValue) => setActiveTab(newValue)}
+         sx={{
+           borderBottom: 1,
+           borderColor: 'divider',
+           px: 2,
+           '& .MuiTab-root': { minHeight: 64, py: 1 },
+         }}
+       >
+         {[
+           { label: 'Expenses', icon: DashboardIcon, color: '#0A84FF' },
+           { label: 'Categories', icon: CategoryIcon, color: '#BF5AF2' },
+           { label: 'Tags', icon: TagIcon, color: '#FF9F0A' },
+         ].map((tabInfo) => (
+           <Tab
+             key={tabInfo.label}
+             iconPosition="start"
+             icon={
+               <Box
+                 sx={{
+                   width: 32, height: 32, borderRadius: '10px',
+                   backgroundColor: `${tabInfo.color}1f`,
+                   display: 'flex', alignItems: 'center', justifyContent: 'center',
+                 }}
+               >
+                 <tabInfo.icon sx={{ color: tabInfo.color, fontSize: 18 }} />
+               </Box>
+             }
+             label={tabInfo.label}
+           />
+         ))}
        </Tabs>
 
        {/* Expenses Tab */}
        {activeTab === 0 && (
          <Box sx={{ p: 3 }}>
            {/* Filters */}
-           <Grid container spacing={2} sx={{ mb: 3 }}>
-             <Grid item xs={12} md={4}>
-               <TextField
-                 id="search-input"
-                 fullWidth
-                 label="Search expenses"
-                 value={filters.search}
-                 onChange={(e) => handleFilterChange('search', e.target.value)}
-                 InputProps={{
-                   startAdornment: (
-                     <InputAdornment position="start">
-                       <SearchIcon />
-                     </InputAdornment>
-                   ),
+           <Paper
+             elevation={0}
+             sx={{
+               p: 2.5,
+               mb: 3,
+               borderRadius: 3,
+               border: '1px solid',
+               borderColor: 'divider',
+               backgroundColor: (theme) =>
+                 theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
+             }}
+           >
+             <Box display="flex" alignItems="center" gap={1} sx={{ mb: 2 }}>
+               <Box
+                 sx={{
+                   width: 26, height: 26, borderRadius: '8px',
+                   backgroundColor: 'rgba(10,132,255,0.12)',
+                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                  }}
-                 placeholder="Search by description, location..."
-               />
-             </Grid>
-             <Grid item xs={12} md={2}>
-               <AutocompleteComponent
-                 options={categories.map(cat => ({ label: cat.name, id: cat.id }))}
-                 label="Category"
-                 value={filters.category}
-                 onChange={(value) => handleFilterChange('category', value)}
-               />
-             </Grid>
-             <Grid item xs={12} md={2}>
-               <TextField
-                 fullWidth
-                 type="date"
-                 label="From Date"
-                 value={filters.dateFrom}
-                 onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-                 InputLabelProps={{ shrink: true }}
-               />
-             </Grid>
-             <Grid item xs={12} md={2}>
-               <TextField
-                 fullWidth
-                 type="date"
-                 label="To Date"
-                 value={filters.dateTo}
-                 onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-                 InputLabelProps={{ shrink: true }}
-               />
-             </Grid>
-             <Grid item xs={12} md={2}>
-               <Box display="flex" gap={1}>
-                 <Tooltip title="Clear filters">
-                   <IconButton onClick={clearFilters}>
-                     <CloseIcon />
-                   </IconButton>
-                 </Tooltip>
-                 <Tooltip title="More filters">
-                   <IconButton onClick={(e) => handleMenuOpen(e, 'filter', null)}>
-                     <FilterIcon />
-                   </IconButton>
-                 </Tooltip>
+               >
+                 <FilterIcon sx={{ color: '#0A84FF', fontSize: 15 }} />
                </Box>
+               <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                 Filters
+               </Typography>
+             </Box>
+             <Grid container spacing={2} alignItems="center">
+               <Grid item xs={12} md={4}>
+                 <TextField
+                   id="search-input"
+                   fullWidth
+                   size="small"
+                   label="Search expenses"
+                   value={filters.search}
+                   onChange={(e) => handleFilterChange('search', e.target.value)}
+                   InputProps={{
+                     startAdornment: (
+                       <InputAdornment position="start">
+                         <SearchIcon fontSize="small" />
+                       </InputAdornment>
+                     ),
+                   }}
+                   placeholder="Search by description, location..."
+                 />
+               </Grid>
+               <Grid item xs={12} md={2}>
+                 <AutocompleteComponent
+                   options={categories.map(cat => ({ label: cat.name, id: cat.id }))}
+                   label="Category"
+                   value={filters.category}
+                   onChange={(value) => handleFilterChange('category', value)}
+                 />
+               </Grid>
+               <Grid item xs={12} md={2}>
+                 <TextField
+                   fullWidth
+                   size="small"
+                   type="date"
+                   label="From Date"
+                   value={filters.dateFrom}
+                   onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                   InputLabelProps={{ shrink: true }}
+                 />
+               </Grid>
+               <Grid item xs={12} md={2}>
+                 <TextField
+                   fullWidth
+                   size="small"
+                   type="date"
+                   label="To Date"
+                   value={filters.dateTo}
+                   onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                   InputLabelProps={{ shrink: true }}
+                 />
+               </Grid>
+               <Grid item xs={12} md={2}>
+                 <Box display="flex" gap={1} justifyContent={{ xs: 'flex-start', md: 'flex-end' }}>
+                   <Tooltip title="Clear filters">
+                     <IconButton
+                       onClick={clearFilters}
+                       size="small"
+                       sx={{ '&:hover': { backgroundColor: 'rgba(255,69,58,0.1)', color: '#FF453A' } }}
+                     >
+                       <CloseIcon fontSize="small" />
+                     </IconButton>
+                   </Tooltip>
+                   <Tooltip title="More filters">
+                     <IconButton
+                       onClick={(e) => handleMenuOpen(e, 'filter', null)}
+                       size="small"
+                       sx={{ '&:hover': { backgroundColor: 'rgba(10,132,255,0.1)', color: '#0A84FF' } }}
+                     >
+                       <FilterIcon fontSize="small" />
+                     </IconButton>
+                   </Tooltip>
+                 </Box>
+               </Grid>
              </Grid>
-           </Grid>
+           </Paper>
 
            {/* Expenses Table */}
-           <TableContainer>
+           <TableContainer
+             sx={{
+               borderRadius: 3,
+               border: '1px solid',
+               borderColor: 'divider',
+             }}
+           >
              <Table>
                <TableHead>
                  <TableRow>
@@ -761,16 +844,20 @@ export default function ExpenseTrackerPage() {
                    <TableCell>Category</TableCell>
                    <TableCell>Amount</TableCell>
                    <TableCell>Tags</TableCell>
-                   <TableCell>Actions</TableCell>
+                   <TableCell align="right">Actions</TableCell>
                  </TableRow>
                </TableHead>
                <TableBody>
                  {expenses.map((expense) => (
                    <TableRow key={expense.id} hover>
-                     <TableCell>{formatDate(expense.date)}</TableCell>
+                     <TableCell>
+                       <Typography variant="body2" color="text.secondary">
+                         {formatDate(expense.date)}
+                       </Typography>
+                     </TableCell>
                      <TableCell>
                        <Box>
-                         <Typography variant="body2">{expense.description}</Typography>
+                         <Typography variant="body2" fontWeight={500}>{expense.description}</Typography>
                          {expense.location && (
                            <Typography variant="caption" color="text.secondary">
                              📍 {expense.location}
@@ -784,8 +871,10 @@ export default function ExpenseTrackerPage() {
                            label={expense.category.name}
                            sx={{
                              backgroundColor: expense.category.color,
-                             color: 'white',
-                             fontSize: '0.75rem'
+                             color: '#fff',
+                             fontSize: '0.75rem',
+                             fontWeight: 600,
+                             boxShadow: `0 2px 8px ${expense.category.color}55`,
                            }}
                            size="small"
                          />
@@ -795,7 +884,7 @@ export default function ExpenseTrackerPage() {
                        <Typography
                          variant="body2"
                          color={expense.type === 'income' ? 'success.main' : 'error.main'}
-                         fontWeight="medium"
+                         fontWeight={600}
                        >
                          {expense.type === 'income' ? '+' : '-'}{formatCurrency(expense.amount)}
                        </Typography>
@@ -809,8 +898,10 @@ export default function ExpenseTrackerPage() {
                              size="small"
                              sx={{
                                backgroundColor: tag.color,
-                               color: 'white',
-                               fontSize: '0.7rem'
+                               color: '#fff',
+                               fontSize: '0.7rem',
+                               fontWeight: 500,
+                               boxShadow: `0 2px 6px ${tag.color}44`,
                              }}
                            />
                          ))}
@@ -823,13 +914,35 @@ export default function ExpenseTrackerPage() {
                          )}
                        </Box>
                      </TableCell>
-                     <TableCell>
-                       <IconButton
-                         size="small"
-                         onClick={(e) => handleMenuOpen(e, 'expense', expense)}
-                       >
-                         <MoreVertIcon />
-                       </IconButton>
+                     <TableCell align="right">
+                       <Box display="flex" gap={0.5} justifyContent="flex-end">
+                         <Tooltip title="Edit expense">
+                           <IconButton
+                             size="small"
+                             onClick={() => openExpenseForm(expense)}
+                             sx={{
+                               color: '#0A84FF',
+                               transition: 'background-color 0.15s ease, transform 0.15s ease',
+                               '&:hover': { backgroundColor: 'rgba(10,132,255,0.12)', transform: 'translateY(-1px)' },
+                             }}
+                           >
+                             <EditIcon fontSize="small" />
+                           </IconButton>
+                         </Tooltip>
+                         <Tooltip title="Delete expense">
+                           <IconButton
+                             size="small"
+                             onClick={() => deleteExpenseHandler(expense.id)}
+                             sx={{
+                               color: '#FF453A',
+                               transition: 'background-color 0.15s ease, transform 0.15s ease',
+                               '&:hover': { backgroundColor: 'rgba(255,69,58,0.12)', transform: 'translateY(-1px)' },
+                             }}
+                           >
+                             <DeleteIcon fontSize="small" />
+                           </IconButton>
+                         </Tooltip>
+                       </Box>
                      </TableCell>
                    </TableRow>
                  ))}
@@ -854,7 +967,7 @@ export default function ExpenseTrackerPage() {
        {activeTab === 1 && (
          <Box sx={{ p: 3 }}>
            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-             <Typography variant="h6">Categories</Typography>
+             <Typography variant="h6" sx={{ fontWeight: 600 }}>Categories</Typography>
              <Button
                variant="contained"
                startIcon={<AddIcon />}
@@ -866,20 +979,35 @@ export default function ExpenseTrackerPage() {
            <Grid container spacing={2}>
              {categories.map((category) => (
                <Grid item xs={12} sm={6} md={4} key={category.id}>
-                 <Card>
+                 <Card
+                   elevation={0}
+                   sx={{
+                     border: '1px solid',
+                     borderColor: 'divider',
+                     borderRadius: 3,
+                     backgroundColor: (theme) =>
+                       theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+                     backdropFilter: 'blur(20px)',
+                     transition: 'transform 0.2s ease, border-color 0.2s ease',
+                     '&:hover': { transform: 'translateY(-3px)', borderColor: category.color },
+                   }}
+                 >
                    <CardContent>
                      <Box display="flex" justifyContent="space-between" alignItems="center">
                        <Box display="flex" alignItems="center" gap={2}>
                          <Box
                            sx={{
-                             width: 20,
-                             height: 20,
-                             borderRadius: '50%',
-                             backgroundColor: category.color
+                             width: 40, height: 40, borderRadius: '12px',
+                             background: `linear-gradient(135deg, ${category.color}, ${category.color}cc)`,
+                             display: 'flex', alignItems: 'center', justifyContent: 'center',
+                             boxShadow: `0 4px 12px ${category.color}55`,
+                             flexShrink: 0,
                            }}
-                         />
+                         >
+                           <CategoryIcon sx={{ color: '#fff', fontSize: 20 }} />
+                         </Box>
                          <Box>
-                           <Typography variant="h6">{category.name}</Typography>
+                           <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{category.name}</Typography>
                            <Typography variant="body2" color="text.secondary">
                              {category.description}
                            </Typography>
@@ -888,8 +1016,9 @@ export default function ExpenseTrackerPage() {
                        <IconButton
                          size="small"
                          onClick={(e) => handleMenuOpen(e, 'category', category)}
+                         sx={{ '&:hover': { backgroundColor: 'rgba(10,132,255,0.1)' } }}
                        >
-                         <MoreVertIcon />
+                         <MoreVertIcon fontSize="small" />
                        </IconButton>
                      </Box>
                    </CardContent>
@@ -904,7 +1033,7 @@ export default function ExpenseTrackerPage() {
        {activeTab === 2 && (
          <Box sx={{ p: 3 }}>
            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-             <Typography variant="h6">Tags</Typography>
+             <Typography variant="h6" sx={{ fontWeight: 600 }}>Tags</Typography>
              <Button
                variant="contained"
                startIcon={<AddIcon />}
@@ -916,25 +1045,41 @@ export default function ExpenseTrackerPage() {
            <Grid container spacing={2}>
              {tags.map((tag) => (
                <Grid item xs={12} sm={6} md={4} key={tag.id}>
-                 <Card>
+                 <Card
+                   elevation={0}
+                   sx={{
+                     border: '1px solid',
+                     borderColor: 'divider',
+                     borderRadius: 3,
+                     backgroundColor: (theme) =>
+                       theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+                     backdropFilter: 'blur(20px)',
+                     transition: 'transform 0.2s ease, border-color 0.2s ease',
+                     '&:hover': { transform: 'translateY(-3px)', borderColor: tag.color },
+                   }}
+                 >
                    <CardContent>
                      <Box display="flex" justifyContent="space-between" alignItems="center">
                        <Box display="flex" alignItems="center" gap={2}>
                          <Box
                            sx={{
-                             width: 20,
-                             height: 20,
-                             borderRadius: '50%',
-                             backgroundColor: tag.color
+                             width: 40, height: 40, borderRadius: '12px',
+                             background: `linear-gradient(135deg, ${tag.color}, ${tag.color}cc)`,
+                             display: 'flex', alignItems: 'center', justifyContent: 'center',
+                             boxShadow: `0 4px 12px ${tag.color}55`,
+                             flexShrink: 0,
                            }}
-                         />
-                         <Typography variant="h6">{tag.name}</Typography>
+                         >
+                           <TagIcon sx={{ color: '#fff', fontSize: 20 }} />
+                         </Box>
+                         <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{tag.name}</Typography>
                        </Box>
                        <IconButton
                          size="small"
                          onClick={(e) => handleMenuOpen(e, 'tag', tag)}
+                         sx={{ '&:hover': { backgroundColor: 'rgba(10,132,255,0.1)' } }}
                        >
-                         <MoreVertIcon />
+                         <MoreVertIcon fontSize="small" />
                        </IconButton>
                      </Box>
                    </CardContent>
@@ -951,27 +1096,16 @@ export default function ExpenseTrackerPage() {
        anchorEl={anchorEl}
        open={!!anchorEl}
        onClose={handleMenuClose}
+       PaperProps={{ sx: { minWidth: 160 } }}
      >
-       {menuType?.type === 'expense' && (
-         <>
-           <MenuItem onClick={() => { handleMenuClose(); openExpenseForm(menuType.item); }}>
-             <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
-             <ListItemText>Edit</ListItemText>
-           </MenuItem>
-           <MenuItem onClick={() => { handleMenuClose(); deleteExpenseHandler(menuType.item.id); }}>
-             <ListItemIcon><DeleteIcon fontSize="small" /></ListItemIcon>
-             <ListItemText>Delete</ListItemText>
-           </MenuItem>
-         </>
-       )}
        {menuType?.type === 'category' && (
          <>
            <MenuItem onClick={() => { handleMenuClose(); openCategoryForm(menuType.item); }}>
-             <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
+             <ListItemIcon><EditIcon fontSize="small" sx={{ color: '#0A84FF' }} /></ListItemIcon>
              <ListItemText>Edit</ListItemText>
            </MenuItem>
-           <MenuItem onClick={() => { handleMenuClose(); deleteCategoryHandler(menuType.item.id); }}>
-             <ListItemIcon><DeleteIcon fontSize="small" /></ListItemIcon>
+           <MenuItem onClick={() => { handleMenuClose(); deleteCategoryHandler(menuType.item.id); }} sx={{ color: '#FF453A' }}>
+             <ListItemIcon><DeleteIcon fontSize="small" sx={{ color: '#FF453A' }} /></ListItemIcon>
              <ListItemText>Delete</ListItemText>
            </MenuItem>
          </>
@@ -979,11 +1113,11 @@ export default function ExpenseTrackerPage() {
        {menuType?.type === 'tag' && (
          <>
            <MenuItem onClick={() => { handleMenuClose(); openTagForm(menuType.item); }}>
-             <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
+             <ListItemIcon><EditIcon fontSize="small" sx={{ color: '#0A84FF' }} /></ListItemIcon>
              <ListItemText>Edit</ListItemText>
            </MenuItem>
-           <MenuItem onClick={() => { handleMenuClose(); deleteTagHandler(menuType.item.id); }}>
-             <ListItemIcon><DeleteIcon fontSize="small" /></ListItemIcon>
+           <MenuItem onClick={() => { handleMenuClose(); deleteTagHandler(menuType.item.id); }} sx={{ color: '#FF453A' }}>
+             <ListItemIcon><DeleteIcon fontSize="small" sx={{ color: '#FF453A' }} /></ListItemIcon>
              <ListItemText>Delete</ListItemText>
            </MenuItem>
          </>
@@ -991,9 +1125,11 @@ export default function ExpenseTrackerPage() {
        {menuType?.type === 'filter' && (
          <>
            <MenuItem onClick={() => { handleMenuClose(); handleFilterChange('amountMin', ''); handleFilterChange('amountMax', ''); }}>
+             <ListItemIcon><FilterIcon fontSize="small" sx={{ color: '#0A84FF' }} /></ListItemIcon>
              <ListItemText>Amount Range</ListItemText>
            </MenuItem>
            <MenuItem onClick={() => { handleMenuClose(); handleFilterChange('tags', []); }}>
+             <ListItemIcon><TagIcon fontSize="small" sx={{ color: '#FF9F0A' }} /></ListItemIcon>
              <ListItemText>Tag Filter</ListItemText>
            </MenuItem>
          </>
@@ -1002,8 +1138,29 @@ export default function ExpenseTrackerPage() {
 
      {/* Expense Form Dialog */}
      <Dialog open={expenseForm.open} onClose={closeExpenseForm} maxWidth="md" fullWidth>
-       <DialogTitle>
-         {expenseForm.editing ? 'Edit Expense' : 'Add New Expense'}
+       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+         <Box
+           sx={{
+             width: 40, height: 40, borderRadius: '12px',
+             background: 'linear-gradient(135deg, #0A84FF, #64D2FF)',
+             display: 'flex', alignItems: 'center', justifyContent: 'center',
+             boxShadow: '0 6px 16px rgba(10,132,255,0.4)',
+             flexShrink: 0,
+           }}
+         >
+           <AddIcon sx={{ color: '#fff', fontSize: 20 }} />
+         </Box>
+         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+           <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+             {expenseForm.editing ? 'Edit Expense' : 'Add New Expense'}
+           </Typography>
+           <Typography variant="body2" color="text.secondary">
+             {expenseForm.editing ? 'Update the details below' : 'Track a new expense or income entry'}
+           </Typography>
+         </Box>
+         <IconButton onClick={closeExpenseForm} size="small">
+           <CloseIcon fontSize="small" />
+         </IconButton>
        </DialogTitle>
        <DialogContent>
          <Grid container spacing={3} sx={{ mt: 1 }}>
@@ -1023,18 +1180,11 @@ export default function ExpenseTrackerPage() {
              />
            </Grid>
            <Grid item xs={12} md={6}>
-             <AutocompleteComponent
-               options={[
-                 { label: 'Expense', id: 'expense' },
-                 { label: 'Income', id: 'income' },
-                 { label: 'Debt', id: 'debt' },
-                 { label: 'Credit', id: 'credit' }
-               ]}
-               label="Transaction Type"
-               value={expenseForm.data.transactionType}
-               onChange={(value) => setExpenseForm(prev => ({
+             <DatePickerComponent
+               value={expenseForm.data.date}
+               onChange={(date) => setExpenseForm(prev => ({
                  ...prev,
-                 data: { ...prev.data, transactionType: value }
+                 data: { ...prev.data, date }
                }))}
              />
            </Grid>
@@ -1050,11 +1200,18 @@ export default function ExpenseTrackerPage() {
              />
            </Grid>
            <Grid item xs={12} md={6}>
-             <DatePickerComponent
-               value={expenseForm.data.date}
-               onChange={(date) => setExpenseForm(prev => ({
+             <AutocompleteComponent
+               options={[
+                 { label: 'Expense', id: 'expense' },
+                 { label: 'Income', id: 'income' },
+                 { label: 'Debt', id: 'debt' },
+                 { label: 'Credit', id: 'credit' }
+               ]}
+               label="Transaction Type"
+               value={expenseForm.data.transactionType}
+               onChange={(value) => setExpenseForm(prev => ({
                  ...prev,
-                 data: { ...prev.data, date }
+                 data: { ...prev.data, transactionType: value }
                }))}
              />
            </Grid>
@@ -1094,18 +1251,27 @@ export default function ExpenseTrackerPage() {
              />
            </Grid>
            <Grid item xs={12}>
-             <FormControlLabel
-               control={
-                 <Switch
-                   checked={expenseForm.data.isRecurring}
-                   onChange={(e) => setExpenseForm(prev => ({
-                     ...prev,
-                     data: { ...prev.data, isRecurring: e.target.checked }
-                   }))}
-                 />
-               }
-               label="Recurring expense"
-             />
+             <Box
+               sx={{
+                 borderRadius: 2,
+                 border: '1px solid',
+                 borderColor: 'divider',
+                 px: 2, py: 0.5,
+               }}
+             >
+               <FormControlLabel
+                 control={
+                   <Switch
+                     checked={expenseForm.data.isRecurring}
+                     onChange={(e) => setExpenseForm(prev => ({
+                       ...prev,
+                       data: { ...prev.data, isRecurring: e.target.checked }
+                     }))}
+                   />
+                 }
+                 label="Recurring expense"
+               />
+             </Box>
            </Grid>
            <Grid item xs={12}>
              <AutocompleteComponent
@@ -1122,7 +1288,7 @@ export default function ExpenseTrackerPage() {
          </Grid>
        </DialogContent>
        <DialogActions>
-         <Button onClick={closeExpenseForm}>Cancel</Button>
+         <Button onClick={closeExpenseForm} color="inherit">Cancel</Button>
          <Button onClick={saveExpense} variant="contained">
            {expenseForm.editing ? 'Update' : 'Add'} Expense
          </Button>
@@ -1131,8 +1297,30 @@ export default function ExpenseTrackerPage() {
 
      {/* Category Form Dialog */}
      <Dialog open={categoryForm.open} onClose={closeCategoryForm} maxWidth="sm" fullWidth>
-       <DialogTitle>
-         {categoryForm.editing ? 'Edit Category' : 'Add New Category'}
+       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+         <Box
+           sx={{
+             width: 40, height: 40, borderRadius: '12px',
+             background: `linear-gradient(135deg, ${categoryForm.data.color}, ${categoryForm.data.color}cc)`,
+             display: 'flex', alignItems: 'center', justifyContent: 'center',
+             boxShadow: `0 6px 16px ${categoryForm.data.color}66`,
+             flexShrink: 0,
+             transition: 'background 0.2s ease, box-shadow 0.2s ease',
+           }}
+         >
+           <CategoryIcon sx={{ color: '#fff', fontSize: 20 }} />
+         </Box>
+         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+           <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+             {categoryForm.editing ? 'Edit Category' : 'Add New Category'}
+           </Typography>
+           <Typography variant="body2" color="text.secondary">
+             Group expenses under a color-coded category
+           </Typography>
+         </Box>
+         <IconButton onClick={closeCategoryForm} size="small">
+           <CloseIcon fontSize="small" />
+         </IconButton>
        </DialogTitle>
        <DialogContent>
          <Grid container spacing={3} sx={{ mt: 1 }}>
@@ -1187,10 +1375,23 @@ export default function ExpenseTrackerPage() {
                }))}
              />
            </Grid>
+           {categoryForm.data.name && (
+             <Grid item xs={12}>
+               <Chip
+                 label={categoryForm.data.name}
+                 sx={{
+                   backgroundColor: categoryForm.data.color,
+                   color: '#fff',
+                   fontWeight: 600,
+                   boxShadow: `0 2px 8px ${categoryForm.data.color}55`,
+                 }}
+               />
+             </Grid>
+           )}
          </Grid>
        </DialogContent>
        <DialogActions>
-         <Button onClick={closeCategoryForm}>Cancel</Button>
+         <Button onClick={closeCategoryForm} color="inherit">Cancel</Button>
          <Button onClick={saveCategory} variant="contained">
            {categoryForm.editing ? 'Update' : 'Add'} Category
          </Button>
@@ -1199,8 +1400,30 @@ export default function ExpenseTrackerPage() {
 
      {/* Tag Form Dialog */}
      <Dialog open={tagForm.open} onClose={closeTagForm} maxWidth="sm" fullWidth>
-       <DialogTitle>
-         {tagForm.editing ? 'Edit Tag' : 'Add New Tag'}
+       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+         <Box
+           sx={{
+             width: 40, height: 40, borderRadius: '12px',
+             background: `linear-gradient(135deg, ${tagForm.data.color}, ${tagForm.data.color}cc)`,
+             display: 'flex', alignItems: 'center', justifyContent: 'center',
+             boxShadow: `0 6px 16px ${tagForm.data.color}66`,
+             flexShrink: 0,
+             transition: 'background 0.2s ease, box-shadow 0.2s ease',
+           }}
+         >
+           <TagIcon sx={{ color: '#fff', fontSize: 20 }} />
+         </Box>
+         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+           <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+             {tagForm.editing ? 'Edit Tag' : 'Add New Tag'}
+           </Typography>
+           <Typography variant="body2" color="text.secondary">
+             Tags help you slice expenses across categories
+           </Typography>
+         </Box>
+         <IconButton onClick={closeTagForm} size="small">
+           <CloseIcon fontSize="small" />
+         </IconButton>
        </DialogTitle>
        <DialogContent>
          <Grid container spacing={3} sx={{ mt: 1 }}>
@@ -1215,7 +1438,7 @@ export default function ExpenseTrackerPage() {
                }))}
              />
            </Grid>
-           <Grid item xs={12}>
+           <Grid item xs={12} md={6}>
              <TextField
                fullWidth
                type="color"
@@ -1227,10 +1450,25 @@ export default function ExpenseTrackerPage() {
                }))}
              />
            </Grid>
+           {tagForm.data.name && (
+             <Grid item xs={12} md={6}>
+               <Box display="flex" alignItems="center" height="100%">
+                 <Chip
+                   label={tagForm.data.name}
+                   sx={{
+                     backgroundColor: tagForm.data.color,
+                     color: '#fff',
+                     fontWeight: 500,
+                     boxShadow: `0 2px 8px ${tagForm.data.color}55`,
+                   }}
+                 />
+               </Box>
+             </Grid>
+           )}
          </Grid>
        </DialogContent>
        <DialogActions>
-         <Button onClick={closeTagForm}>Cancel</Button>
+         <Button onClick={closeTagForm} color="inherit">Cancel</Button>
          <Button onClick={saveTag} variant="contained">
            {tagForm.editing ? 'Update' : 'Add'} Tag
          </Button>
@@ -1241,7 +1479,11 @@ export default function ExpenseTrackerPage() {
      <Fab
        color="primary"
        aria-label="add"
-       sx={{ position: 'fixed', bottom: 16, right: 16 }}
+       sx={{
+         position: 'fixed', bottom: 16, right: 16,
+         background: 'linear-gradient(135deg, #0A84FF, #2997FF)',
+         '&:hover': { background: 'linear-gradient(135deg, #0071e3, #0A84FF)' },
+       }}
        onClick={() => openExpenseForm()}
      >
        <AddIcon />

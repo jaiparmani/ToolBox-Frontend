@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import {
   Container, Paper, Typography, Box, Grid, TextField,
-  Button, Alert, Snackbar, IconButton, InputAdornment,
-  LinearProgress, Card, CardContent, Divider, Link,
-  FormHelperText
+  Button, Alert, IconButton, InputAdornment,
+  LinearProgress, Card, CardContent, Divider, Link
 } from '@mui/material';
 import {
   Visibility,
@@ -45,6 +44,17 @@ export default function UserRegistrationPage() {
     feedback: [],
     color: 'error.main'
   });
+
+  // Render a field error with a matching icon
+  const renderFieldError = (message) => {
+    if (!message) return '';
+    return (
+      <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+        <ErrorIcon sx={{ fontSize: 14 }} />
+        {message}
+      </Box>
+    );
+  };
 
   // Handle input changes
   const handleInputChange = (field) => (event) => {
@@ -282,48 +292,10 @@ export default function UserRegistrationPage() {
 
         {/* Registration Form */}
         <Box component="form" onSubmit={handleSubmit}>
-          <Grid container spacing={3}>
-            {/* Username Field */}
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Username"
-                value={formData.username}
-                onChange={handleInputChange('username')}
-                error={!!formErrors.username}
-                helperText={formErrors.username}
-                required
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Person />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-
-            {/* Email Field */}
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Email Address"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange('email')}
-                error={!!formErrors.email}
-                helperText={formErrors.email}
-                required
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Email />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-
+          <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1 }}>
+            Your Name
+          </Typography>
+          <Grid container spacing={3} sx={{ mt: 0, mb: 1 }}>
             {/* First Name Field */}
             <Grid item xs={12} md={6}>
               <TextField
@@ -332,7 +304,7 @@ export default function UserRegistrationPage() {
                 value={formData.first_name}
                 onChange={handleInputChange('first_name')}
                 error={!!formErrors.first_name}
-                helperText={formErrors.first_name}
+                helperText={renderFieldError(formErrors.first_name)}
                 required
                 InputProps={{
                   startAdornment: (
@@ -352,12 +324,58 @@ export default function UserRegistrationPage() {
                 value={formData.last_name}
                 onChange={handleInputChange('last_name')}
                 error={!!formErrors.last_name}
-                helperText={formErrors.last_name}
+                helperText={renderFieldError(formErrors.last_name)}
                 required
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
                       <Person />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+          </Grid>
+
+          <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1 }}>
+            Account Details
+          </Typography>
+          <Grid container spacing={3} sx={{ mt: 0, mb: 1 }}>
+            {/* Username Field */}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Username"
+                value={formData.username}
+                onChange={handleInputChange('username')}
+                error={!!formErrors.username}
+                helperText={renderFieldError(formErrors.username)}
+                required
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Person />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+
+            {/* Email Field */}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Email Address"
+                type="email"
+                value={formData.email}
+                onChange={handleInputChange('email')}
+                error={!!formErrors.email}
+                helperText={renderFieldError(formErrors.email)}
+                required
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Email />
                     </InputAdornment>
                   ),
                 }}
@@ -373,7 +391,7 @@ export default function UserRegistrationPage() {
                 value={formData.password}
                 onChange={handleInputChange('password')}
                 error={!!formErrors.password}
-                helperText={formErrors.password}
+                helperText={renderFieldError(formErrors.password)}
                 required
                 InputProps={{
                   startAdornment: (
@@ -406,7 +424,7 @@ export default function UserRegistrationPage() {
                 value={formData.password_confirm}
                 onChange={handleInputChange('password_confirm')}
                 error={!!formErrors.password_confirm}
-                helperText={formErrors.password_confirm}
+                helperText={renderFieldError(formErrors.password_confirm)}
                 required
                 InputProps={{
                   startAdornment: (
@@ -431,7 +449,18 @@ export default function UserRegistrationPage() {
           </Grid>
 
           {/* Password Requirements Info */}
-          <Card variant="outlined" sx={{ mt: 3, mb: 3 }}>
+          <Card
+            variant="outlined"
+            sx={{
+              mt: 3,
+              mb: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              backgroundColor: (theme) =>
+                theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(20px)',
+            }}
+          >
             <CardContent sx={{ py: 2 }}>
               <Typography variant="subtitle2" gutterBottom>
                 Password Requirements:
@@ -463,7 +492,8 @@ export default function UserRegistrationPage() {
             variant="contained"
             size="large"
             disabled={isLoading}
-            sx={{ mt: 3, mb: 2 }}
+            startIcon={isLoading ? null : <HowToReg />}
+            sx={{ mt: 3, mb: 2, py: 1.3 }}
           >
             {isLoading ? 'Creating Account...' : 'Create Account'}
           </Button>

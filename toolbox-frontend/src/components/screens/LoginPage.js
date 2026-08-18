@@ -1,19 +1,15 @@
 import React, { useState } from 'react';
 import {
   Container, Paper, Typography, Box, Grid, TextField,
-  Button, Alert, Snackbar, IconButton, InputAdornment,
-  LinearProgress, Card, CardContent, Divider, Link,
+  Button, Alert, InputAdornment,
+  LinearProgress, Divider, Link,
   FormControlLabel, Checkbox
 } from '@mui/material';
 import {
-  Visibility,
-  VisibilityOff,
   Person,
-  Lock,
   Login,
   CheckCircle,
-  Error as ErrorIcon,
-  HowToReg
+  Error as ErrorIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { authUtils } from '../rest/authUtils';
@@ -34,6 +30,17 @@ export default function LoginPage() {
   const [formErrors, setFormErrors] = useState({});
   const [success, setSuccess] = useState(false);
   const [clearingSession, setClearingSession] = useState(false);
+
+  // Render a field error with a matching icon
+  const renderFieldError = (message) => {
+    if (!message) return '';
+    return (
+      <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+        <ErrorIcon sx={{ fontSize: 14 }} />
+        {message}
+      </Box>
+    );
+  };
 
   // Handle input changes
   const handleInputChange = (field) => (event) => {
@@ -243,7 +250,7 @@ export default function LoginPage() {
                 value={formData.userid}
                 onChange={handleInputChange('userid')}
                 error={!!formErrors.userid}
-                helperText={formErrors.userid}
+                helperText={renderFieldError(formErrors.userid)}
                 required
                 autoComplete="userid"
                 InputProps={{
@@ -256,9 +263,8 @@ export default function LoginPage() {
               />
             </Grid>
 
-
             {/* Remember Me Checkbox */}
-            <Grid item xs={12}>
+            <Grid item xs={12} sx={{ pt: '0 !important' }}>
               <FormControlLabel
                 control={
                   <Checkbox
@@ -282,16 +288,17 @@ export default function LoginPage() {
             variant="contained"
             size="large"
             disabled={isLoading}
-            sx={{ mt: 3, mb: 2 }}
+            sx={{ mt: 3, mb: 1, py: 1.3 }}
             startIcon={isLoading ? null : <Login />}
           >
             {isLoading ? 'Signing in...' : 'Sign In'}
           </Button>
 
-          {/* Clear Session Link */}
-          <Box textAlign="center" sx={{ mb: 2 }}>
+          {/* Secondary Actions */}
+          <Box textAlign="center" sx={{ mt: 1 }}>
             <Link
               component="button"
+              type="button"
               variant="body2"
               onClick={handleClearSession}
               disabled={clearingSession}
@@ -306,6 +313,8 @@ export default function LoginPage() {
               {clearingSession ? 'Clearing session...' : 'Clear Session Data'}
             </Link>
           </Box>
+
+          <Divider sx={{ my: 3 }} />
 
           {/* Info */}
           <Box textAlign="center">

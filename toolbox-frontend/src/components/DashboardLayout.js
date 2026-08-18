@@ -94,7 +94,7 @@ export default function DashboardLayoutBasic(props) {
     >
       <div>
         <NavbarComponent />
-        <DashboardLayout>
+        <DashboardLayout sx={{ '& .MuiAppBar-positionAbsolute': { display: 'none' } }}>
           <PageContainer>
             <Grid container spacing={2}>
               <Grid xs={12}>

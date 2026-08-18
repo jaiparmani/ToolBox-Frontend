@@ -10,7 +10,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogContentText,
   DialogTitle,
   IconButton,
   Tooltip,
@@ -178,8 +177,8 @@ export default function NavbarComponent() {
           Clear All Cookies and Data?
         </DialogTitle>
         <DialogContent>
-          <DialogContentText>
-            This action will:
+          <Box sx={{ color: 'text.secondary' }}>
+            <Typography variant="body1" color="text.secondary">This action will:</Typography>
             <Box component="ul" sx={{ mt: 1, pl: 2 }}>
               <li>Clear all browser cookies</li>
               <li>Remove session data</li>
@@ -190,7 +189,7 @@ export default function NavbarComponent() {
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontStyle: 'italic' }}>
               This action cannot be undone.
             </Typography>
-          </DialogContentText>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button

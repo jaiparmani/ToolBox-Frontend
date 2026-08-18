@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { extendTheme } from '@mui/material/styles';
 import {
   Box, Typography, IconButton, Tooltip, Dialog, DialogTitle,
-  DialogContent, DialogContentText, DialogActions, Button, CircularProgress
+  DialogContent, DialogActions, Button, CircularProgress
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import BarChartIcon from '@mui/icons-material/BarChart';
@@ -75,8 +75,14 @@ const NAVIGATION = [
   },
 ];
 const demoTheme = extendTheme({
-  colorSchemes: { light: true, dark: true },
+  colorSchemes: {
+    light: { palette: { primary: { main: '#0071e3' } } },
+    dark: { palette: { primary: { main: '#2997ff' } } },
+  },
   colorSchemeSelector: 'class',
+  typography: {
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
+  },
   breakpoints: {
     values: {
       xs: 0,
@@ -156,8 +162,8 @@ function SidebarFooterAccount({ mini }) {
           Clear All Cookies and Data?
         </DialogTitle>
         <DialogContent>
-          <DialogContentText>
-            This action will:
+          <Box sx={{ color: 'text.secondary' }}>
+            <Typography variant="body1" color="text.secondary">This action will:</Typography>
             <Box component="ul" sx={{ mt: 1, pl: 2 }}>
               <li>Clear all browser cookies</li>
               <li>Remove session data</li>
@@ -168,7 +174,7 @@ function SidebarFooterAccount({ mini }) {
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontStyle: 'italic' }}>
               This action cannot be undone.
             </Typography>
-          </DialogContentText>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowConfirmDialog(false)} disabled={isClearing} color="inherit">

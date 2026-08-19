@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { useState } from 'react';
-import { extendTheme } from '@mui/material/styles';
+import { useEffect, useState } from 'react';
+import { extendTheme, useColorScheme } from '@mui/material/styles';
 import {
   Box, Typography, IconButton, Tooltip, Dialog, DialogTitle,
   DialogContent, DialogActions, Button, CircularProgress
@@ -13,6 +13,8 @@ import LayersIcon from '@mui/icons-material/Layers';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import LogoutIcon from '@mui/icons-material/Logout';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
 import { AppProvider } from '@toolpad/core/AppProvider';
 import { DashboardLayout } from '@toolpad/core/DashboardLayout';
 import { PageContainer } from '@toolpad/core/PageContainer';
@@ -25,6 +27,7 @@ import QRCodeGenerator from './screens/QRCodeGenerator.js';
 import UserProfilePage from './screens/UserProfilePage';
 import { authUtils } from './rest/authUtils';
 import { clearAllData } from './rest/userApis';
+import { useColorMode } from '../contexts/ColorModeContext';
 
 const NAVIGATION = [
   {
@@ -94,10 +97,22 @@ const demoTheme = extendTheme({
   },
 });
 
+// Keeps Toolpad's own CSS-vars color scheme (used by the Dashboard's AppProvider
+// theme) in lockstep with the app-wide ColorModeContext, so the same toggle
+// works consistently whether it's clicked here or on any other page.
+function ThemeSync({ mode }) {
+  const { setMode } = useColorScheme();
+  useEffect(() => {
+    setMode(mode);
+  }, [mode, setMode]);
+  return null;
+}
+
 // Rendered at the bottom of the left sidebar - the welcome message, clear-session,
-// and logout actions that used to live in a second, redundant top header bar.
+// theme toggle, and logout actions that used to live in a second, redundant top header bar.
 function SidebarFooterAccount({ mini }) {
   const user = authUtils.getUser();
+  const { mode, toggleColorMode } = useColorMode();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
@@ -135,6 +150,11 @@ function SidebarFooterAccount({ mini }) {
         </Typography>
       )}
       <Box sx={{ display: 'flex', gap: 0.5, justifyContent: mini ? 'center' : 'flex-start' }}>
+        <Tooltip title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+          <IconButton size="small" onClick={toggleColorMode}>
+            {mode === 'dark' ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+          </IconButton>
+        </Tooltip>
         <Tooltip title="Clear all cookies and session data">
           <IconButton
             size="small"
@@ -197,6 +217,7 @@ function SidebarFooterAccount({ mini }) {
 
 export default function DashboardLayoutBasic(props) {
   const { window } = props;
+  const { mode } = useColorMode();
 
   // Remove this const when copying and pasting into your project.
   const demoWindow = window ? window() : undefined;
@@ -207,7 +228,10 @@ export default function DashboardLayoutBasic(props) {
       theme={demoTheme}
       window={demoWindow}
     >
-      <DashboardLayout slots={{ sidebarFooter: SidebarFooterAccount }}>
+      <ThemeSync mode={mode} />
+      <DashboardLayout
+        slots={{ sidebarFooter: SidebarFooterAccount, toolbarActions: () => null }}
+      >
         <PageContainer>
           <Grid container spacing={2}>
             <Grid xs={12}>

@@ -21,11 +21,15 @@ import { clearAllData } from './rest/userApis';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import LogoutIcon from '@mui/icons-material/Logout';
 import HomeIcon from '@mui/icons-material/Home';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import { useColorMode } from '../contexts/ColorModeContext';
 
 export default function NavbarComponent() {
   const navigate = useNavigate();
   const location = useLocation();
   const user = authUtils.getUser();
+  const { mode, toggleColorMode } = useColorMode();
   const [showSuccess, setShowSuccess] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -120,6 +124,19 @@ export default function NavbarComponent() {
                 Welcome, {user.username || user.email || 'User'}
               </Typography>
             )}
+
+            {/* Theme Toggle */}
+            <Tooltip title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+              <IconButton
+                onClick={toggleColorMode}
+                sx={{
+                  color: 'primary.contrastText',
+                  '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.1)' }
+                }}
+              >
+                {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+              </IconButton>
+            </Tooltip>
 
             {/* Clear Cookies Button */}
             <Tooltip title="Clear all cookies and session data">

@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import './App.css';
 import Router from './components/Router';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -5,27 +6,37 @@ import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './contexts/AuthContext';
+import { ColorModeContext } from './contexts/ColorModeContext';
 
-const theme = createTheme({
+const STORAGE_KEY = 'toolbox-color-mode';
+
+const getInitialMode = () => {
+  const saved = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+  if (saved === 'light' || saved === 'dark') return saved;
+  if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+    return 'dark';
+  }
+  return 'light';
+};
+
+const getTheme = (mode) => createTheme({
   palette: {
-    mode: 'light',
+    mode,
     primary: {
-      main: '#0071e3',
+      main: mode === 'dark' ? '#0A84FF' : '#0071e3',
       dark: '#0058b0',
       light: '#2997ff',
     },
     secondary: {
       main: '#86868b',
     },
-    text: {
-      primary: '#1d1d1f',
-      secondary: '#6e6e73',
-    },
-    background: {
-      default: '#f5f5f7',
-      paper: '#ffffff',
-    },
-    divider: 'rgba(0,0,0,0.07)',
+    text: mode === 'dark'
+      ? { primary: '#f5f5f7', secondary: '#a1a1a6' }
+      : { primary: '#1d1d1f', secondary: '#6e6e73' },
+    background: mode === 'dark'
+      ? { default: '#000000', paper: '#1c1c1e' }
+      : { default: '#f5f5f7', paper: '#ffffff' },
+    divider: mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)',
   },
   typography: {
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
@@ -58,7 +69,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 18,
-          boxShadow: '0 2px 24px rgba(0,0,0,0.05)',
+          boxShadow: mode === 'dark' ? '0 2px 24px rgba(0,0,0,0.4)' : '0 2px 24px rgba(0,0,0,0.05)',
         },
       },
     },
@@ -80,23 +91,23 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 14,
-          backgroundColor: 'rgba(0,0,0,0.02)',
+          backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
           transition: 'background-color 0.2s ease, box-shadow 0.2s ease',
           '&:hover': {
-            backgroundColor: 'rgba(0,0,0,0.03)',
+            backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
           },
           '&.Mui-focused': {
-            backgroundColor: 'rgba(0,113,227,0.04)',
-            boxShadow: '0 0 0 4px rgba(0,113,227,0.12)',
+            backgroundColor: mode === 'dark' ? 'rgba(10,132,255,0.1)' : 'rgba(0,113,227,0.04)',
+            boxShadow: mode === 'dark' ? '0 0 0 4px rgba(10,132,255,0.18)' : '0 0 0 4px rgba(0,113,227,0.12)',
           },
           '& .MuiOutlinedInput-notchedOutline': {
-            borderColor: 'rgba(0,0,0,0.09)',
+            borderColor: mode === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.09)',
           },
           '&:hover .MuiOutlinedInput-notchedOutline': {
-            borderColor: 'rgba(0,0,0,0.15)',
+            borderColor: mode === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.15)',
           },
           '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-            borderColor: '#0071e3',
+            borderColor: mode === 'dark' ? '#0A84FF' : '#0071e3',
             borderWidth: '1.5px',
           },
         },
@@ -114,7 +125,8 @@ const theme = createTheme({
         paper: {
           borderRadius: 24,
           backgroundImage: 'none',
-          boxShadow: '0 24px 70px rgba(0,0,0,0.18)',
+          backgroundColor: mode === 'dark' ? '#1c1c1e' : '#ffffff',
+          boxShadow: mode === 'dark' ? '0 24px 70px rgba(0,0,0,0.6)' : '0 24px 70px rgba(0,0,0,0.18)',
         },
       },
     },
@@ -153,11 +165,11 @@ const theme = createTheme({
     MuiTableCell: {
       styleOverrides: {
         root: {
-          borderColor: 'rgba(0,0,0,0.06)',
+          borderColor: mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
         },
         head: {
           fontWeight: 600,
-          color: '#6e6e73',
+          color: mode === 'dark' ? '#a1a1a6' : '#6e6e73',
           fontSize: '0.8rem',
           textTransform: 'uppercase',
           letterSpacing: '0.03em',
@@ -169,7 +181,7 @@ const theme = createTheme({
         root: {
           transition: 'background-color 0.15s ease',
           '&:hover': {
-            backgroundColor: 'rgba(0,113,227,0.03)',
+            backgroundColor: mode === 'dark' ? 'rgba(10,132,255,0.08)' : 'rgba(0,113,227,0.03)',
           },
         },
       },
@@ -202,7 +214,8 @@ const theme = createTheme({
       styleOverrides: {
         paper: {
           borderRadius: 16,
-          boxShadow: '0 12px 40px rgba(0,0,0,0.14)',
+          backgroundColor: mode === 'dark' ? '#1c1c1e' : '#ffffff',
+          boxShadow: mode === 'dark' ? '0 12px 40px rgba(0,0,0,0.5)' : '0 12px 40px rgba(0,0,0,0.14)',
         },
       },
     },
@@ -210,17 +223,32 @@ const theme = createTheme({
 });
 
 function App() {
+  const [mode, setMode] = useState(getInitialMode);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, mode);
+  }, [mode]);
+
+  const colorMode = useMemo(() => ({
+    mode,
+    toggleColorMode: () => setMode((prev) => (prev === 'light' ? 'dark' : 'light')),
+  }), [mode]);
+
+  const theme = useMemo(() => getTheme(mode), [mode]);
+
   return (
     <ErrorBoundary>
       <div className="App">
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <AuthProvider>
-            <BrowserRouter basename={process.env.PUBLIC_URL}>
-              <Router />
-            </BrowserRouter>
-          </AuthProvider>
-        </ThemeProvider>
+        <ColorModeContext.Provider value={colorMode}>
+          <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <AuthProvider>
+              <BrowserRouter basename={process.env.PUBLIC_URL}>
+                <Router />
+              </BrowserRouter>
+            </AuthProvider>
+          </ThemeProvider>
+        </ColorModeContext.Provider>
       </div>
     </ErrorBoundary>
   );

@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/ToolBox-Frontend/static/css/main.f855e6bc.css",
+    "main.js": "/ToolBox-Frontend/static/js/main.3a5baee7.js",
+    "static/js/488.65e1b365.chunk.js": "/ToolBox-Frontend/static/js/488.65e1b365.chunk.js",
+    "index.html": "/ToolBox-Frontend/index.html",
+    "main.f855e6bc.css.map": "/ToolBox-Frontend/static/css/main.f855e6bc.css.map",
+    "main.3a5baee7.js.map": "/ToolBox-Frontend/static/js/main.3a5baee7.js.map",
+    "488.65e1b365.chunk.js.map": "/ToolBox-Frontend/static/js/488.65e1b365.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.f855e6bc.css",
+    "static/js/main.3a5baee7.js"
+  ]
+}

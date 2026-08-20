@@ -218,6 +218,20 @@ export const addExpenseApi = async (expenseData, onSuccess, onError) => {
     }
 };
 
+// Quick Add - free-text expense parsed and saved by the LLM router endpoint
+export const quickAddExpense = async (text) => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/quick_add/`, {
+            method: 'POST',
+            body: JSON.stringify({ text })
+        });
+        const data = await response.json();
+        return transformExpenseForUI(data);
+    } catch (error) {
+        throw handleApiError(error, 'quick add expense');
+    }
+};
+
 // Legacy function for backward compatibility
 export const addExpenseApiLegacy = (user, amount, category, date, description, onSuccess, onError) => {
     addExpenseApi({

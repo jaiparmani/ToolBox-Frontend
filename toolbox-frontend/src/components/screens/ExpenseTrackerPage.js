@@ -24,7 +24,8 @@ import {
   AccountBalance as BalanceIcon,
   Refresh as RefreshIcon,
   Close as CloseIcon,
-  Logout as LogoutIcon
+  Logout as LogoutIcon,
+  AutoAwesome as AutoAwesomeIcon
 } from '@mui/icons-material';
 
 // Import API functions and reusable components
@@ -32,7 +33,7 @@ import {
   addExpenseApi, getExpenses, updateExpense, deleteExpense,
   getCategories, createCategory, updateCategory, deleteCategory,
   getTags, createTag, updateTag, deleteTag,
-  getExpenseSummary
+  getExpenseSummary, quickAddExpense
 } from '../rest/expenseTrackerApis';
 
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
@@ -124,6 +125,10 @@ export default function ExpenseTrackerPage() {
  const [sortBy, setSortBy] = useState('-date');
  const [anchorEl, setAnchorEl] = useState(null);
  const [menuType, setMenuType] = useState(null);
+
+ // Quick Add (free-text, parsed by the LLM router endpoint) state
+ const [quickAddText, setQuickAddText] = useState('');
+ const [quickAddLoading, setQuickAddLoading] = useState(false);
 
  // Load data when authenticated
  useEffect(() => {
@@ -304,6 +309,26 @@ export default function ExpenseTrackerPage() {
      }
    } finally {
      setLoading(false);
+   }
+ };
+
+ const handleQuickAdd = async () => {
+   if (!quickAddText.trim()) {
+     setError('Enter some expense text first');
+     return;
+   }
+
+   setQuickAddLoading(true);
+   try {
+     await quickAddExpense(quickAddText.trim());
+     setSuccess('Expense added!');
+     setQuickAddText('');
+     loadExpenses();
+     loadSummary();
+   } catch (error) {
+     setError(error.message || 'Failed to parse and add expense');
+   } finally {
+     setQuickAddLoading(false);
    }
  };
 
@@ -610,6 +635,59 @@ export default function ExpenseTrackerPage() {
              </IconButton>
            </Tooltip>
          </Box>
+       </Box>
+     </Paper>
+
+     {/* Quick Add - free text parsed by the LLM router endpoint */}
+     <Paper
+       elevation={0}
+       sx={{
+         p: 2.5, mb: 3, borderRadius: 3,
+         border: '1px solid',
+         borderColor: 'divider',
+         backgroundColor: (theme) =>
+           theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
+       }}
+     >
+       <Box display="flex" alignItems="center" gap={1} sx={{ mb: 2 }}>
+         <Box
+           sx={{
+             width: 26, height: 26, borderRadius: '8px',
+             backgroundColor: 'rgba(191,90,242,0.12)',
+             display: 'flex', alignItems: 'center', justifyContent: 'center',
+           }}
+         >
+           <AutoAwesomeIcon sx={{ color: '#BF5AF2', fontSize: 15 }} />
+         </Box>
+         <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600 }}>
+           Quick Add
+         </Typography>
+       </Box>
+       <Box display="flex" gap={2} alignItems="flex-start" flexWrap="wrap">
+         <TextField
+           fullWidth
+           multiline
+           minRows={2}
+           placeholder='Type an expense in plain words, e.g. "20 aamras" or "58 chai vada pav"'
+           value={quickAddText}
+           onChange={(e) => setQuickAddText(e.target.value)}
+           disabled={quickAddLoading}
+           sx={{ flex: 1, minWidth: 240 }}
+           onKeyDown={(e) => {
+             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+               e.preventDefault();
+               handleQuickAdd();
+             }
+           }}
+         />
+         <Button
+           variant="contained"
+           onClick={handleQuickAdd}
+           disabled={quickAddLoading || !quickAddText.trim()}
+           startIcon={<AutoAwesomeIcon />}
+         >
+           {quickAddLoading ? 'Adding...' : 'Add'}
+         </Button>
        </Box>
      </Paper>
 

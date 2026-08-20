@@ -17,6 +17,8 @@ const getApiBaseUrl = () => {
 };
 
 const API_BASE_URL = getApiBaseUrl();
+// Insights are a sibling app: .../api/expenses -> .../api/insights
+const INSIGHTS_BASE_URL = API_BASE_URL.replace(/\/expenses$/, '/insights');
 const ARRAY_SUM_API_URL = 'https://toolbox.pythonanywhere.com/api/tools/array-sum';
 
 // Session-based authentication utilities
@@ -100,6 +102,8 @@ const throwHttpError = (errorData, status) => {
     if (errorData && typeof errorData === 'object') {
         if (errorData.detail) {
             message = errorData.detail;
+        } else if (typeof errorData.error === 'string') {
+            message = errorData.error;
         } else {
             const fieldMessages = Object.entries(errorData)
                 .filter(([, value]) => Array.isArray(value) || typeof value === 'string')
@@ -132,7 +136,8 @@ export const handleApiError = (error, operation) => {
     } else if (status === 404) {
         return { type: 'not_found', message: 'Resource not found.' };
     } else if (status === 429) {
-        return { type: 'rate_limit', message: 'Too many requests. Please try again later.' };
+        // The server says which quota ran out and when it resets - keep that.
+        return { type: 'rate_limit', message: error.message || 'Too many requests. Please try again later.' };
     } else {
         return { type: 'network_error', message: error.message || `Failed to ${operation}. Please try again.` };
     }
@@ -229,6 +234,54 @@ export const quickAddExpense = async (text) => {
         return transformExpenseForUI(data);
     } catch (error) {
         throw handleApiError(error, 'quick add expense');
+    }
+};
+
+/**
+ * Bulk import - extract every transaction from a pasted log (e.g. a WhatsApp export).
+ * Defaults to a dry run: nothing is written until commit is true, so the user can
+ * review what the model found first.
+ */
+export const bulkAddExpenses = async (text, commit = false) => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/bulk_add/`, {
+            method: 'POST',
+            body: JSON.stringify({ text, commit })
+        });
+        const data = await response.json();
+        return {
+            committed: !!data.committed,
+            count: data.count || 0,
+            detail: data.detail || null,
+            // Preview rows are raw parsed items; committed rows are full expenses.
+            items: data.committed ? (data.items || []).map(transformExpenseForUI) : (data.items || [])
+        };
+    } catch (error) {
+        throw handleApiError(error, commit ? 'save imported expenses' : 'preview import');
+    }
+};
+
+// Spending review written by the model. force=true bypasses the server-side cache.
+export const generateExpenseInsight = async (days = 30, force = false) => {
+    try {
+        const response = await authenticatedFetch(`${INSIGHTS_BASE_URL}/expense/generate/`, {
+            method: 'POST',
+            body: JSON.stringify({ days, force })
+        });
+        return await response.json();
+    } catch (error) {
+        throw handleApiError(error, 'generate spending review');
+    }
+};
+
+// Most recent stored review, or null when there has never been one.
+export const getLatestExpenseInsight = async () => {
+    try {
+        const response = await authenticatedFetch(`${INSIGHTS_BASE_URL}/expense/latest/`);
+        return await response.json();
+    } catch (error) {
+        if (error.type === 'not_found') return null;
+        throw handleApiError(error, 'fetch spending review');
     }
 };
 

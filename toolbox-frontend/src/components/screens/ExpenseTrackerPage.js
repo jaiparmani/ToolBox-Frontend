@@ -25,7 +25,12 @@ import {
   Refresh as RefreshIcon,
   Close as CloseIcon,
   Logout as LogoutIcon,
-  AutoAwesome as AutoAwesomeIcon
+  AutoAwesome as AutoAwesomeIcon,
+  UploadFile as UploadFileIcon,
+  Insights as InsightsIcon,
+  Lightbulb as LightbulbIcon,
+  WarningAmber as WarningAmberIcon,
+  HelpOutline as HelpOutlineIcon
 } from '@mui/icons-material';
 
 // Import API functions and reusable components
@@ -33,7 +38,8 @@ import {
   addExpenseApi, getExpenses, updateExpense, deleteExpense,
   getCategories, createCategory, updateCategory, deleteCategory,
   getTags, createTag, updateTag, deleteTag,
-  getExpenseSummary, quickAddExpense
+  getExpenseSummary, quickAddExpense, bulkAddExpenses,
+  generateExpenseInsight, getLatestExpenseInsight
 } from '../rest/expenseTrackerApis';
 
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
@@ -129,6 +135,14 @@ export default function ExpenseTrackerPage() {
  // Quick Add (free-text, parsed by the LLM router endpoint) state
  const [quickAddText, setQuickAddText] = useState('');
  const [quickAddLoading, setQuickAddLoading] = useState(false);
+
+ // Bulk import: paste a chat log, review what was found, then save
+ const [bulkImport, setBulkImport] = useState({
+   open: false, text: '', loading: false, saving: false, preview: null
+ });
+
+ // Spending review written by the model
+ const [insight, setInsight] = useState({ data: null, loading: false, loaded: false });
 
  // Load data when authenticated
  useEffect(() => {
@@ -332,6 +346,67 @@ export default function ExpenseTrackerPage() {
    }
  };
 
+ const openBulkImport = () => setBulkImport({
+   open: true, text: '', loading: false, saving: false, preview: null
+ });
+
+ const closeBulkImport = () => setBulkImport(prev => ({ ...prev, open: false }));
+
+ // Dry run first - the model decides what counts as a transaction, so the
+ // user sees the rows before anything is written.
+ const previewBulkImport = async () => {
+   if (!bulkImport.text.trim()) {
+     setError('Paste some text to import first');
+     return;
+   }
+   setBulkImport(prev => ({ ...prev, loading: true, preview: null }));
+   try {
+     const result = await bulkAddExpenses(bulkImport.text.trim(), false);
+     setBulkImport(prev => ({ ...prev, loading: false, preview: result }));
+     if (result.count === 0) {
+       setError(result.detail || 'No transactions were found in that text.');
+     }
+   } catch (error) {
+     setBulkImport(prev => ({ ...prev, loading: false }));
+     setError(error.message || 'Failed to read that text');
+   }
+ };
+
+ const commitBulkImport = async () => {
+   setBulkImport(prev => ({ ...prev, saving: true }));
+   try {
+     const result = await bulkAddExpenses(bulkImport.text.trim(), true);
+     setSuccess(`Imported ${result.count} ${result.count === 1 ? 'transaction' : 'transactions'}`);
+     setBulkImport({ open: false, text: '', loading: false, saving: false, preview: null });
+     loadExpenses();
+     loadSummary();
+   } catch (error) {
+     setBulkImport(prev => ({ ...prev, saving: false }));
+     setError(error.message || 'Failed to save the imported expenses');
+   }
+ };
+
+ const loadLatestInsight = async () => {
+   try {
+     const latest = await getLatestExpenseInsight();
+     setInsight({ data: latest, loading: false, loaded: true });
+   } catch (error) {
+     setInsight({ data: null, loading: false, loaded: true });
+   }
+ };
+
+ const runInsight = async (force = false) => {
+   setInsight(prev => ({ ...prev, loading: true }));
+   try {
+     const data = await generateExpenseInsight(30, force);
+     setInsight({ data, loading: false, loaded: true });
+     setSuccess(data.regenerated === false ? 'Showing your most recent review' : 'Spending review ready');
+   } catch (error) {
+     setInsight(prev => ({ ...prev, loading: false, loaded: true }));
+     setError(error.message || 'Could not generate the review');
+   }
+ };
+
  const deleteExpenseHandler = async (expenseId) => {
    if (!window.confirm('Are you sure you want to delete this expense?')) return;
 
@@ -479,6 +554,14 @@ export default function ExpenseTrackerPage() {
    }
  };
 
+ // Pull the stored review the first time the Insights tab is opened, so the
+ // panel isn't empty before the user has spent a model call.
+ useEffect(() => {
+   if (activeTab === 3 && !insight.loaded && isAuthenticated) {
+     loadLatestInsight();
+   }
+ }, [activeTab, insight.loaded, isAuthenticated]);
+
  // Filter handlers
  const handleFilterChange = (key, value) => {
    setFilters(prev => ({ ...prev, [key]: value }));
@@ -619,6 +702,15 @@ export default function ExpenseTrackerPage() {
              <IconButton onClick={loadAllData} disabled={loading}>
                <RefreshIcon />
              </IconButton>
+           </Tooltip>
+           <Tooltip title="Import from a pasted chat log">
+             <Button
+               variant="outlined"
+               startIcon={<UploadFileIcon />}
+               onClick={openBulkImport}
+             >
+               Bulk Import
+             </Button>
            </Tooltip>
            <Tooltip title="Add expense (Ctrl+N)">
              <Button
@@ -782,6 +874,7 @@ export default function ExpenseTrackerPage() {
            { label: 'Expenses', icon: DashboardIcon, color: '#0A84FF' },
            { label: 'Categories', icon: CategoryIcon, color: '#BF5AF2' },
            { label: 'Tags', icon: TagIcon, color: '#FF9F0A' },
+           { label: 'Insights', icon: InsightsIcon, color: '#30D158' },
          ].map((tabInfo) => (
            <Tab
              key={tabInfo.label}
@@ -1167,6 +1260,122 @@ export default function ExpenseTrackerPage() {
            </Grid>
          </Box>
        )}
+
+       {/* Insights Tab */}
+       {activeTab === 3 && (
+         <Box sx={{ p: 3 }}>
+           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
+             <Box>
+               <Typography variant="h6" sx={{ fontWeight: 600 }}>Spending Review</Typography>
+               <Typography variant="body2" color="text.secondary">
+                 An AI read of your last 30 days
+               </Typography>
+             </Box>
+             <Button
+               variant="contained"
+               startIcon={<AutoAwesomeIcon />}
+               onClick={() => runInsight(!!insight.data)}
+               disabled={insight.loading}
+             >
+               {insight.loading
+                 ? 'Analysing...'
+                 : insight.data ? 'Regenerate' : 'Generate review'}
+             </Button>
+           </Box>
+
+           {insight.loading && <LinearProgress sx={{ mb: 2 }} />}
+
+           {!insight.data && !insight.loading && (
+             <Paper
+               elevation={0}
+               sx={{
+                 p: 4, borderRadius: 3, textAlign: 'center',
+                 border: '1px dashed', borderColor: 'divider',
+               }}
+             >
+               <InsightsIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+               <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                 No review yet
+               </Typography>
+               <Typography variant="body2" color="text.secondary">
+                 Generate one to see where your money went and what stands out.
+               </Typography>
+             </Paper>
+           )}
+
+           {insight.data && (
+             <Box>
+               <Paper
+                 elevation={0}
+                 sx={{
+                   p: 3, mb: 3, borderRadius: 3,
+                   border: '1px solid', borderColor: 'divider',
+                   background: 'linear-gradient(135deg, rgba(48,209,88,0.10), rgba(10,132,255,0.06))',
+                 }}
+               >
+                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                   {insight.data.headline}
+                 </Typography>
+                 <Typography variant="body2" color="text.secondary">
+                   {insight.data.summary}
+                 </Typography>
+                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+                   {insight.data.period_start} to {insight.data.period_end}
+                   {insight.data.payload?.entries_analysed != null &&
+                     ` - ${insight.data.payload.entries_analysed} transactions`}
+                 </Typography>
+               </Paper>
+
+               <Grid container spacing={2}>
+                 {[
+                   { key: 'observations', label: 'What the numbers show', icon: InsightsIcon, color: '#0A84FF' },
+                   { key: 'concerns', label: 'Worth attention', icon: WarningAmberIcon, color: '#FF9F0A' },
+                   { key: 'suggestions', label: 'Suggestions', icon: LightbulbIcon, color: '#30D158' },
+                   { key: 'data_gaps', label: 'Not enough data', icon: HelpOutlineIcon, color: '#8E8E93' },
+                 ].map((section) => {
+                   const items = insight.data.payload?.[section.key] || [];
+                   if (!items.length) return null;
+                   return (
+                     <Grid item xs={12} md={6} key={section.key}>
+                       <Card
+                         elevation={0}
+                         sx={{
+                           height: '100%', borderRadius: 3,
+                           border: '1px solid', borderColor: 'divider',
+                         }}
+                       >
+                         <CardContent>
+                           <Box display="flex" alignItems="center" gap={1} mb={1.5}>
+                             <Box
+                               sx={{
+                                 width: 26, height: 26, borderRadius: '8px',
+                                 backgroundColor: `${section.color}1f`,
+                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+                               }}
+                             >
+                               <section.icon sx={{ color: section.color, fontSize: 15 }} />
+                             </Box>
+                             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                               {section.label}
+                             </Typography>
+                           </Box>
+                           <Box component="ul" sx={{ pl: 2.5, m: 0 }}>
+                             {items.map((item, i) => (
+                               <Typography component="li" variant="body2" key={i} sx={{ mb: 0.75 }}>
+                                 {item}
+                               </Typography>
+                             ))}
+                           </Box>
+                         </CardContent>
+                       </Card>
+                     </Grid>
+                   );
+                 })}
+               </Grid>
+             </Box>
+           )}
+         </Box>
+       )}
      </Paper>
 
      {/* Context Menu */}
@@ -1550,6 +1759,121 @@ export default function ExpenseTrackerPage() {
          <Button onClick={saveTag} variant="contained">
            {tagForm.editing ? 'Update' : 'Add'} Tag
          </Button>
+       </DialogActions>
+     </Dialog>
+
+
+     {/* Bulk Import Dialog */}
+     <Dialog open={bulkImport.open} onClose={closeBulkImport} maxWidth="md" fullWidth>
+       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+         <Box
+           sx={{
+             width: 40, height: 40, borderRadius: '12px',
+             background: 'linear-gradient(135deg, #BF5AF2, #0A84FF)',
+             display: 'flex', alignItems: 'center', justifyContent: 'center',
+             boxShadow: '0 6px 16px rgba(191,90,242,0.4)',
+             flexShrink: 0,
+           }}
+         >
+           <UploadFileIcon sx={{ color: '#fff', fontSize: 20 }} />
+         </Box>
+         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+           <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+             Bulk Import
+           </Typography>
+           <Typography variant="body2" color="text.secondary">
+             Paste a chat log or a list of notes - nothing is saved until you confirm
+           </Typography>
+         </Box>
+         <IconButton onClick={closeBulkImport} size="small">
+           <CloseIcon fontSize="small" />
+         </IconButton>
+       </DialogTitle>
+       <DialogContent>
+         <TextField
+           fullWidth
+           multiline
+           minRows={6}
+           sx={{ mt: 1 }}
+           placeholder={'[28/05/25, 3:21:37 PM] Jai: 20 aamras\n[28/05/25, 6:48:57 PM] Jai: 58 chai vada pav\n250 lunch with team'}
+           value={bulkImport.text}
+           onChange={(e) => setBulkImport(prev => ({ ...prev, text: e.target.value, preview: null }))}
+           disabled={bulkImport.loading || bulkImport.saving}
+         />
+
+         {bulkImport.loading && <LinearProgress sx={{ mt: 2 }} />}
+
+         {bulkImport.preview && bulkImport.preview.count > 0 && (
+           <Box sx={{ mt: 3 }}>
+             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+               Found {bulkImport.preview.count}{' '}
+               {bulkImport.preview.count === 1 ? 'transaction' : 'transactions'} - review before saving
+             </Typography>
+             <TableContainer sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+               <Table size="small">
+                 <TableHead>
+                   <TableRow>
+                     <TableCell>Date</TableCell>
+                     <TableCell>Description</TableCell>
+                     <TableCell>Category</TableCell>
+                     <TableCell>Type</TableCell>
+                     <TableCell align="right">Amount</TableCell>
+                   </TableRow>
+                 </TableHead>
+                 <TableBody>
+                   {bulkImport.preview.items.map((item, i) => (
+                     <TableRow key={i} hover>
+                       <TableCell>
+                         <Typography variant="body2" color="text.secondary">
+                           {item.date || 'today'}
+                         </Typography>
+                       </TableCell>
+                       <TableCell>{item.description}</TableCell>
+                       <TableCell>
+                         <Chip label={item.category_name} size="small" variant="outlined" />
+                       </TableCell>
+                       <TableCell>
+                         <Typography
+                           variant="caption"
+                           sx={{ textTransform: 'capitalize' }}
+                           color={item.transaction_type === 'income' ? 'success.main' : 'text.secondary'}
+                         >
+                           {item.transaction_type}
+                         </Typography>
+                       </TableCell>
+                       <TableCell align="right">
+                         <Typography variant="body2" fontWeight={600}>
+                           {formatCurrency(item.amount)}
+                         </Typography>
+                       </TableCell>
+                     </TableRow>
+                   ))}
+                 </TableBody>
+               </Table>
+             </TableContainer>
+           </Box>
+         )}
+       </DialogContent>
+       <DialogActions>
+         <Button onClick={closeBulkImport} color="inherit">Cancel</Button>
+         {!bulkImport.preview?.count ? (
+           <Button
+             onClick={previewBulkImport}
+             variant="contained"
+             disabled={bulkImport.loading || !bulkImport.text.trim()}
+             startIcon={<AutoAwesomeIcon />}
+           >
+             {bulkImport.loading ? 'Reading...' : 'Preview'}
+           </Button>
+         ) : (
+           <Button
+             onClick={commitBulkImport}
+             variant="contained"
+             disabled={bulkImport.saving}
+           >
+             {bulkImport.saving ? 'Saving...' : `Save ${bulkImport.preview.count}`}
+           </Button>
+         )}
        </DialogActions>
      </Dialog>
 

@@ -334,8 +334,14 @@ export default function ExpenseTrackerPage() {
 
    setQuickAddLoading(true);
    try {
-     await quickAddExpense(quickAddText.trim());
-     setSuccess('Expense added!');
+     const saved = await quickAddExpense(quickAddText.trim());
+     // Echo back what was actually stored, not just "done". The model chose the
+     // amount, description and category, so showing them is how a misread gets
+     // noticed straight away rather than at the next reconciliation.
+     // amount_display comes from the server already formatted in rupees.
+     const amountText = saved.displayAmount || formatCurrency(saved.amount);
+     const categoryText = saved.category?.name ? ` \u00b7 ${saved.category.name}` : '';
+     setSuccess(`Added "${saved.description}" \u2014 ${amountText}${categoryText}`);
      setQuickAddText('');
      loadExpenses();
      loadSummary();
@@ -375,7 +381,9 @@ export default function ExpenseTrackerPage() {
  const commitBulkImport = async () => {
    setBulkImport(prev => ({ ...prev, saving: true }));
    try {
-     const result = await bulkAddExpenses(bulkImport.text.trim(), true);
+     // Send back the rows on screen rather than the text: no second model
+     // call, and no chance of saving something other than what was reviewed.
+     const result = await bulkAddExpenses(bulkImport.preview.items, true);
      setSuccess(`Imported ${result.count} ${result.count === 1 ? 'transaction' : 'transactions'}`);
      setBulkImport({ open: false, text: '', loading: false, saving: false, preview: null });
      loadExpenses();
@@ -1801,7 +1809,15 @@ export default function ExpenseTrackerPage() {
            disabled={bulkImport.loading || bulkImport.saving}
          />
 
-         {bulkImport.loading && <LinearProgress sx={{ mt: 2 }} />}
+         {bulkImport.loading && (
+           <Box sx={{ mt: 2 }}>
+             <LinearProgress />
+             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+               Reading your text - this can take up to a minute on the free AI tier.
+               Saving afterwards is instant.
+             </Typography>
+           </Box>
+         )}
 
          {bulkImport.preview && bulkImport.preview.count > 0 && (
            <Box sx={{ mt: 3 }}>

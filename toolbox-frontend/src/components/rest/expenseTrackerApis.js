@@ -239,15 +239,21 @@ export const quickAddExpense = async (text) => {
 };
 
 /**
- * Bulk import - extract every transaction from a pasted log (e.g. a WhatsApp export).
- * Defaults to a dry run: nothing is written until commit is true, so the user can
- * review what the model found first.
+ * Bulk import - extract every transaction from pasted text.
+ *
+ * Called with text and commit=false for the dry run. To save, pass the reviewed
+ * rows back as `items`: that skips a second model call, so saving is instant,
+ * and guarantees what gets stored is exactly what was on screen (re-parsing the
+ * same text can return different rows).
  */
-export const bulkAddExpenses = async (text, commit = false) => {
+export const bulkAddExpenses = async (textOrItems, commit = false) => {
     try {
+        const body = commit && Array.isArray(textOrItems)
+            ? { items: textOrItems, commit: true }
+            : { text: textOrItems, commit };
         const response = await authenticatedFetch(`${API_BASE_URL}/expenses/bulk_add/`, {
             method: 'POST',
-            body: JSON.stringify({ text, commit })
+            body: JSON.stringify(body)
         });
         const data = await response.json();
         return {

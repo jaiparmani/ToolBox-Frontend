@@ -19,6 +19,7 @@ const getApiBaseUrl = () => {
 const API_BASE_URL = getApiBaseUrl();
 // Insights are a sibling app: .../api/expenses -> .../api/insights
 const INSIGHTS_BASE_URL = API_BASE_URL.replace(/\/expenses$/, '/insights');
+const LLM_BASE_URL = API_BASE_URL.replace(/\/expenses$/, '/llm');
 const ARRAY_SUM_API_URL = 'https://toolbox.pythonanywhere.com/api/tools/array-sum';
 
 // Session-based authentication utilities
@@ -282,6 +283,54 @@ export const getLatestExpenseInsight = async () => {
     } catch (error) {
         if (error.type === 'not_found') return null;
         throw handleApiError(error, 'fetch spending review');
+    }
+};
+
+/**
+ * OpenRouter key queue. Keys power every AI feature; the server rotates them
+ * front-to-back so the daily per-key request cap multiplies by however many
+ * are stored. The full key is never returned - only a masked form.
+ */
+export const getOpenRouterKeys = async () => {
+    try {
+        const response = await authenticatedFetch(`${LLM_BASE_URL}/keys/`);
+        const data = await response.json();
+        return Array.isArray(data) ? data : (data.results || []);
+    } catch (error) {
+        throw handleApiError(error, 'fetch API keys');
+    }
+};
+
+export const addOpenRouterKey = async (key, label = '') => {
+    try {
+        const response = await authenticatedFetch(`${LLM_BASE_URL}/keys/`, {
+            method: 'POST',
+            body: JSON.stringify({ key, label })
+        });
+        return await response.json();
+    } catch (error) {
+        throw handleApiError(error, 'add API key');
+    }
+};
+
+export const deleteOpenRouterKey = async (id) => {
+    try {
+        await authenticatedFetch(`${LLM_BASE_URL}/keys/${id}/`, { method: 'DELETE' });
+        return true;
+    } catch (error) {
+        throw handleApiError(error, 'remove API key');
+    }
+};
+
+export const moveOpenRouterKeyToBack = async (id) => {
+    try {
+        const response = await authenticatedFetch(`${LLM_BASE_URL}/keys/${id}/move_to_back/`, {
+            method: 'POST',
+            body: JSON.stringify({})
+        });
+        return await response.json();
+    } catch (error) {
+        throw handleApiError(error, 'reorder API key');
     }
 };
 

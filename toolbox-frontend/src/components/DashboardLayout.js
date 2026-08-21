@@ -11,6 +11,7 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import LayersIcon from '@mui/icons-material/Layers';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import LogoutIcon from '@mui/icons-material/Logout';
 import LightModeIcon from '@mui/icons-material/LightMode';
@@ -75,6 +76,11 @@ const NAVIGATION = [
     segment: 'profile',
     title: 'My Profile',
     icon: <AccountCircleIcon />,
+  },
+  {
+    segment: 'api-keys',
+    title: 'API Keys',
+    icon: <VpnKeyIcon />,
   },
 ];
 const demoTheme = extendTheme({

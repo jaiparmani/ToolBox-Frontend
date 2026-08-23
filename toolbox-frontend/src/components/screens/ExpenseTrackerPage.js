@@ -31,7 +31,10 @@ import {
   Lightbulb as LightbulbIcon,
   WarningAmber as WarningAmberIcon,
   HelpOutline as HelpOutlineIcon,
-  QuestionAnswer as QuestionAnswerIcon
+  QuestionAnswer as QuestionAnswerIcon,
+  CallSplit as CallSplitIcon,
+  Person as PersonIcon,
+  DoneAll as DoneAllIcon
 } from '@mui/icons-material';
 
 // Import API functions and reusable components
@@ -40,7 +43,8 @@ import {
   getCategories, createCategory, updateCategory, deleteCategory,
   getTags, createTag, updateTag, deleteTag,
   getExpenseSummary, quickAddExpense, bulkAddExpenses,
-  generateExpenseInsight, getLatestExpenseInsight, askExpenses
+  generateExpenseInsight, getLatestExpenseInsight, askExpenses,
+  splitAddExpense, getSplitBalances, settleUpWith
 } from '../rest/expenseTrackerApis';
 
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
@@ -147,6 +151,11 @@ export default function ExpenseTrackerPage() {
 
  // Plain-language question over the expense list
  const [ask, setAsk] = useState({ question: '', loading: false, answer: null });
+
+ // Shared bills: who owes what
+ const [splits, setSplits] = useState({
+   text: '', loading: false, balances: [], totalOwed: 0, loaded: false, settling: null
+ });
 
  // Load data when authenticated
  useEffect(() => {
@@ -398,6 +407,52 @@ export default function ExpenseTrackerPage() {
    }
  };
 
+ const loadBalances = async () => {
+   try {
+     const data = await getSplitBalances();
+     setSplits(prev => ({
+       ...prev, balances: data.balances, totalOwed: data.totalOwedToYou, loaded: true
+     }));
+   } catch (error) {
+     setSplits(prev => ({ ...prev, loaded: true }));
+     setError(error.message || 'Could not load balances');
+   }
+ };
+
+ const handleSplitAdd = async () => {
+   if (!splits.text.trim()) {
+     setError('Describe the shared expense first');
+     return;
+   }
+   setSplits(prev => ({ ...prev, loading: true }));
+   try {
+     const result = await splitAddExpense(splits.text.trim());
+     const who = result.splits.map(s => `${s.person_name} ${formatCurrency(s.amount)}`).join(', ');
+     setSuccess(`Split ${formatCurrency(result.expense.amount)} — ${who || 'no one'}`);
+     setSplits(prev => ({ ...prev, text: '', loading: false }));
+     loadBalances();
+     loadExpenses();
+     loadSummary();
+   } catch (error) {
+     setSplits(prev => ({ ...prev, loading: false }));
+     setError(error.message || 'Could not split that');
+   }
+ };
+
+ const handleSettle = async (balance) => {
+   if (!window.confirm(`Mark ${balance.name}'s ${formatCurrency(balance.owed)} as settled?`)) return;
+   setSplits(prev => ({ ...prev, settling: balance.personId }));
+   try {
+     const result = await settleUpWith(balance.personId);
+     setSuccess(`Settled ${formatCurrency(result.total)} with ${balance.name}`);
+     setSplits(prev => ({ ...prev, settling: null }));
+     loadBalances();
+   } catch (error) {
+     setSplits(prev => ({ ...prev, settling: null }));
+     setError(error.message || 'Could not settle');
+   }
+ };
+
  const runAsk = async () => {
    if (!ask.question.trim()) {
      setError('Type a question first');
@@ -590,6 +645,13 @@ export default function ExpenseTrackerPage() {
      loadLatestInsight();
    }
  }, [activeTab, insight.loaded, isAuthenticated]);
+
+ // Balances are cheap to fetch (no model call), so load them with the tab.
+ useEffect(() => {
+   if (activeTab === 4 && !splits.loaded && isAuthenticated) {
+     loadBalances();
+   }
+ }, [activeTab, splits.loaded, isAuthenticated]);
 
  // Filter handlers
  const handleFilterChange = (key, value) => {
@@ -907,6 +969,7 @@ export default function ExpenseTrackerPage() {
            { label: 'Categories', icon: CategoryIcon, color: '#BF5AF2' },
            { label: 'Tags', icon: TagIcon, color: '#FF9F0A' },
            { label: 'Insights', icon: InsightsIcon, color: '#30D158' },
+           { label: 'Splits', icon: CallSplitIcon, color: '#FF9F0A' },
          ].map((tabInfo) => (
            <Tab
              key={tabInfo.label}
@@ -1517,6 +1580,144 @@ export default function ExpenseTrackerPage() {
                  })}
                </Grid>
              </Box>
+           )}
+         </Box>
+       )}
+
+       {/* Splits Tab */}
+       {activeTab === 4 && (
+         <Box sx={{ p: 3 }}>
+           <Box mb={3}>
+             <Typography variant="h6" sx={{ fontWeight: 600 }}>Shared expenses</Typography>
+             <Typography variant="body2" color="text.secondary">
+               Log a bill you paid for a group and track what comes back to you
+             </Typography>
+           </Box>
+
+           {/* Add a shared bill */}
+           <Paper
+             elevation={0}
+             sx={{
+               p: 2.5, mb: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider',
+               backgroundColor: (theme) =>
+                 theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
+             }}
+           >
+             <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
+               <TextField
+                 fullWidth
+                 size="small"
+                 sx={{ flex: 1, minWidth: 260 }}
+                 placeholder='e.g. "split 1200 dinner with raj and priya"'
+                 value={splits.text}
+                 onChange={(e) => setSplits(prev => ({ ...prev, text: e.target.value }))}
+                 disabled={splits.loading}
+                 onKeyDown={(e) => { if (e.key === 'Enter') handleSplitAdd(); }}
+               />
+               <Button
+                 variant="contained"
+                 onClick={handleSplitAdd}
+                 disabled={splits.loading || !splits.text.trim()}
+                 startIcon={<AutoAwesomeIcon />}
+               >
+                 {splits.loading ? 'Splitting...' : 'Split'}
+               </Button>
+             </Box>
+             {splits.loading && <LinearProgress sx={{ mt: 2 }} />}
+             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+               The full amount is recorded as your expense; each person's share is tracked
+               as owed to you. Say "paid 500 for raj's ticket" when you didn't share the cost.
+             </Typography>
+           </Paper>
+
+           {/* Owed to you */}
+           {splits.totalOwed > 0 && (
+             <Paper
+               elevation={0}
+               sx={{
+                 p: 3, mb: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider',
+                 background: 'linear-gradient(135deg, rgba(255,159,10,0.12), rgba(191,90,242,0.06))',
+               }}
+             >
+               <Typography variant="overline" color="text.secondary">Owed to you</Typography>
+               <Typography variant="h4" sx={{ fontWeight: 600 }}>
+                 {formatCurrency(splits.totalOwed)}
+               </Typography>
+             </Paper>
+           )}
+
+           {splits.balances.length === 0 ? (
+             <Paper
+               elevation={0}
+               sx={{ p: 4, borderRadius: 3, textAlign: 'center', border: '1px dashed', borderColor: 'divider' }}
+             >
+               <CallSplitIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+               <Typography variant="body1" sx={{ fontWeight: 500 }}>No shared expenses yet</Typography>
+               <Typography variant="body2" color="text.secondary">
+                 Split a bill above and whoever owes you will show up here.
+               </Typography>
+             </Paper>
+           ) : (
+             <Grid container spacing={2}>
+               {splits.balances.map((balance) => (
+                 <Grid item xs={12} sm={6} md={4} key={balance.personId}>
+                   <Card
+                     elevation={0}
+                     sx={{
+                       borderRadius: 3, border: '1px solid',
+                       borderColor: balance.owed > 0 ? 'rgba(255,159,10,0.4)' : 'divider',
+                     }}
+                   >
+                     <CardContent>
+                       <Box display="flex" alignItems="center" gap={2} mb={1.5}>
+                         <Box
+                           sx={{
+                             width: 40, height: 40, borderRadius: '50%',
+                             background: balance.owed > 0
+                               ? 'linear-gradient(135deg, #FF9F0A, #FF453A)'
+                               : 'linear-gradient(135deg, #30D158, #0A84FF)',
+                             display: 'flex', alignItems: 'center', justifyContent: 'center',
+                             flexShrink: 0,
+                           }}
+                         >
+                           <PersonIcon sx={{ color: '#fff', fontSize: 20 }} />
+                         </Box>
+                         <Box sx={{ minWidth: 0 }}>
+                           <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>
+                             {balance.name}
+                           </Typography>
+                           <Typography variant="caption" color="text.secondary">
+                             {balance.unsettledCount === 0
+                               ? 'all settled'
+                               : `${balance.unsettledCount} unsettled`}
+                           </Typography>
+                         </Box>
+                       </Box>
+                       <Typography
+                         variant="h5"
+                         sx={{ fontWeight: 600 }}
+                         color={balance.owed > 0 ? 'warning.main' : 'text.secondary'}
+                       >
+                         {formatCurrency(balance.owed)}
+                       </Typography>
+                       {balance.owed > 0 && (
+                         <Button
+                           fullWidth
+                           size="small"
+                           variant="outlined"
+                           startIcon={<DoneAllIcon />}
+                           sx={{ mt: 1.5 }}
+                           onClick={() => handleSettle(balance)}
+                           disabled={splits.settling === balance.personId}
+                         >
+                           {splits.settling === balance.personId ? 'Settling...' : 'Settle up'}
+                         </Button>
+                       )}
+                     </CardContent>
+                   </Card>
+                 </Grid>
+               ))}
+             </Grid>
            )}
          </Box>
        )}

@@ -365,6 +365,60 @@ export const askExpenses = async (question) => {
     }
 };
 
+/**
+ * Splitting bills. The server records the expense in full against you and
+ * stores what each other person owes, so your spending total stays truthful
+ * while the balances track separately.
+ */
+export const splitAddExpense = async (text) => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/split_add/`, {
+            method: 'POST',
+            body: JSON.stringify({ text })
+        });
+        const data = await response.json();
+        return {
+            expense: transformExpenseForUI(data.expense),
+            splits: data.splits || [],
+            yourShare: parseFloat(data.your_share || 0),
+            owedToYou: parseFloat(data.owed_to_you || 0)
+        };
+    } catch (error) {
+        throw handleApiError(error, 'split that expense');
+    }
+};
+
+export const getSplitBalances = async () => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/splits/balances/`);
+        const data = await response.json();
+        return {
+            totalOwedToYou: parseFloat(data.total_owed_to_you || 0),
+            balances: (data.balances || []).map(b => ({
+                personId: b.person_id,
+                name: b.name,
+                owed: parseFloat(b.owed || 0),
+                unsettledCount: b.unsettled_count || 0
+            }))
+        };
+    } catch (error) {
+        throw handleApiError(error, 'fetch balances');
+    }
+};
+
+export const settleUpWith = async (personId) => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/splits/settle/`, {
+            method: 'POST',
+            body: JSON.stringify({ person_id: personId })
+        });
+        const data = await response.json();
+        return { count: data.settled_count || 0, total: parseFloat(data.settled_total || 0) };
+    } catch (error) {
+        throw handleApiError(error, 'settle up');
+    }
+};
+
 // Legacy function for backward compatibility
 export const addExpenseApiLegacy = (user, amount, category, date, description, onSuccess, onError) => {
     addExpenseApi({

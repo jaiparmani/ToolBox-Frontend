@@ -7,7 +7,7 @@ import {
   Fab, Switch, FormControlLabel, Tab, Tabs,
   Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, TablePagination, InputAdornment, Menu, MenuItem,
-  ListItemIcon, ListItemText, LinearProgress
+  ListItemIcon, ListItemText, LinearProgress, Autocomplete
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -44,7 +44,8 @@ import {
   getTags, createTag, updateTag, deleteTag,
   getExpenseSummary, quickAddExpense, bulkAddExpenses,
   generateExpenseInsight, getLatestExpenseInsight, askExpenses,
-  splitAddExpense, getSplitBalances, settleUpWith
+  splitAddExpense, getSplitBalances, settleUpWith,
+  createSplitManually, searchSplitUsers
 } from '../rest/expenseTrackerApis';
 
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
@@ -156,6 +157,12 @@ export default function ExpenseTrackerPage() {
  const [splits, setSplits] = useState({
    text: '', loading: false, balances: [], youOwe: [],
    totalOwed: 0, totalYouOwe: 0, net: 0, loaded: false, settling: null
+ });
+
+ // Manual split: exact numbers, no model call and no quota spent
+ const [splitForm, setSplitForm] = useState({
+   open: false, saving: false, amount: '', description: '', categoryId: '',
+   splitWithMe: true, people: [], userOptions: [], searching: false
  });
 
  // Load data when authenticated
@@ -405,6 +412,90 @@ export default function ExpenseTrackerPage() {
    } catch (error) {
      setBulkImport(prev => ({ ...prev, saving: false }));
      setError(error.message || 'Failed to save the imported expenses');
+   }
+ };
+
+ const openSplitForm = () => {
+   setSplitForm({
+     open: true, saving: false, amount: '', description: '', categoryId: '',
+     splitWithMe: true, people: [], userOptions: [], searching: false
+   });
+   // Seed the picker with people already split with, before any typing.
+   searchSplitUsers('').then(userOptions =>
+     setSplitForm(prev => ({ ...prev, userOptions }))).catch(() => {});
+ };
+
+ const closeSplitForm = () => setSplitForm(prev => ({ ...prev, open: false }));
+
+ const searchUsers = async (term) => {
+   setSplitForm(prev => ({ ...prev, searching: true }));
+   try {
+     const userOptions = await searchSplitUsers(term);
+     setSplitForm(prev => ({ ...prev, userOptions, searching: false }));
+   } catch (error) {
+     setSplitForm(prev => ({ ...prev, searching: false }));
+   }
+ };
+
+ // What each person will owe, worked out the same way the server will, so the
+ // form shows the real numbers before anything is saved.
+ const previewShares = () => {
+   const total = parseFloat(splitForm.amount);
+   if (!total || total <= 0 || splitForm.people.length === 0) return null;
+   const explicit = splitForm.people.filter(p => p.amount);
+   const paise = Math.round(total * 100);
+   if (explicit.length) {
+     const named = explicit.reduce((sum, p) => sum + Math.round(parseFloat(p.amount) * 100), 0);
+     if (named > paise) return { error: 'Those shares add up to more than the bill' };
+     const rest = splitForm.people.filter(p => !p.amount);
+     const each = rest.length ? Math.floor((paise - named) / rest.length) : 0;
+     return {
+       shares: splitForm.people.map(p => ({
+         label: p.label,
+         amount: p.amount ? parseFloat(p.amount) : each / 100
+       })),
+       yours: (paise - named - each * rest.length) / 100
+     };
+   }
+   const ways = splitForm.people.length + (splitForm.splitWithMe ? 1 : 0);
+   const base = Math.floor(paise / ways);
+   const remainder = paise - base * ways;
+   return {
+     shares: splitForm.people.map(p => ({ label: p.label, amount: base / 100 })),
+     yours: splitForm.splitWithMe ? (base + remainder) / 100 : 0
+   };
+ };
+
+ const saveManualSplit = async () => {
+   const preview = previewShares();
+   if (!preview || preview.error) {
+     setError(preview?.error || 'Enter an amount and at least one person');
+     return;
+   }
+   if (!splitForm.description.trim()) {
+     setError('What was the expense for?');
+     return;
+   }
+   setSplitForm(prev => ({ ...prev, saving: true }));
+   try {
+     const result = await createSplitManually({
+       amount: parseFloat(splitForm.amount),
+       description: splitForm.description.trim(),
+       categoryId: splitForm.categoryId || undefined,
+       splitWithMe: splitForm.splitWithMe,
+       participants: splitForm.people.map(p => ({
+         userId: p.userId, name: p.label, amount: p.amount || undefined
+       }))
+     });
+     setSuccess(`Split ${formatCurrency(result.expense.amount)} with ${result.splits.length} ` +
+                `${result.splits.length === 1 ? 'person' : 'people'}`);
+     setSplitForm(prev => ({ ...prev, open: false, saving: false }));
+     loadBalances();
+     loadExpenses();
+     loadSummary();
+   } catch (error) {
+     setSplitForm(prev => ({ ...prev, saving: false }));
+     setError(error.message || 'Could not create the split');
    }
  };
 
@@ -1636,6 +1727,13 @@ export default function ExpenseTrackerPage() {
                >
                  {splits.loading ? 'Splitting...' : 'Split'}
                </Button>
+               <Button
+                 variant="outlined"
+                 onClick={openSplitForm}
+                 startIcon={<AddIcon />}
+               >
+                 Enter manually
+               </Button>
              </Box>
              {splits.loading && <LinearProgress sx={{ mt: 2 }} />}
              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
@@ -2288,6 +2386,185 @@ export default function ExpenseTrackerPage() {
              {bulkImport.saving ? 'Saving...' : `Save ${bulkImport.preview.count}`}
            </Button>
          )}
+       </DialogActions>
+     </Dialog>
+
+
+     {/* Manual split - exact numbers, no model call */}
+     <Dialog open={splitForm.open} onClose={closeSplitForm} maxWidth="sm" fullWidth>
+       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+         <Box
+           sx={{
+             width: 40, height: 40, borderRadius: '12px',
+             background: 'linear-gradient(135deg, #FF9F0A, #FF453A)',
+             display: 'flex', alignItems: 'center', justifyContent: 'center',
+             boxShadow: '0 6px 16px rgba(255,159,10,0.4)', flexShrink: 0,
+           }}
+         >
+           <CallSplitIcon sx={{ color: '#fff', fontSize: 20 }} />
+         </Box>
+         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+           <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>Split a bill</Typography>
+           <Typography variant="body2" color="text.secondary">
+             Exact amounts, no AI involved
+           </Typography>
+         </Box>
+         <IconButton onClick={closeSplitForm} size="small"><CloseIcon fontSize="small" /></IconButton>
+       </DialogTitle>
+       <DialogContent>
+         <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
+           <Grid item xs={12} sm={5}>
+             <TextField
+               fullWidth label="Amount *" type="number"
+               value={splitForm.amount}
+               onChange={(e) => setSplitForm(prev => ({ ...prev, amount: e.target.value }))}
+               InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+             />
+           </Grid>
+           <Grid item xs={12} sm={7}>
+             <TextField
+               fullWidth label="What for? *"
+               value={splitForm.description}
+               onChange={(e) => setSplitForm(prev => ({ ...prev, description: e.target.value }))}
+             />
+           </Grid>
+
+           <Grid item xs={12}>
+             <AutocompleteComponent
+               options={categories.map(cat => ({ label: cat.name, id: cat.id }))}
+               label="Category"
+               value={splitForm.categoryId}
+               onChange={(value) => setSplitForm(prev => ({ ...prev, categoryId: value }))}
+             />
+           </Grid>
+
+           <Grid item xs={12}>
+             <Autocomplete
+               multiple
+               freeSolo
+               options={splitForm.userOptions}
+               getOptionLabel={(option) =>
+                 typeof option === 'string' ? option : option.username}
+               filterSelectedOptions
+               loading={splitForm.searching}
+               onInputChange={(e, value, reason) => {
+                 if (reason === 'input' && value.length >= 2) searchUsers(value);
+               }}
+               onChange={(e, values) => {
+                 setSplitForm(prev => ({
+                   ...prev,
+                   // An option from the list carries a userId, so the split
+                   // reaches that account's panel; free text is a name only.
+                   people: values.map(v => {
+                     const existing = prev.people.find(p =>
+                       p.label === (typeof v === 'string' ? v : v.username));
+                     if (existing) return existing;
+                     return typeof v === 'string'
+                       ? { label: v, userId: null, amount: '' }
+                       : { label: v.username, userId: v.userId, amount: '' };
+                   })
+                 }));
+               }}
+               renderInput={(params) => (
+                 <TextField
+                   {...params}
+                   label="Split with *"
+                   placeholder="Search accounts, or type a name"
+                   helperText="People with an account see the split in their own panel"
+                 />
+               )}
+             />
+           </Grid>
+
+           {splitForm.people.length > 0 && (
+             <Grid item xs={12}>
+               <Box
+                 sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', px: 2, py: 0.5, mb: 1.5 }}
+               >
+                 <FormControlLabel
+                   control={
+                     <Switch
+                       checked={splitForm.splitWithMe}
+                       onChange={(e) => setSplitForm(prev => ({ ...prev, splitWithMe: e.target.checked }))}
+                     />
+                   }
+                   label="I shared this too"
+                 />
+               </Box>
+               <Typography variant="caption" color="text.secondary">
+                 Leave amounts blank to divide evenly, or set one to fix that person's share
+               </Typography>
+               {splitForm.people.map((person, index) => (
+                 <Box key={person.label} display="flex" alignItems="center" gap={2} sx={{ mt: 1.5 }}>
+                   <Chip
+                     label={person.label}
+                     size="small"
+                     color={person.userId ? 'primary' : 'default'}
+                     variant={person.userId ? 'filled' : 'outlined'}
+                     sx={{ minWidth: 110 }}
+                   />
+                   <TextField
+                     size="small" type="number" placeholder="even"
+                     value={person.amount}
+                     onChange={(e) => setSplitForm(prev => {
+                       const people = [...prev.people];
+                       people[index] = { ...people[index], amount: e.target.value };
+                       return { ...prev, people };
+                     })}
+                     InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+                     sx={{ width: 150 }}
+                   />
+                 </Box>
+               ))}
+             </Grid>
+           )}
+
+           {(() => {
+             const preview = previewShares();
+             if (!preview) return null;
+             if (preview.error) {
+               return (
+                 <Grid item xs={12}>
+                   <Alert severity="warning">{preview.error}</Alert>
+                 </Grid>
+               );
+             }
+             return (
+               <Grid item xs={12}>
+                 <Paper
+                   elevation={0}
+                   sx={{ p: 2, borderRadius: 2, border: '1px dashed', borderColor: 'divider' }}
+                 >
+                   <Typography variant="caption" color="text.secondary">Who owes what</Typography>
+                   {preview.shares.map((share) => (
+                     <Box key={share.label} display="flex" justifyContent="space-between" sx={{ mt: 0.5 }}>
+                       <Typography variant="body2">{share.label}</Typography>
+                       <Typography variant="body2" fontWeight={600}>
+                         {formatCurrency(share.amount)}
+                       </Typography>
+                     </Box>
+                   ))}
+                   <Box display="flex" justifyContent="space-between" sx={{ mt: 0.5 }}>
+                     <Typography variant="body2" color="text.secondary">you</Typography>
+                     <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                       {formatCurrency(preview.yours)}
+                     </Typography>
+                   </Box>
+                 </Paper>
+               </Grid>
+             );
+           })()}
+         </Grid>
+       </DialogContent>
+       <DialogActions>
+         <Button onClick={closeSplitForm} color="inherit">Cancel</Button>
+         <Button
+           onClick={saveManualSplit}
+           variant="contained"
+           disabled={splitForm.saving || !splitForm.amount || splitForm.people.length === 0}
+         >
+           {splitForm.saving ? 'Saving...' : 'Create split'}
+         </Button>
        </DialogActions>
      </Dialog>
 

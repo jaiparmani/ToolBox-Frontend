@@ -434,6 +434,57 @@ export const settleUpWith = async ({ personId, owedToUserId }) => {
     }
 };
 
+// Accounts you can split with. Without a search term this returns only people
+// you've already split with, so it isn't a directory of every user.
+export const searchSplitUsers = async (search = '') => {
+    try {
+        const query = search ? `?search=${encodeURIComponent(search)}` : '';
+        const response = await authenticatedFetch(`${API_BASE_URL}/people/available_users/${query}`);
+        const data = await response.json();
+        return (data || []).map(u => ({
+            userId: u.user_id, username: u.username, alreadyAdded: u.already_added
+        }));
+    } catch (error) {
+        throw handleApiError(error, 'find people to split with');
+    }
+};
+
+/**
+ * Create a split from exact fields - no model call, so the numbers are
+ * whatever was typed and it costs nothing against the daily AI quota.
+ * participants: [{ userId }] for app accounts, or [{ name }] for someone
+ * without one; add `amount` to a participant to set their share explicitly.
+ */
+export const createSplitManually = async ({ amount, description, categoryId, date,
+                                            splitWithMe = true, participants }) => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/create_split/`, {
+            method: 'POST',
+            body: JSON.stringify({
+                amount,
+                description,
+                category_id: categoryId || undefined,
+                date: date || undefined,
+                split_with_me: splitWithMe,
+                participants: participants.map(p => ({
+                    user_id: p.userId || undefined,
+                    name: p.userId ? undefined : p.name,
+                    amount: p.amount || undefined
+                }))
+            })
+        });
+        const data = await response.json();
+        return {
+            expense: transformExpenseForUI(data.expense),
+            splits: data.splits || [],
+            yourShare: parseFloat(data.your_share || 0),
+            owedToYou: parseFloat(data.owed_to_you || 0)
+        };
+    } catch (error) {
+        throw handleApiError(error, 'create the split');
+    }
+};
+
 // Legacy function for backward compatibility
 export const addExpenseApiLegacy = (user, amount, category, date, description, onSuccess, onError) => {
     addExpenseApi({

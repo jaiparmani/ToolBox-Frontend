@@ -154,7 +154,8 @@ export default function ExpenseTrackerPage() {
 
  // Shared bills: who owes what
  const [splits, setSplits] = useState({
-   text: '', loading: false, balances: [], totalOwed: 0, loaded: false, settling: null
+   text: '', loading: false, balances: [], youOwe: [],
+   totalOwed: 0, totalYouOwe: 0, net: 0, loaded: false, settling: null
  });
 
  // Load data when authenticated
@@ -411,7 +412,13 @@ export default function ExpenseTrackerPage() {
    try {
      const data = await getSplitBalances();
      setSplits(prev => ({
-       ...prev, balances: data.balances, totalOwed: data.totalOwedToYou, loaded: true
+       ...prev,
+       balances: data.balances,
+       youOwe: data.youOwe,
+       totalOwed: data.totalOwedToYou,
+       totalYouOwe: data.totalYouOwe,
+       net: data.net,
+       loaded: true
      }));
    } catch (error) {
      setSplits(prev => ({ ...prev, loaded: true }));
@@ -439,11 +446,18 @@ export default function ExpenseTrackerPage() {
    }
  };
 
- const handleSettle = async (balance) => {
-   if (!window.confirm(`Mark ${balance.name}'s ${formatCurrency(balance.owed)} as settled?`)) return;
-   setSplits(prev => ({ ...prev, settling: balance.personId }));
+ const handleSettle = async (balance, direction = 'owed_to_me') => {
+   const owedByMe = direction === 'i_owe';
+   const prompt = owedByMe
+     ? `Mark the ${formatCurrency(balance.owed)} you owe ${balance.name} as paid?`
+     : `Mark ${balance.name}'s ${formatCurrency(balance.owed)} as settled?`;
+   if (!window.confirm(prompt)) return;
+
+   const key = owedByMe ? `u${balance.userId}` : balance.personId;
+   setSplits(prev => ({ ...prev, settling: key }));
    try {
-     const result = await settleUpWith(balance.personId);
+     const result = await settleUpWith(
+       owedByMe ? { owedToUserId: balance.userId } : { personId: balance.personId });
      setSuccess(`Settled ${formatCurrency(result.total)} with ${balance.name}`);
      setSplits(prev => ({ ...prev, settling: null }));
      loadBalances();
@@ -1630,6 +1644,52 @@ export default function ExpenseTrackerPage() {
              </Typography>
            </Paper>
 
+           {/* You owe - the other side of a split somebody else paid for */}
+           {splits.youOwe.length > 0 && (
+             <Paper
+               elevation={0}
+               sx={{
+                 p: 2.5, mb: 3, borderRadius: 3, border: '1px solid',
+                 borderColor: 'rgba(255,69,58,0.4)',
+                 background: 'linear-gradient(135deg, rgba(255,69,58,0.10), transparent)',
+               }}
+             >
+               <Typography variant="overline" color="text.secondary">You owe</Typography>
+               <Typography variant="h4" sx={{ fontWeight: 600, color: '#FF453A', mb: 1.5 }}>
+                 {formatCurrency(splits.totalYouOwe)}
+               </Typography>
+               {splits.youOwe.map((debt) => (
+                 <Box
+                   key={debt.userId}
+                   display="flex" alignItems="center" justifyContent="space-between"
+                   gap={2} flexWrap="wrap"
+                   sx={{ py: 1, borderTop: '1px solid', borderColor: 'divider' }}
+                 >
+                   <Box>
+                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{debt.name}</Typography>
+                     <Typography variant="caption" color="text.secondary">
+                       {debt.unsettledCount} shared {debt.unsettledCount === 1 ? 'bill' : 'bills'} they paid for
+                     </Typography>
+                   </Box>
+                   <Box display="flex" alignItems="center" gap={2}>
+                     <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                       {formatCurrency(debt.owed)}
+                     </Typography>
+                     <Button
+                       size="small"
+                       variant="outlined"
+                       startIcon={<DoneAllIcon />}
+                       onClick={() => handleSettle(debt, 'i_owe')}
+                       disabled={splits.settling === `u${debt.userId}`}
+                     >
+                       {splits.settling === `u${debt.userId}` ? 'Settling...' : 'Mark paid'}
+                     </Button>
+                   </Box>
+                 </Box>
+               ))}
+             </Paper>
+           )}
+
            {/* Owed to you */}
            {splits.totalOwed > 0 && (
              <Paper
@@ -1646,7 +1706,7 @@ export default function ExpenseTrackerPage() {
              </Paper>
            )}
 
-           {splits.balances.length === 0 ? (
+           {splits.balances.length === 0 && splits.youOwe.length === 0 ? (
              <Paper
                elevation={0}
                sx={{ p: 4, borderRadius: 3, textAlign: 'center', border: '1px dashed', borderColor: 'divider' }}
@@ -1686,10 +1746,11 @@ export default function ExpenseTrackerPage() {
                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>
                              {balance.name}
                            </Typography>
-                           <Typography variant="caption" color="text.secondary">
+                           <Typography variant="caption" color="text.secondary" noWrap>
                              {balance.unsettledCount === 0
                                ? 'all settled'
                                : `${balance.unsettledCount} unsettled`}
+                             {balance.linkedUsername ? ' · has an account' : ''}
                            </Typography>
                          </Box>
                        </Box>

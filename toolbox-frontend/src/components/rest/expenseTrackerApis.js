@@ -394,8 +394,18 @@ export const getSplitBalances = async () => {
         const data = await response.json();
         return {
             totalOwedToYou: parseFloat(data.total_owed_to_you || 0),
+            totalYouOwe: parseFloat(data.total_you_owe || 0),
+            net: parseFloat(data.net || 0),
             balances: (data.balances || []).map(b => ({
                 personId: b.person_id,
+                name: b.name,
+                linkedUsername: b.linked_username || null,
+                owed: parseFloat(b.owed || 0),
+                unsettledCount: b.unsettled_count || 0
+            })),
+            // Splits pointing at you, on bills somebody else paid.
+            youOwe: (data.you_owe || []).map(b => ({
+                userId: b.user_id,
                 name: b.name,
                 owed: parseFloat(b.owed || 0),
                 unsettledCount: b.unsettled_count || 0
@@ -406,11 +416,16 @@ export const getSplitBalances = async () => {
     }
 };
 
-export const settleUpWith = async (personId) => {
+/**
+ * Record that the money moved. Either side can do it: pass person_id when
+ * someone has paid you back, or owed_to_user_id when you have paid them.
+ */
+export const settleUpWith = async ({ personId, owedToUserId }) => {
     try {
         const response = await authenticatedFetch(`${API_BASE_URL}/splits/settle/`, {
             method: 'POST',
-            body: JSON.stringify({ person_id: personId })
+            body: JSON.stringify(personId ? { person_id: personId }
+                                          : { owed_to_user_id: owedToUserId })
         });
         const data = await response.json();
         return { count: data.settled_count || 0, total: parseFloat(data.settled_total || 0) };

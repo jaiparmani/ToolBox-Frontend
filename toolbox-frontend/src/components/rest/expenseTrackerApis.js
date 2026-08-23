@@ -340,6 +340,31 @@ export const moveOpenRouterKeyToBack = async (id) => {
     }
 };
 
+/**
+ * Ask a question about spending in plain words. The server has the model pick
+ * filter values only - the matching and the arithmetic are done in the database,
+ * so the totals are real rather than model-written.
+ */
+export const askExpenses = async (question) => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/ask/`, {
+            method: 'POST',
+            body: JSON.stringify({ question })
+        });
+        const data = await response.json();
+        return {
+            question: data.question,
+            interpretation: data.interpretation,
+            filters: data.filters || {},
+            total: parseFloat(data.total || 0),
+            count: data.count || 0,
+            results: (data.results || []).map(transformExpenseForUI)
+        };
+    } catch (error) {
+        throw handleApiError(error, 'answer that question');
+    }
+};
+
 // Legacy function for backward compatibility
 export const addExpenseApiLegacy = (user, amount, category, date, description, onSuccess, onError) => {
     addExpenseApi({

@@ -30,7 +30,8 @@ import {
   Insights as InsightsIcon,
   Lightbulb as LightbulbIcon,
   WarningAmber as WarningAmberIcon,
-  HelpOutline as HelpOutlineIcon
+  HelpOutline as HelpOutlineIcon,
+  QuestionAnswer as QuestionAnswerIcon
 } from '@mui/icons-material';
 
 // Import API functions and reusable components
@@ -39,7 +40,7 @@ import {
   getCategories, createCategory, updateCategory, deleteCategory,
   getTags, createTag, updateTag, deleteTag,
   getExpenseSummary, quickAddExpense, bulkAddExpenses,
-  generateExpenseInsight, getLatestExpenseInsight
+  generateExpenseInsight, getLatestExpenseInsight, askExpenses
 } from '../rest/expenseTrackerApis';
 
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
@@ -143,6 +144,9 @@ export default function ExpenseTrackerPage() {
 
  // Spending review written by the model
  const [insight, setInsight] = useState({ data: null, loading: false, loaded: false });
+
+ // Plain-language question over the expense list
+ const [ask, setAsk] = useState({ question: '', loading: false, answer: null });
 
  // Load data when authenticated
  useEffect(() => {
@@ -394,6 +398,23 @@ export default function ExpenseTrackerPage() {
    }
  };
 
+ const runAsk = async () => {
+   if (!ask.question.trim()) {
+     setError('Type a question first');
+     return;
+   }
+   setAsk(prev => ({ ...prev, loading: true }));
+   try {
+     const answer = await askExpenses(ask.question.trim());
+     setAsk(prev => ({ ...prev, loading: false, answer }));
+   } catch (error) {
+     setAsk(prev => ({ ...prev, loading: false }));
+     setError(error.message || 'Could not answer that');
+   }
+ };
+
+ const clearAsk = () => setAsk({ question: '', loading: false, answer: null });
+
  const loadLatestInsight = async () => {
    try {
      const latest = await getLatestExpenseInsight();
@@ -600,9 +621,12 @@ export default function ExpenseTrackerPage() {
  };
 
  const formatCurrency = (amount) => {
-   return new Intl.NumberFormat('en-US', {
+   // Amounts are stored and returned by the server in rupees - it formats them
+   // as such in amount_display - so showing them as dollars here misreported
+   // every figure on the page.
+   return new Intl.NumberFormat('en-IN', {
      style: 'currency',
-     currency: 'USD'
+     currency: 'INR'
    }).format(amount || 0);
  };
 
@@ -906,6 +930,118 @@ export default function ExpenseTrackerPage() {
        {/* Expenses Tab */}
        {activeTab === 0 && (
          <Box sx={{ p: 3 }}>
+           {/* Ask a question in plain words */}
+           <Paper
+             elevation={0}
+             sx={{
+               p: 2.5, mb: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider',
+               backgroundColor: (theme) =>
+                 theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
+             }}
+           >
+             <Box display="flex" alignItems="center" gap={1} sx={{ mb: 2 }}>
+               <Box
+                 sx={{
+                   width: 26, height: 26, borderRadius: '8px',
+                   backgroundColor: 'rgba(48,209,88,0.12)',
+                   display: 'flex', alignItems: 'center', justifyContent: 'center',
+                 }}
+               >
+                 <QuestionAnswerIcon sx={{ color: '#30D158', fontSize: 15 }} />
+               </Box>
+               <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                 Ask
+               </Typography>
+             </Box>
+             <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
+               <TextField
+                 fullWidth
+                 size="small"
+                 sx={{ flex: 1, minWidth: 240 }}
+                 placeholder='e.g. "how much on food last month" or "anything over 1000"'
+                 value={ask.question}
+                 onChange={(e) => setAsk(prev => ({ ...prev, question: e.target.value }))}
+                 disabled={ask.loading}
+                 onKeyDown={(e) => { if (e.key === 'Enter') runAsk(); }}
+               />
+               <Button
+                 variant="contained"
+                 onClick={runAsk}
+                 disabled={ask.loading || !ask.question.trim()}
+                 startIcon={<AutoAwesomeIcon />}
+               >
+                 {ask.loading ? 'Asking...' : 'Ask'}
+               </Button>
+               {ask.answer && (
+                 <Button onClick={clearAsk} color="inherit">Clear</Button>
+               )}
+             </Box>
+
+             {ask.loading && <LinearProgress sx={{ mt: 2 }} />}
+
+             {ask.answer && (
+               <Box sx={{ mt: 2.5 }}>
+                 <Box display="flex" alignItems="baseline" gap={2} flexWrap="wrap">
+                   <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                     {formatCurrency(ask.answer.total)}
+                   </Typography>
+                   <Typography variant="body2" color="text.secondary">
+                     across {ask.answer.count} {ask.answer.count === 1 ? 'transaction' : 'transactions'}
+                   </Typography>
+                 </Box>
+                 {ask.answer.interpretation && (
+                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                     {ask.answer.interpretation}
+                   </Typography>
+                 )}
+                 {Object.keys(ask.answer.filters).length > 0 && (
+                   <Box display="flex" gap={0.5} flexWrap="wrap" sx={{ mt: 1.5 }}>
+                     {Object.entries(ask.answer.filters).map(([key, value]) => (
+                       <Chip key={key} size="small" variant="outlined" label={`${key}: ${value}`} />
+                     ))}
+                   </Box>
+                 )}
+                 {ask.answer.results.length > 0 && (
+                   <TableContainer sx={{ mt: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                     <Table size="small">
+                       <TableBody>
+                         {ask.answer.results.slice(0, 10).map((row) => (
+                           <TableRow key={row.id} hover>
+                             <TableCell sx={{ width: 110 }}>
+                               <Typography variant="body2" color="text.secondary">
+                                 {formatDate(row.date)}
+                               </Typography>
+                             </TableCell>
+                             <TableCell>{row.description}</TableCell>
+                             <TableCell sx={{ width: 150 }}>
+                               {row.category && (
+                                 <Chip
+                                   label={row.category.name}
+                                   size="small"
+                                   sx={{ backgroundColor: row.category.color, color: '#fff', fontSize: '0.7rem' }}
+                                 />
+                               )}
+                             </TableCell>
+                             <TableCell align="right" sx={{ width: 120 }}>
+                               <Typography variant="body2" fontWeight={600}>
+                                 {row.displayAmount || formatCurrency(row.amount)}
+                               </Typography>
+                             </TableCell>
+                           </TableRow>
+                         ))}
+                       </TableBody>
+                     </Table>
+                   </TableContainer>
+                 )}
+                 {ask.answer.count > 10 && (
+                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                     Showing the 10 most recent of {ask.answer.count}.
+                   </Typography>
+                 )}
+               </Box>
+             )}
+           </Paper>
+
            {/* Filters */}
            <Paper
              elevation={0}

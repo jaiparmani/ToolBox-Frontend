@@ -485,6 +485,31 @@ export const createSplitManually = async ({ amount, description, categoryId, dat
     }
 };
 
+// The individual splits behind a balance, so a person's card can show the
+// bills rather than just the total.
+export const getSplits = async ({ personId, settled } = {}) => {
+    try {
+        const params = new URLSearchParams();
+        if (personId) params.append('person', personId);
+        if (settled) params.append('settled', settled);
+        const query = params.toString() ? `?${params}` : '';
+        const response = await authenticatedFetch(`${API_BASE_URL}/splits/${query}`);
+        const data = await response.json();
+        return (data.results || data || []).map(s => ({
+            id: s.id,
+            description: s.description,
+            date: s.date,
+            amount: parseFloat(s.amount),
+            expenseTotal: parseFloat(s.expense_total || 0),
+            personName: s.person_name,
+            paidBy: s.paid_by,
+            isSettled: s.is_settled
+        }));
+    } catch (error) {
+        throw handleApiError(error, 'load the splits');
+    }
+};
+
 // Legacy function for backward compatibility
 export const addExpenseApiLegacy = (user, amount, category, date, description, onSuccess, onError) => {
     addExpenseApi({

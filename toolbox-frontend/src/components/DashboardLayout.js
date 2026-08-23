@@ -12,6 +12,7 @@ import FavoriteIcon from '@mui/icons-material/Favorite';
 import LayersIcon from '@mui/icons-material/Layers';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import LogoutIcon from '@mui/icons-material/Logout';
 import LightModeIcon from '@mui/icons-material/LightMode';
@@ -44,6 +45,11 @@ const NAVIGATION = [
     segment: 'expense-tracker',
     title: 'Expenses',
     icon: <BarChartIcon />,
+  },
+  {
+    segment: 'splits',
+    title: 'Splits',
+    icon: <CallSplitIcon />,
   },
   {
     segment: 'hobby-tracker',

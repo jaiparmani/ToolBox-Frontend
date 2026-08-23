@@ -13,6 +13,7 @@ import UserProfilePage from './screens/UserProfilePage'
 import LandingPage from './screens/LandingPage'
 import QRCodeGenerator from './screens/QRCodeGenerator'
 import ApiKeysPage from './screens/ApiKeysPage'
+import SplitsPage from './screens/SplitsPage'
 import { Box, CircularProgress, Typography } from '@mui/material'
 
 // Loading Component
@@ -109,6 +110,12 @@ export default function Router() {
       <Route path="/array-sum" element={
         <ProtectedRoute>
           <ArraySumDemo />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/splits" element={
+        <ProtectedRoute>
+          <SplitsPage />
         </ProtectedRoute>
       } />
 

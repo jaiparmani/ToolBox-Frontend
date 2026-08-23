@@ -4,6 +4,7 @@ import Router from './components/Router';
 import ErrorBoundary from './components/ErrorBoundary';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { motion, shadows, surfaces } from './theme/tokens';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './contexts/AuthContext';
 import { ColorModeContext } from './contexts/ColorModeContext';
@@ -34,30 +35,44 @@ const getTheme = (mode) => createTheme({
       ? { primary: '#f5f5f7', secondary: '#a1a1a6' }
       : { primary: '#1d1d1f', secondary: '#6e6e73' },
     background: mode === 'dark'
-      ? { default: '#000000', paper: '#1c1c1e' }
-      : { default: '#f5f5f7', paper: '#ffffff' },
-    divider: mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)',
+      // Not pure black: a near-black with a touch of blue gives the glass
+      // panels something to sit on, so edges read as depth instead of seams.
+      ? { default: surfaces.dark.canvas, paper: '#151518' }
+      : { default: surfaces.light.canvas, paper: '#ffffff' },
+    divider: mode === 'dark' ? surfaces.dark.hairline : surfaces.light.hairline,
   },
   typography: {
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
     h1: { fontWeight: 700, letterSpacing: '-0.02em' },
     h2: { fontWeight: 700, letterSpacing: '-0.02em' },
     h3: { fontWeight: 700, letterSpacing: '-0.015em' },
-    h4: { fontWeight: 600, letterSpacing: '-0.01em' },
-    h5: { fontWeight: 600, letterSpacing: '-0.005em' },
-    h6: { fontWeight: 600 },
-    button: { textTransform: 'none', fontWeight: 500 },
+    // Headings shrink on small screens rather than wrapping mid-word.
+    h4: { fontWeight: 650, letterSpacing: '-0.02em', fontSize: 'clamp(1.5rem, 4.5vw, 2.125rem)' },
+    h5: { fontWeight: 650, letterSpacing: '-0.015em', fontSize: 'clamp(1.25rem, 3.6vw, 1.5rem)' },
+    h6: { fontWeight: 650, letterSpacing: '-0.01em' },
+    // Numbers line up in columns only if the digits are the same width.
+    subtitle2: { fontWeight: 600, letterSpacing: '-0.005em' },
+    button: { textTransform: 'none', fontWeight: 550 },
   },
   shape: {
     borderRadius: 14,
   },
   components: {
     MuiButton: {
+      defaultProps: { disableElevation: true },
       styleOverrides: {
         root: {
           borderRadius: 980,
           padding: '9px 24px',
           fontSize: '0.95rem',
+          minHeight: 42,
+          transition: `transform ${motion.fast}ms ${motion.ease}, background-color ${motion.fast}ms ${motion.ease}, box-shadow ${motion.fast}ms ${motion.ease}`,
+          // A touch device has no hover, so the press itself has to answer.
+          '&:active': { transform: 'scale(0.97)' },
+          '@media (prefers-reduced-motion: reduce)': {
+            transition: 'none',
+            '&:active': { transform: 'none' },
+          },
         },
         containedPrimary: {
           boxShadow: 'none',
@@ -69,9 +84,42 @@ const getTheme = (mode) => createTheme({
       styleOverrides: {
         root: {
           borderRadius: 18,
-          boxShadow: mode === 'dark' ? '0 2px 24px rgba(0,0,0,0.4)' : '0 2px 24px rgba(0,0,0,0.05)',
+          boxShadow: mode === 'dark' ? shadows.dark.card : shadows.light.card,
+          transition: `transform ${motion.normal}ms ${motion.ease}, box-shadow ${motion.normal}ms ${motion.ease}, border-color ${motion.normal}ms ${motion.ease}`,
+          '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
         },
       },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          transition: `transform ${motion.fast}ms ${motion.ease}, background-color ${motion.fast}ms ${motion.ease}`,
+          '&:active': { transform: 'scale(0.92)' },
+          '@media (prefers-reduced-motion: reduce)': {
+            transition: 'none',
+            '&:active': { transform: 'none' },
+          },
+        },
+      },
+    },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          borderRadius: 22,
+          // Full-width sheet on a phone, centred dialog with room above on desktop.
+          '@media (max-width:600px)': {
+            margin: 12,
+            width: 'calc(100% - 24px)',
+            maxHeight: 'calc(100% - 24px)',
+          },
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: { root: { fontWeight: 550 } },
+    },
+    MuiTooltip: {
+      defaultProps: { enterTouchDelay: 400 },
     },
     MuiPaper: {
       styleOverrides: {

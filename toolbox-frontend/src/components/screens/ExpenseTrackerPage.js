@@ -7,7 +7,8 @@ import {
   Fab, Switch, FormControlLabel, Tab, Tabs,
   Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, TablePagination, InputAdornment, Menu, MenuItem,
-  ListItemIcon, ListItemText, LinearProgress, Autocomplete
+  ListItemIcon, ListItemText, LinearProgress, Autocomplete,
+  Stack, useMediaQuery, Collapse
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -51,6 +52,14 @@ import {
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
 import AutocompleteComponent from '../ReusableComponents/AutocompleteComponent';
 import NavbarComponent from '../NavbarComponent';
+import SummaryStrip from '../ui/SummaryStrip';
+import SectionNav from '../ui/SectionNav';
+import ExpenseItem from '../ui/ExpenseItem';
+import QuickCapture from '../ui/QuickCapture';
+import ThinkingHint from '../ui/ThinkingHint';
+import ErrorBanner from '../ui/ErrorBanner';
+import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
+import { money } from '../ui/money';
 
 // Color palette for categories
 const categoryColors = [
@@ -135,6 +144,10 @@ export default function ExpenseTrackerPage() {
    total: 0
  });
  const [sortBy, setSortBy] = useState('-date');
+ // Filters start closed on a phone, open on desktop where there's room.
+ const isCompact = useMediaQuery((theme) => theme.breakpoints.down('md'));
+ const [filtersOpen, setFiltersOpen] = useState(false);
+ useEffect(() => { setFiltersOpen(!isCompact); }, [isCompact]);
  const [anchorEl, setAnchorEl] = useState(null);
  const [menuType, setMenuType] = useState(null);
 
@@ -787,6 +800,13 @@ export default function ExpenseTrackerPage() {
    setMenuType(null);
  };
 
+ // Shown next to the Filters heading so a filter hidden behind the fold can't
+ // silently explain why the list looks short.
+ const activeFilterCount = [
+   filters.search, filters.category, filters.dateFrom, filters.dateTo,
+   filters.amountMin, filters.amountMax,
+ ].filter(Boolean).length + (filters.tags?.length ? 1 : 0);
+
  const formatCurrency = (amount) => {
    // Amounts are stored and returned by the server in rupees - it formats them
    // as such in amount_display - so showing them as dollars here misreported
@@ -857,194 +877,120 @@ export default function ExpenseTrackerPage() {
  return (
    <>
      <NavbarComponent />
-     <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
-     {/* Header */}
+     <Container
+       maxWidth="xl"
+       sx={{
+         mt: { xs: 1.5, sm: 2 },
+         px: { xs: 2, sm: 3 },
+         // Room for the fixed bottom nav (and the home indicator under it).
+         pb: { xs: 'calc(72px + env(safe-area-inset-bottom))', md: 4 },
+       }}
+     >
+     {/* Header - stays reachable, shrinks to icons on a phone */}
      <Paper
        elevation={0}
        sx={{
-         p: 3, mb: 3,
-         position: 'relative',
-         overflow: 'hidden',
-         border: '1px solid',
-         borderColor: 'divider',
+         p: { xs: 2, sm: 3 }, mb: { xs: 2, sm: 3 },
+         position: 'relative', overflow: 'hidden',
+         border: '1px solid', borderColor: 'divider',
          '&::before': {
-           content: '""',
-           position: 'absolute',
-           inset: 0,
+           content: '""', position: 'absolute', inset: 0,
            background: 'radial-gradient(circle at 0% 0%, rgba(10,132,255,0.18), transparent 55%)',
          },
        }}
      >
-       <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} sx={{ position: 'relative' }}>
-         <Box display="flex" alignItems="center" gap={2}>
+       <Box display="flex" justifyContent="space-between" alignItems="center" gap={1.5} sx={{ position: 'relative' }}>
+         <Box display="flex" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
            <Box
              sx={{
-               width: 48, height: 48, borderRadius: '14px',
+               width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 }, borderRadius: '14px',
                background: 'linear-gradient(135deg, #0A84FF, #64D2FF)',
-               display: 'flex', alignItems: 'center', justifyContent: 'center',
+               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                boxShadow: '0 8px 20px rgba(10,132,255,0.4)',
              }}
            >
-             <DashboardIcon sx={{ fontSize: 26, color: '#fff' }} />
+             <DashboardIcon sx={{ fontSize: { xs: 22, sm: 26 }, color: '#fff' }} />
            </Box>
-           <Box>
-             <Typography variant="h4" component="h1">
-               Expense Tracker
+           <Box sx={{ minWidth: 0 }}>
+             <Typography sx={{ fontWeight: 650, letterSpacing: '-0.02em', fontSize: { xs: '1.35rem', sm: '2rem' } }} noWrap>
+               Expenses
              </Typography>
-             <Typography variant="body2" color="text.secondary">
+             <Typography variant="body2" color="text.secondary" noWrap sx={{ display: { xs: 'none', sm: 'block' } }}>
                Manage your expenses efficiently
              </Typography>
            </Box>
          </Box>
-         <Box display="flex" alignItems="center" gap={2}>
-           <Tooltip title="Refresh data (Ctrl+R)">
-             <IconButton onClick={loadAllData} disabled={loading}>
-               <RefreshIcon />
+         <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
+           <Tooltip title="Refresh">
+             <IconButton onClick={loadAllData} disabled={loading} size="small" sx={{ width: 40, height: 40 }}>
+               <RefreshIcon fontSize="small" />
              </IconButton>
            </Tooltip>
            <Tooltip title="Import from a pasted chat log">
-             <Button
-               variant="outlined"
-               startIcon={<UploadFileIcon />}
-               onClick={openBulkImport}
-             >
-               Bulk Import
-             </Button>
-           </Tooltip>
-           <Tooltip title="Add expense (Ctrl+N)">
-             <Button
-               variant="contained"
-               startIcon={<AddIcon />}
-               onClick={() => openExpenseForm()}
-             >
-               Add Expense
-             </Button>
-           </Tooltip>
-           <Tooltip title="Logout">
-             <IconButton onClick={handleLogout} color="error">
-               <LogoutIcon />
+             <IconButton onClick={openBulkImport} size="small" sx={{ width: 40, height: 40 }}>
+               <UploadFileIcon fontSize="small" />
              </IconButton>
            </Tooltip>
-         </Box>
+           {/* Full-form actions only where there is room for them */}
+           <Button
+             variant="contained"
+             startIcon={<AddIcon />}
+             onClick={() => openExpenseForm()}
+             sx={{ display: { xs: 'none', md: 'inline-flex' } }}
+           >
+             Add Expense
+           </Button>
+           <Tooltip title="Logout">
+             <IconButton onClick={handleLogout} color="error" size="small" sx={{ width: 40, height: 40 }}>
+               <LogoutIcon fontSize="small" />
+             </IconButton>
+           </Tooltip>
+         </Stack>
        </Box>
      </Paper>
 
-     {/* Quick Add - free text parsed by the LLM router endpoint */}
-     <Paper
-       elevation={0}
-       sx={{
-         p: 2.5, mb: 3, borderRadius: 3,
-         border: '1px solid',
-         borderColor: 'divider',
-         backgroundColor: (theme) =>
-           theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
-       }}
+     {/* Capture: the primary action, sized for a thumb */}
+     <Box sx={{ mb: { xs: 2, sm: 3 } }}>
+       <QuickCapture
+         value={quickAddText}
+         onChange={(value) => setQuickAddText(value)}
+         onSubmit={handleQuickAdd}
+         loading={quickAddLoading}
+         placeholder="20 aamras, 58 chai vada pav…"
+         hint="Type it how you'd say it — the amount and category are worked out for you"
+       />
+       <ThinkingHint show={quickAddLoading} label="Reading that expense…" />
+     </Box>
+
+     {/* Failures stay until dismissed; confirmations fade on their own */}
+     <ErrorBanner error={error} onClose={() => setError(null)} />
+     <Snackbar
+       open={!!success}
+       autoHideDuration={4000}
+       onClose={() => setSuccess(null)}
+       anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+       sx={{ bottom: { xs: 80, md: 24 } }}
      >
-       <Box display="flex" alignItems="center" gap={1} sx={{ mb: 2 }}>
-         <Box
-           sx={{
-             width: 26, height: 26, borderRadius: '8px',
-             backgroundColor: 'rgba(191,90,242,0.12)',
-             display: 'flex', alignItems: 'center', justifyContent: 'center',
-           }}
-         >
-           <AutoAwesomeIcon sx={{ color: '#BF5AF2', fontSize: 15 }} />
-         </Box>
-         <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600 }}>
-           Quick Add
-         </Typography>
-       </Box>
-       <Box display="flex" gap={2} alignItems="flex-start" flexWrap="wrap">
-         <TextField
-           fullWidth
-           multiline
-           minRows={2}
-           placeholder='Type an expense in plain words, e.g. "20 aamras" or "58 chai vada pav"'
-           value={quickAddText}
-           onChange={(e) => setQuickAddText(e.target.value)}
-           disabled={quickAddLoading}
-           sx={{ flex: 1, minWidth: 240 }}
-           onKeyDown={(e) => {
-             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-               e.preventDefault();
-               handleQuickAdd();
-             }
-           }}
-         />
-         <Button
-           variant="contained"
-           onClick={handleQuickAdd}
-           disabled={quickAddLoading || !quickAddText.trim()}
-           startIcon={<AutoAwesomeIcon />}
-         >
-           {quickAddLoading ? 'Adding...' : 'Add'}
-         </Button>
-       </Box>
-     </Paper>
-
-     {/* Error/Success Messages */}
-     <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)}>
-       <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
-         {error}
-       </Alert>
-     </Snackbar>
-     <Snackbar open={!!success} autoHideDuration={4000} onClose={() => setSuccess(null)}>
-       <Alert onClose={() => setSuccess(null)} severity="success" sx={{ width: '100%' }}>
+       <Alert onClose={() => setSuccess(null)} severity="success" sx={{ width: '100%', borderRadius: 3 }}>
          {success}
        </Alert>
      </Snackbar>
 
-     {/* Loading Progress */}
-     {loading && <LinearProgress sx={{ mb: 2 }} />}
-
-     {/* Summary Dashboard */}
-     {summary && (
-       <Grid container spacing={3} sx={{ mb: 3 }}>
-         {[
-           { label: 'Total Expenses', value: formatCurrency(summary.totalExpenses), icon: TrendingUpIcon, color: '#FF453A' },
-           { label: 'Total Income', value: formatCurrency(summary.totalIncome), icon: TrendingDownIcon, color: '#30D158' },
-           { label: 'Net Balance', value: formatCurrency(summary.netBalance), icon: BalanceIcon, color: '#0A84FF' },
-           { label: 'Transactions', value: summary.transactionCount, icon: DashboardIcon, color: '#BF5AF2' },
-         ].map((stat) => (
-           <Grid item xs={12} sm={6} md={3} key={stat.label}>
-             <Card
-               elevation={0}
-               sx={{
-                 border: '1px solid',
-                 borderColor: 'divider',
-                 backgroundColor: (theme) =>
-                   theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
-                 backdropFilter: 'blur(20px)',
-                 transition: 'transform 0.2s ease, border-color 0.2s ease',
-                 '&:hover': { transform: 'translateY(-3px)', borderColor: stat.color },
-               }}
-             >
-               <CardContent>
-                 <Box display="flex" alignItems="center" justifyContent="space-between">
-                   <Box>
-                     <Typography color="text.secondary" gutterBottom variant="overline">
-                       {stat.label}
-                     </Typography>
-                     <Typography variant="h5">
-                       {stat.value}
-                     </Typography>
-                   </Box>
-                   <Box
-                     sx={{
-                       width: 44, height: 44, borderRadius: '12px',
-                       backgroundColor: `${stat.color}1f`,
-                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                     }}
-                   >
-                     <stat.icon sx={{ color: stat.color, fontSize: 22 }} />
-                   </Box>
-                 </Box>
-               </CardContent>
-             </Card>
-           </Grid>
-         ))}
-       </Grid>
-     )}
+     {/* Headline figures */}
+     <Box sx={{ mb: { xs: 2, sm: 3 } }}>
+       {!summary && loading ? (
+         <SummarySkeleton />
+       ) : summary ? (
+         <SummaryStrip
+           stats={[
+             { label: 'Spent', raw: summary.totalExpenses, icon: TrendingUpIcon, color: '#FF453A' },
+             { label: 'Income', raw: summary.totalIncome, icon: TrendingDownIcon, color: '#30D158' },
+             { label: 'Balance', raw: summary.netBalance, icon: BalanceIcon, color: '#0A84FF' },
+             { label: 'Transactions', value: summary.transactionCount, icon: DashboardIcon, color: '#BF5AF2' },
+           ]}
+         />
+       ) : null}
+     </Box>
 
      {/* Main Content Tabs */}
      <Paper
@@ -1059,93 +1005,44 @@ export default function ExpenseTrackerPage() {
          backdropFilter: 'blur(20px)',
        }}
      >
-       <Tabs
+       <SectionNav
          value={activeTab}
-         onChange={(e, newValue) => setActiveTab(newValue)}
-         sx={{
-           borderBottom: 1,
-           borderColor: 'divider',
-           px: 2,
-           '& .MuiTab-root': { minHeight: 64, py: 1 },
-         }}
-       >
-         {[
+         onChange={setActiveTab}
+         sections={[
            { label: 'Expenses', icon: DashboardIcon, color: '#0A84FF' },
            { label: 'Categories', icon: CategoryIcon, color: '#BF5AF2' },
            { label: 'Tags', icon: TagIcon, color: '#FF9F0A' },
            { label: 'Insights', icon: InsightsIcon, color: '#30D158' },
            { label: 'Splits', icon: CallSplitIcon, color: '#FF9F0A' },
-         ].map((tabInfo) => (
-           <Tab
-             key={tabInfo.label}
-             iconPosition="start"
-             icon={
-               <Box
-                 sx={{
-                   width: 32, height: 32, borderRadius: '10px',
-                   backgroundColor: `${tabInfo.color}1f`,
-                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                 }}
-               >
-                 <tabInfo.icon sx={{ color: tabInfo.color, fontSize: 18 }} />
-               </Box>
-             }
-             label={tabInfo.label}
-           />
-         ))}
-       </Tabs>
+         ]}
+       />
 
        {/* Expenses Tab */}
        {activeTab === 0 && (
-         <Box sx={{ p: 3 }}>
-           {/* Ask a question in plain words */}
+         <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
+           {/* Ask: same pill as capture, so the two read as one idea */}
            <Paper
              elevation={0}
              sx={{
-               p: 2.5, mb: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider',
+               p: { xs: 1.5, sm: 2.5 }, mb: { xs: 2, sm: 3 }, borderRadius: 3,
+               border: '1px solid', borderColor: 'divider',
                backgroundColor: (theme) =>
                  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
              }}
            >
-             <Box display="flex" alignItems="center" gap={1} sx={{ mb: 2 }}>
-               <Box
-                 sx={{
-                   width: 26, height: 26, borderRadius: '8px',
-                   backgroundColor: 'rgba(48,209,88,0.12)',
-                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                 }}
-               >
-                 <QuestionAnswerIcon sx={{ color: '#30D158', fontSize: 15 }} />
+             <QuickCapture
+               value={ask.question}
+               onChange={(value) => setAsk(prev => ({ ...prev, question: value }))}
+               onSubmit={runAsk}
+               loading={ask.loading}
+               placeholder="How much on food last month?"
+             />
+             <ThinkingHint show={ask.loading} label="Working out the filters…" />
+             {ask.answer && (
+               <Box display="flex" justifyContent="flex-end" sx={{ mt: 1 }}>
+                 <Button size="small" onClick={clearAsk} color="inherit">Clear</Button>
                </Box>
-               <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                 Ask
-               </Typography>
-             </Box>
-             <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
-               <TextField
-                 fullWidth
-                 size="small"
-                 sx={{ flex: 1, minWidth: 240 }}
-                 placeholder='e.g. "how much on food last month" or "anything over 1000"'
-                 value={ask.question}
-                 onChange={(e) => setAsk(prev => ({ ...prev, question: e.target.value }))}
-                 disabled={ask.loading}
-                 onKeyDown={(e) => { if (e.key === 'Enter') runAsk(); }}
-               />
-               <Button
-                 variant="contained"
-                 onClick={runAsk}
-                 disabled={ask.loading || !ask.question.trim()}
-                 startIcon={<AutoAwesomeIcon />}
-               >
-                 {ask.loading ? 'Asking...' : 'Ask'}
-               </Button>
-               {ask.answer && (
-                 <Button onClick={clearAsk} color="inherit">Clear</Button>
-               )}
-             </Box>
-
-             {ask.loading && <LinearProgress sx={{ mt: 2 }} />}
+             )}
 
              {ask.answer && (
                <Box sx={{ mt: 2.5 }}>
@@ -1223,7 +1120,11 @@ export default function ExpenseTrackerPage() {
                  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
              }}
            >
-             <Box display="flex" alignItems="center" gap={1} sx={{ mb: 2 }}>
+             <Box
+               display="flex" alignItems="center" gap={1}
+               onClick={() => setFiltersOpen(prev => !prev)}
+               sx={{ mb: filtersOpen ? 2 : 0, cursor: { xs: 'pointer', md: 'default' } }}
+             >
                <Box
                  sx={{
                    width: 26, height: 26, borderRadius: '8px',
@@ -1233,10 +1134,16 @@ export default function ExpenseTrackerPage() {
                >
                  <FilterIcon sx={{ color: '#0A84FF', fontSize: 15 }} />
                </Box>
-               <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                 Filters
+               <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600, flexGrow: 1 }}>
+                 Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
                </Typography>
+               {/* Four filter fields ate most of a phone screen before you saw a
+                   single expense, so they fold away until asked for. */}
+               <IconButton size="small" sx={{ display: { xs: 'inline-flex', md: 'none' } }}>
+                 {filtersOpen ? <CloseIcon fontSize="small" /> : <FilterIcon fontSize="small" />}
+               </IconButton>
              </Box>
+             <Collapse in={filtersOpen}>
              <Grid container spacing={2} alignItems="center">
                <Grid item xs={12} md={4}>
                  <TextField
@@ -1309,129 +1216,38 @@ export default function ExpenseTrackerPage() {
                  </Box>
                </Grid>
              </Grid>
+             </Collapse>
            </Paper>
 
-           {/* Expenses Table */}
-           <TableContainer
-             sx={{
-               borderRadius: 3,
-               border: '1px solid',
-               borderColor: 'divider',
-             }}
+           {/* The list. A six-column table scrolled sideways on a phone and
+               hid the amount, so each expense is one row that reflows instead. */}
+           <Paper
+             elevation={0}
+             sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}
            >
-             <Table>
-               <TableHead>
-                 <TableRow>
-                   <TableCell>Date</TableCell>
-                   <TableCell>Description</TableCell>
-                   <TableCell>Category</TableCell>
-                   <TableCell>Amount</TableCell>
-                   <TableCell>Tags</TableCell>
-                   <TableCell align="right">Actions</TableCell>
-                 </TableRow>
-               </TableHead>
-               <TableBody>
+             {loading && expenses.length === 0 ? (
+               <Box sx={{ p: 1.5 }}><ExpenseListSkeleton rows={6} /></Box>
+             ) : expenses.length === 0 ? (
+               <Box sx={{ p: 5, textAlign: 'center' }}>
+                 <DashboardIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+                 <Typography variant="body1" sx={{ fontWeight: 500 }}>Nothing here yet</Typography>
+                 <Typography variant="body2" color="text.secondary">
+                   Add one above, or clear the filters if you're expecting something.
+                 </Typography>
+               </Box>
+             ) : (
+               <Box sx={{ px: { xs: 1, sm: 1.5 } }}>
                  {expenses.map((expense) => (
-                   <TableRow key={expense.id} hover>
-                     <TableCell>
-                       <Typography variant="body2" color="text.secondary">
-                         {formatDate(expense.date)}
-                       </Typography>
-                     </TableCell>
-                     <TableCell>
-                       <Box>
-                         <Typography variant="body2" fontWeight={500}>{expense.description}</Typography>
-                         {expense.location && (
-                           <Typography variant="caption" color="text.secondary">
-                             📍 {expense.location}
-                           </Typography>
-                         )}
-                       </Box>
-                     </TableCell>
-                     <TableCell>
-                       {expense.category && (
-                         <Chip
-                           label={expense.category.name}
-                           sx={{
-                             backgroundColor: expense.category.color,
-                             color: '#fff',
-                             fontSize: '0.75rem',
-                             fontWeight: 600,
-                             boxShadow: `0 2px 8px ${expense.category.color}55`,
-                           }}
-                           size="small"
-                         />
-                       )}
-                     </TableCell>
-                     <TableCell>
-                       <Typography
-                         variant="body2"
-                         color={expense.type === 'income' ? 'success.main' : 'error.main'}
-                         fontWeight={600}
-                       >
-                         {expense.type === 'income' ? '+' : '-'}{formatCurrency(expense.amount)}
-                       </Typography>
-                     </TableCell>
-                     <TableCell>
-                       <Box display="flex" flexWrap="wrap" gap={0.5}>
-                         {expense.tags?.slice(0, 2).map((tag) => (
-                           <Chip
-                             key={tag.id}
-                             label={tag.name}
-                             size="small"
-                             sx={{
-                               backgroundColor: tag.color,
-                               color: '#fff',
-                               fontSize: '0.7rem',
-                               fontWeight: 500,
-                               boxShadow: `0 2px 6px ${tag.color}44`,
-                             }}
-                           />
-                         ))}
-                         {expense.tags?.length > 2 && (
-                           <Chip
-                             label={`+${expense.tags.length - 2}`}
-                             size="small"
-                             variant="outlined"
-                           />
-                         )}
-                       </Box>
-                     </TableCell>
-                     <TableCell align="right">
-                       <Box display="flex" gap={0.5} justifyContent="flex-end">
-                         <Tooltip title="Edit expense">
-                           <IconButton
-                             size="small"
-                             onClick={() => openExpenseForm(expense)}
-                             sx={{
-                               color: '#0A84FF',
-                               transition: 'background-color 0.15s ease, transform 0.15s ease',
-                               '&:hover': { backgroundColor: 'rgba(10,132,255,0.12)', transform: 'translateY(-1px)' },
-                             }}
-                           >
-                             <EditIcon fontSize="small" />
-                           </IconButton>
-                         </Tooltip>
-                         <Tooltip title="Delete expense">
-                           <IconButton
-                             size="small"
-                             onClick={() => deleteExpenseHandler(expense.id)}
-                             sx={{
-                               color: '#FF453A',
-                               transition: 'background-color 0.15s ease, transform 0.15s ease',
-                               '&:hover': { backgroundColor: 'rgba(255,69,58,0.12)', transform: 'translateY(-1px)' },
-                             }}
-                           >
-                             <DeleteIcon fontSize="small" />
-                           </IconButton>
-                         </Tooltip>
-                       </Box>
-                     </TableCell>
-                   </TableRow>
+                   <ExpenseItem
+                     key={expense.id}
+                     expense={expense}
+                     onEdit={openExpenseForm}
+                     onDelete={deleteExpenseHandler}
+                   />
                  ))}
-               </TableBody>
-             </Table>
-           </TableContainer>
+               </Box>
+             )}
+           </Paper>
 
            {/* Pagination */}
            <TablePagination
@@ -1448,7 +1264,7 @@ export default function ExpenseTrackerPage() {
 
        {/* Categories Tab */}
        {activeTab === 1 && (
-         <Box sx={{ p: 3 }}>
+         <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
              <Typography variant="h6" sx={{ fontWeight: 600 }}>Categories</Typography>
              <Button
@@ -1514,7 +1330,7 @@ export default function ExpenseTrackerPage() {
 
        {/* Tags Tab */}
        {activeTab === 2 && (
-         <Box sx={{ p: 3 }}>
+         <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
              <Typography variant="h6" sx={{ fontWeight: 600 }}>Tags</Typography>
              <Button
@@ -1575,7 +1391,7 @@ export default function ExpenseTrackerPage() {
 
        {/* Insights Tab */}
        {activeTab === 3 && (
-         <Box sx={{ p: 3 }}>
+         <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
              <Box>
                <Typography variant="h6" sx={{ fontWeight: 600 }}>Spending Review</Typography>
@@ -1691,7 +1507,7 @@ export default function ExpenseTrackerPage() {
 
        {/* Splits Tab */}
        {activeTab === 4 && (
-         <Box sx={{ p: 3 }}>
+         <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
            <Box mb={3}>
              <Typography variant="h6" sx={{ fontWeight: 600 }}>Shared expenses</Typography>
              <Typography variant="body2" color="text.secondary">
@@ -2573,7 +2389,9 @@ export default function ExpenseTrackerPage() {
        color="primary"
        aria-label="add"
        sx={{
-         position: 'fixed', bottom: 16, right: 16,
+         position: 'fixed', right: 16,
+         // Sits above the bottom bar on a phone, in the corner on desktop.
+         bottom: { xs: 'calc(76px + env(safe-area-inset-bottom))', md: 24 },
          background: 'linear-gradient(135deg, #0A84FF, #2997FF)',
          '&:hover': { background: 'linear-gradient(135deg, #0071e3, #0A84FF)' },
        }}

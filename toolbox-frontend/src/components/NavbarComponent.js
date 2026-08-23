@@ -83,7 +83,7 @@ export default function NavbarComponent() {
           },
         }}
       >
-        <Toolbar>
+        <Toolbar sx={{ gap: 1, minHeight: { xs: 56, sm: 64 } }}>
           <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
             {location.pathname !== '/' && location.pathname !== '/dashboard' && (
               <Tooltip title="Back to Dashboard">
@@ -101,12 +101,19 @@ export default function NavbarComponent() {
             <Typography
               variant="h6"
               component="div"
+              noWrap
               sx={{
                 fontWeight: 600,
-                color: 'primary.contrastText'
+                color: 'primary.contrastText',
+                minWidth: 0,
+                // "ToolBox Dashboard" wrapped to two lines on a phone and ran
+                // into the greeting beside it. Shorter title, one line, and the
+                // greeting steps aside below sm.
+                fontSize: { xs: '1.05rem', sm: '1.25rem' },
               }}
             >
-              ToolBox Dashboard
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>ToolBox Dashboard</Box>
+              <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>ToolBox</Box>
             </Typography>
           </Box>
 
@@ -115,10 +122,14 @@ export default function NavbarComponent() {
             {user && (
               <Typography
                 variant="body2"
+                noWrap
                 sx={{
                   color: 'primary.contrastText',
                   mr: 2,
-                  opacity: 0.9
+                  opacity: 0.9,
+                  // No room for a greeting next to the icons on a phone.
+                  display: { xs: 'none', sm: 'block' },
+                  maxWidth: 200,
                 }}
               >
                 Welcome, {user.username || user.email || 'User'}

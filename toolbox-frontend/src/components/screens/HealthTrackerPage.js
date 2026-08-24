@@ -13,7 +13,6 @@ import DirectionsWalkIcon from '@mui/icons-material/DirectionsWalk';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 
 import { getMetrics, getMetricsSummary, addMetric, deleteMetric } from '../rest/healthApis';
-import NavbarComponent from '../NavbarComponent';
 import Reveal from '../ui/Reveal';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import TrendBars from '../ui/TrendBars';
@@ -98,7 +97,6 @@ export default function HealthTrackerPage() {
 
   return (
     <>
-      <NavbarComponent />
       <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 12 }}>
         <Reveal>
           <Box display="flex" alignItems="center" gap={1.5} sx={{ mb: 2 }}>

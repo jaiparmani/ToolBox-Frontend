@@ -12,7 +12,6 @@ import AddIcon from '@mui/icons-material/Add';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
-import NavbarComponent from '../NavbarComponent';
 import MoneyConstellation from '../ui/MoneyConstellation';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import Reveal from '../ui/Reveal';
@@ -247,7 +246,6 @@ export default function SplitsPage() {
 
   return (
     <>
-      <NavbarComponent />
       <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 12 }}>
         <ErrorBanner error={error} onClose={() => setError(null)} />
 

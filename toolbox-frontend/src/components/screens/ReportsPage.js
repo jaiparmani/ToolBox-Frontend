@@ -12,7 +12,6 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { getExpenseSummary, getMonthlyReport } from '../rest/expenseTrackerApis';
-import NavbarComponent from '../NavbarComponent';
 import Reveal from '../ui/Reveal';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import CategoryBreakdown from '../ui/CategoryBreakdown';
@@ -84,7 +83,6 @@ export default function ReportsPage() {
 
   return (
     <>
-      <NavbarComponent />
       <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 6 }}>
         {/* Month navigator */}
         <Reveal>

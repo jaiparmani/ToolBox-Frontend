@@ -16,7 +16,6 @@ import {
 import {
   getOpenRouterKeys, addOpenRouterKey, deleteOpenRouterKey, moveOpenRouterKeyToBack
 } from '../rest/expenseTrackerApis';
-import NavbarComponent from '../NavbarComponent';
 
 export default function ApiKeysPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -102,7 +101,6 @@ export default function ApiKeysPage() {
 
   return (
     <>
-      <NavbarComponent />
       <Container maxWidth="lg" sx={{ mt: 2, mb: 4 }}>
         {/* Header */}
         <Paper

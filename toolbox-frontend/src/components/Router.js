@@ -67,72 +67,20 @@ export default function Router() {
       } />
 
 
-      {/* Protected Routes */}
-      <Route path="/" element={
-        <ProtectedRoute>
-          <DashboardLayoutBasic />
-        </ProtectedRoute>
-      } />
-
-      <Route path="/dashboard" element={
-        <ProtectedRoute>
-          <DashboardLayoutBasic />
-        </ProtectedRoute>
-      } />
-
-      <Route path="/profile" element={
-        <ProtectedRoute>
-          <UserProfilePage />
-        </ProtectedRoute>
-      } />
-
-      <Route path="/hobby-tracker" element={
-        <ProtectedRoute>
-          <HobbyTracker />
-        </ProtectedRoute>
-      } />
-
-      <Route path="/expense-tracker" element={
-        <ProtectedRoute>
-          <ExpenseTrackerPage />
-        </ProtectedRoute>
-      } />
-
-      <Route path="/reports" element={
-        <ProtectedRoute>
-          <ReportsPage />
-        </ProtectedRoute>
-      } />
-
-      <Route path="/health-tracker" element={
-        <ProtectedRoute>
-          <HealthTrackerPage />
-        </ProtectedRoute>
-      } />
-
-      <Route path="/array-sum" element={
-        <ProtectedRoute>
-          <ArraySumDemo />
-        </ProtectedRoute>
-      } />
-
-      <Route path="/splits" element={
-        <ProtectedRoute>
-          <SplitsPage />
-        </ProtectedRoute>
-      } />
-
-      <Route path="/api-keys" element={
-        <ProtectedRoute>
-          <ApiKeysPage />
-        </ProtectedRoute>
-      } />
-
-      <Route path="/qr-generator" element={
-        <ProtectedRoute>
-          <QRCodeGenerator />
-        </ProtectedRoute>
-      } />
+      {/* Protected app: one shell (sidebar + header), all pages nested inside */}
+      <Route element={<ProtectedRoute><DashboardLayoutBasic /></ProtectedRoute>}>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/dashboard" element={<LandingPage />} />
+        <Route path="/profile" element={<UserProfilePage />} />
+        <Route path="/hobby-tracker" element={<HobbyTracker />} />
+        <Route path="/expense-tracker" element={<ExpenseTrackerPage />} />
+        <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/health-tracker" element={<HealthTrackerPage />} />
+        <Route path="/array-sum" element={<ArraySumDemo />} />
+        <Route path="/splits" element={<SplitsPage />} />
+        <Route path="/api-keys" element={<ApiKeysPage />} />
+        <Route path="/qr-generator" element={<QRCodeGenerator />} />
+      </Route>
 
       {/* Legacy routes - redirect to dashboard */}
       <Route path="/about" element={<Navigate to="/" replace />} />

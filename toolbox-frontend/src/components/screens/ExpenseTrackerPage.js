@@ -51,7 +51,6 @@ import {
 
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
 import AutocompleteComponent from '../ReusableComponents/AutocompleteComponent';
-import NavbarComponent from '../NavbarComponent';
 import SummaryStrip from '../ui/SummaryStrip';
 import SectionNav from '../ui/SectionNav';
 import ExpenseItem from '../ui/ExpenseItem';
@@ -881,7 +880,6 @@ export default function ExpenseTrackerPage() {
 
  return (
    <>
-     <NavbarComponent />
      <Container
        maxWidth="xl"
        sx={{

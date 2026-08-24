@@ -15,7 +15,6 @@ import LogoutIcon from '@mui/icons-material/Logout';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { clearAllData } from '../rest/userApis.js';
-import NavbarComponent from '../NavbarComponent';
 import Reveal from '../ui/Reveal';
 import { accents } from '../../theme/tokens';
 
@@ -118,7 +117,6 @@ export default function UserProfilePage() {
 
   return (
     <>
-      <NavbarComponent />
       <Container maxWidth="sm" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 6 }}>
         {/* Identity hero */}
         <Reveal>

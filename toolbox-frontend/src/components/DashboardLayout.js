@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { extendTheme, useColorScheme } from '@mui/material/styles';
 import {
   Box, Typography, IconButton, Tooltip, Dialog, DialogTitle,
@@ -231,28 +232,36 @@ function SidebarFooterAccount({ mini }) {
 export default function DashboardLayoutBasic(props) {
   const { window } = props;
   const { mode } = useColorMode();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Remove this const when copying and pasting into your project.
   const demoWindow = window ? window() : undefined;
+
+  // Toolpad drives its own sidebar from this router shim; without it the nav
+  // was decorative. pathname tells it which item is active, navigate() runs a
+  // react-router transition when an item is clicked.
+  const router = useMemo(() => ({
+    pathname: location.pathname,
+    searchParams: new URLSearchParams(location.search),
+    navigate: (url) => navigate(String(url)),
+  }), [location.pathname, location.search, navigate]);
 
   return (
     <AppProvider
       navigation={NAVIGATION}
       theme={demoTheme}
       window={demoWindow}
+      router={router}
       branding={{ title: 'ToolBox', logo: <BrandLogo size={30} />, homeUrl: '/' }}
     >
       <ThemeSync mode={mode} />
       <DashboardLayout
         slots={{ sidebarFooter: SidebarFooterAccount, toolbarActions: () => null }}
       >
-        <PageContainer>
-          <Grid container spacing={2}>
-            <Grid xs={12}>
-              <LandingPage />
-            </Grid>
-          </Grid>
-        </PageContainer>
+        {/* Every nested route renders here, inside the one shell */}
+        <Box sx={{ p: { xs: 0, sm: 1 } }}>
+          <Outlet />
+        </Box>
       </DashboardLayout>
     </AppProvider>
   );

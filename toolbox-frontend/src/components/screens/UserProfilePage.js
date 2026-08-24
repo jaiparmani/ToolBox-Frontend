@@ -1,974 +1,290 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Box, Container, Typography, Paper, Grid, TextField,
-  Button, Dialog, DialogTitle, DialogContent, DialogActions,
-  Alert, Snackbar, Tab, Tabs, Card, CardContent,
-  Divider, LinearProgress, IconButton, InputAdornment,
-  FormHelperText, Chip, Avatar, CircularProgress
-} from '@mui/material';
-import {
-  Person as PersonIcon,
-  Email as EmailIcon,
-  Lock as LockIcon,
-  Edit as EditIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon,
-  Visibility,
-  VisibilityOff,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Refresh as RefreshIcon,
-  AccountCircle as AccountIcon,
-  Security as SecurityIcon,
-  Delete as DeleteIcon,
-  Warning as WarningIcon
-} from '@mui/icons-material';
-import { useAuth } from '../../contexts/AuthContext';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Alert, Box, Button, Card, CardContent, Container, IconButton, InputAdornment,
+  LinearProgress, Paper, Snackbar, Stack, TextField, Typography,
+} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import LockIcon from '@mui/icons-material/Lock';
+import PersonIcon from '@mui/icons-material/Person';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import CheckIcon from '@mui/icons-material/Check';
+import LogoutIcon from '@mui/icons-material/Logout';
+
+import { useAuth } from '../../contexts/AuthContext';
 import { clearAllData } from '../rest/userApis.js';
 import NavbarComponent from '../NavbarComponent';
+import Reveal from '../ui/Reveal';
+import { accents } from '../../theme/tokens';
+
+/**
+ * Profile, rebuilt as a single scrollable column of glass cards rather than a
+ * tabbed form. Everything you'd change about your account, in the order you'd
+ * reach for it: who you are, your password, then the destructive stuff last
+ * and clearly marked.
+ */
+
+// Cheap, honest password meter: length carries most of the weight, variety the
+// rest. Four bands so "weak/fair/good/strong" map onto something.
+function scorePassword(pw) {
+  if (!pw) return { score: 0, label: '', color: accents.red };
+  let s = 0;
+  if (pw.length >= 8) s++;
+  if (pw.length >= 12) s++;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) s++;
+  if (/\d/.test(pw)) s++;
+  if (/[^A-Za-z0-9]/.test(pw)) s++;
+  const score = Math.min(s, 4);
+  const label = ['Too short', 'Weak', 'Fair', 'Good', 'Strong'][score];
+  const color = [accents.red, accents.red, accents.amber, accents.blue, accents.green][score];
+  return { score, label, color };
+}
 
 export default function UserProfilePage() {
   const navigate = useNavigate();
-  const {
-    user,
-    isAuthenticated,
-    isLoading,
-    error,
-    clearError,
-    updateProfile,
-    changePassword,
-    refreshUserProfile
-  } = useAuth();
+  const { user, isAuthenticated, isLoading, updateProfile, changePassword, logout } = useAuth();
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState(0);
+  const [details, setDetails] = useState({ username: '', email: '', first_name: '', last_name: '' });
+  const [editing, setEditing] = useState(false);
+  const [savingDetails, setSavingDetails] = useState(false);
 
-  // Profile editing state
-  const [editMode, setEditMode] = useState(false);
-  const [profileForm, setProfileForm] = useState({
-    username: '',
-    email: '',
-    first_name: '',
-    last_name: ''
-  });
-  const [profileErrors, setProfileErrors] = useState({});
-  const [profileSuccess, setProfileSuccess] = useState(false);
+  const [pw, setPw] = useState({ old_password: '', new_password: '', new_password_confirm: '' });
+  const [showPw, setShowPw] = useState(false);
+  const [savingPw, setSavingPw] = useState(false);
 
-  // Password change state
-  const [passwordForm, setPasswordForm] = useState({
-    old_password: '',
-    new_password: '',
-    new_password_confirm: ''
-  });
-  const [passwordErrors, setPasswordErrors] = useState({});
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
-  const [showPasswords, setShowPasswords] = useState({
-    old: false,
-    new: false,
-    confirm: false
-  });
+  const [clearing, setClearing] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
-  // Password strength state
-  const [passwordStrength, setPasswordStrength] = useState({
-    score: 0,
-    feedback: [],
-    color: 'error.main'
-  });
+  const [toast, setToast] = useState(null);
+  const [error, setError] = useState(null);
 
-  // Data clearing state
-  const [isClearingData, setIsClearingData] = useState(false);
-  const [clearDataSuccess, setClearDataSuccess] = useState(false);
-  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
-
-  // Initialize profile form when user data is available
   useEffect(() => {
-    if (user) {
-      setProfileForm({
-        username: user.username || '',
-        email: user.email || '',
-        first_name: user.firstName || '',
-        last_name: user.lastName || ''
-      });
-    }
+    if (user) setDetails({
+      username: user.username || '', email: user.email || '',
+      first_name: user.first_name || '', last_name: user.last_name || '',
+    });
   }, [user]);
 
-  // Password strength validation
-  const validatePasswordStrength = (password) => {
-    const feedback = [];
-    let score = 0;
+  const strength = useMemo(() => scorePassword(pw.new_password), [pw.new_password]);
 
-    if (password.length >= 8) score += 25;
-    else feedback.push('At least 8 characters');
-
-    if (/[A-Z]/.test(password)) score += 25;
-    else feedback.push('One uppercase letter');
-
-    if (/[a-z]/.test(password)) score += 25;
-    else feedback.push('One lowercase letter');
-
-    if (/[0-9]/.test(password)) score += 25;
-    else feedback.push('One number');
-
-    let color = 'error.main';
-    if (score >= 75) color = 'success.main';
-    else if (score >= 50) color = 'warning.main';
-
-    setPasswordStrength({ score, feedback, color });
-  };
-
-  // Profile form validation
-  const validateProfileForm = () => {
-    const errors = {};
-
-    if (!profileForm.username) {
-      errors.username = 'Username is required';
-    } else if (profileForm.username.length < 3) {
-      errors.username = 'Username must be at least 3 characters';
-    } else if (!/^[a-zA-Z0-9_]+$/.test(profileForm.username)) {
-      errors.username = 'Username can only contain letters, numbers, and underscores';
-    }
-
-    if (!profileForm.email) {
-      errors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileForm.email)) {
-      errors.email = 'Please enter a valid email address';
-    }
-
-    if (!profileForm.first_name.trim()) {
-      errors.first_name = 'First name is required';
-    }
-
-    if (!profileForm.last_name.trim()) {
-      errors.last_name = 'Last name is required';
-    }
-
-    setProfileErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  // Password form validation
-  const validatePasswordForm = () => {
-    const errors = {};
-
-    if (!passwordForm.old_password) {
-      errors.old_password = 'Current password is required';
-    }
-
-    if (!passwordForm.new_password) {
-      errors.new_password = 'New password is required';
-    } else if (passwordStrength.score < 50) {
-      errors.new_password = 'Password is too weak';
-    }
-
-    if (!passwordForm.new_password_confirm) {
-      errors.new_password_confirm = 'Please confirm your new password';
-    } else if (passwordForm.new_password !== passwordForm.new_password_confirm) {
-      errors.new_password_confirm = 'Passwords do not match';
-    }
-
-    setPasswordErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  // Handle profile form input changes
-  const handleProfileInputChange = (field) => (event) => {
-    const value = event.target.value;
-    setProfileForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
-
-    if (profileErrors[field]) {
-      setProfileErrors(prev => ({
-        ...prev,
-        [field]: ''
-      }));
-    }
-  };
-
-  // Handle password form input changes
-  const handlePasswordInputChange = (field) => (event) => {
-    const value = event.target.value;
-    setPasswordForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
-
-    if (passwordErrors[field]) {
-      setPasswordErrors(prev => ({
-        ...prev,
-        [field]: ''
-      }));
-    }
-
-    if (field === 'new_password') {
-      validatePasswordStrength(value);
-    }
-  };
-
-  // Handle profile save
-  const handleProfileSave = async () => {
-    if (!validateProfileForm()) {
-      return;
-    }
-
+  const saveDetails = async () => {
+    setSavingDetails(true);
     try {
-      const result = await updateProfile(profileForm);
-
-      if (result.success) {
-        setProfileSuccess(true);
-        setEditMode(false);
-        setTimeout(() => setProfileSuccess(false), 4000);
-      }
-    } catch (error) {
-      console.error('Profile update error:', error);
-    }
+      const res = await updateProfile(details);
+      if (res?.success === false) throw new Error(res.error || 'Could not save');
+      setToast('Profile updated'); setEditing(false);
+    } catch (e) { setError(e.message || 'Could not save your details'); }
+    finally { setSavingDetails(false); }
   };
 
-  // Handle password change
-  const handlePasswordChange = async () => {
-    if (!validatePasswordForm()) {
-      return;
-    }
-
+  const savePassword = async () => {
+    if (pw.new_password !== pw.new_password_confirm) { setError('The new passwords do not match'); return; }
+    if (strength.score < 2) { setError('Choose a stronger password'); return; }
+    setSavingPw(true);
     try {
-      const result = await changePassword(
-        passwordForm.old_password,
-        passwordForm.new_password,
-        passwordForm.new_password_confirm
-      );
-
-      if (result.success) {
-        setPasswordSuccess(true);
-        setPasswordForm({
-          old_password: '',
-          new_password: '',
-          new_password_confirm: ''
-        });
-        setPasswordStrength({ score: 0, feedback: [], color: 'error.main' });
-        setTimeout(() => setPasswordSuccess(false), 4000);
-      }
-    } catch (error) {
-      console.error('Password change error:', error);
-    }
+      const res = await changePassword(pw.old_password, pw.new_password, pw.new_password_confirm);
+      if (res?.success === false) throw new Error(res.error || 'Could not change password');
+      setToast('Password changed');
+      setPw({ old_password: '', new_password: '', new_password_confirm: '' });
+    } catch (e) { setError(e.message || 'Could not change your password'); }
+    finally { setSavingPw(false); }
   };
 
-  // Handle tab change
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
-    clearError();
-  };
-
-  // Handle clear all data
-  const handleClearAllData = async () => {
-    setIsClearingData(true);
-
+  const doClear = async () => {
+    setClearing(true);
     try {
-      const result = await clearAllData();
-
-      if (result) {
-        setClearDataSuccess(true);
-        setTimeout(() => {
-          setClearDataSuccess(false);
-          // Navigate to login page after clearing data
-          navigate('/login');
-        }, 2000);
-      }
-    } catch (error) {
-      console.error('Clear data error:', error);
-    } finally {
-      setIsClearingData(false);
-    }
+      await clearAllData();
+      setToast('All your data was cleared');
+      setConfirmClear(false);
+    } catch (e) { setError('Could not clear your data'); }
+    finally { setClearing(false); }
   };
 
-  // Toggle password visibility
-  const togglePasswordVisibility = (field) => {
-    setShowPasswords(prev => ({
-      ...prev,
-      [field]: !prev[field]
-    }));
-  };
-
-  // Password strength indicator component
-  const PasswordStrengthIndicator = () => (
-    <Box sx={{ mt: 1 }}>
-      <Box display="flex" alignItems="center" gap={1} mb={1}>
-        <Typography variant="caption" color="text.secondary">
-          Password Strength:
-        </Typography>
-        <LinearProgress
-          variant="determinate"
-          value={passwordStrength.score}
-          sx={{
-            flexGrow: 1,
-            height: 6,
-            borderRadius: 3,
-            '& .MuiLinearProgress-bar': {
-              backgroundColor: passwordStrength.color,
-              borderRadius: 3
-            }
-          }}
-        />
-        <Typography variant="caption" sx={{ color: passwordStrength.color }}>
-          {passwordStrength.score < 50 ? 'Weak' :
-           passwordStrength.score < 75 ? 'Medium' : 'Strong'}
-        </Typography>
-      </Box>
-      {passwordStrength.feedback.length > 0 && (
-        <Box>
-          {passwordStrength.feedback.map((item, index) => (
-            <Typography key={index} variant="caption" display="block" color="text.secondary">
-              • {item}
-            </Typography>
-          ))}
-        </Box>
-      )}
-    </Box>
-  );
-
-  // Authentication check
+  if (isLoading) return null;
   if (!isAuthenticated) {
     return (
-      <>
-      <NavbarComponent />
       <Container maxWidth="sm" sx={{ mt: 8 }}>
-        <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
-          <ErrorIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
-          <Typography variant="h5" gutterBottom>
-            Access Denied
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            You need to be logged in to view your profile.
-          </Typography>
-          <Button
-            variant="contained"
-            onClick={() => navigate('/login')}
-            startIcon={<PersonIcon />}
-          >
-            Go to Login
-          </Button>
+        <Paper elevation={3} sx={{ p: 4 }}>
+          <Typography variant="h5" align="center">Authentication Required</Typography>
         </Paper>
       </Container>
-      </>
     );
   }
 
-  // Loading state
-  if (isLoading && !user) {
-    return (
-      <>
-      <NavbarComponent />
-      <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Paper elevation={3} sx={{ p: 4 }}>
-          <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-            <Typography>Loading profile...</Typography>
-          </Box>
-        </Paper>
-      </Container>
-      </>
-    );
-  }
+  const initial = (details.username || details.email || '?').charAt(0).toUpperCase();
+  const fullName = [details.first_name, details.last_name].filter(Boolean).join(' ');
 
   return (
     <>
-    <NavbarComponent />
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        {/* Header */}
-        <Box display="flex" alignItems="center" gap={2} mb={3}>
-          <Box
+      <NavbarComponent />
+      <Container maxWidth="sm" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 6 }}>
+        {/* Identity hero */}
+        <Reveal>
+          <Paper
+            elevation={0}
             sx={{
-              width: 48, height: 48, borderRadius: '14px',
-              background: 'linear-gradient(135deg, #0A84FF, #BF5AF2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 8px 20px rgba(10,132,255,0.4)',
+              p: 3, mb: 2.5, borderRadius: 5, textAlign: 'center', position: 'relative', overflow: 'hidden',
+              border: '1px solid', borderColor: 'divider',
+              '&::before': {
+                content: '""', position: 'absolute', inset: 0, pointerEvents: 'none',
+                background: 'radial-gradient(circle at 50% -20%, rgba(10,132,255,0.22), transparent 60%)',
+              },
             }}
           >
-            <AccountIcon sx={{ fontSize: 26, color: '#fff' }} />
-          </Box>
-          <Box>
-            <Typography variant="h4" component="h1">
-              User Profile
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Manage your account settings and preferences
-            </Typography>
-          </Box>
-        </Box>
-
-        <Divider sx={{ mb: 3 }} />
-
-        {/* Error Alert */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={clearError}>
-            {error.message || 'An error occurred. Please try again.'}
-          </Alert>
-        )}
-
-        {/* Success Messages */}
-        <Snackbar open={profileSuccess} autoHideDuration={4000} onClose={() => setProfileSuccess(false)}>
-          <Alert onClose={() => setProfileSuccess(false)} severity="success" sx={{ width: '100%' }}>
-            Profile updated successfully!
-          </Alert>
-        </Snackbar>
-
-        <Snackbar open={passwordSuccess} autoHideDuration={4000} onClose={() => setPasswordSuccess(false)}>
-          <Alert onClose={() => setPasswordSuccess(false)} severity="success" sx={{ width: '100%' }}>
-            Password changed successfully!
-          </Alert>
-        </Snackbar>
-
-        {/* Profile Header Card */}
-        <Card
-          sx={{
-            mb: 3,
-            border: '1px solid',
-            borderColor: 'divider',
-            backgroundColor: (theme) =>
-              theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
-            backdropFilter: 'blur(20px)',
-          }}
-        >
-          <CardContent>
-            <Box display="flex" alignItems="center" gap={3}>
-              <Avatar
+            <Box sx={{ position: 'relative' }}>
+              <Box
                 sx={{
-                  width: 80,
-                  height: 80,
-                  background: 'linear-gradient(135deg, #0A84FF, #BF5AF2)',
-                  fontSize: '2rem',
-                  boxShadow: '0 8px 24px rgba(10,132,255,0.35)',
+                  width: 84, height: 84, borderRadius: '50%', mx: 'auto', mb: 1.5,
+                  background: `linear-gradient(135deg, ${accents.blue}, ${accents.purple})`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '2.2rem', fontWeight: 700, color: '#fff',
+                  boxShadow: `0 12px 30px ${accents.blue}55`,
                 }}
               >
-                {user?.displayName?.charAt(0)?.toUpperCase() || user?.username?.charAt(0)?.toUpperCase() || 'U'}
-              </Avatar>
-              <Box flexGrow={1}>
-                <Typography variant="h5" gutterBottom>
-                  {user?.displayName || user?.username}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {user?.email}
-                </Typography>
-                <Chip
-                  label={`Member since ${user?.dateJoined ? new Date(user.dateJoined).getFullYear() : 'N/A'}`}
-                  size="small"
-                  color="primary"
-                  variant="outlined"
-                  sx={{ mt: 1 }}
-                />
+                {initial}
               </Box>
-              <Button
-                variant="outlined"
-                startIcon={<RefreshIcon />}
-                onClick={refreshUserProfile}
-                disabled={isLoading}
-              >
-                Refresh
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>{fullName || details.username}</Typography>
+              <Typography variant="body2" color="text.secondary">{details.email || 'No email set'}</Typography>
+            </Box>
+          </Paper>
+        </Reveal>
+
+        {/* Your details */}
+        <Reveal index={1}>
+          <SectionCard icon={<PersonIcon />} color={accents.blue} title="Your details"
+            action={
+              <Button size="small" startIcon={editing ? <CheckIcon /> : <EditIcon />}
+                onClick={() => (editing ? saveDetails() : setEditing(true))} disabled={savingDetails}>
+                {editing ? (savingDetails ? 'Saving…' : 'Save') : 'Edit'}
               </Button>
-            </Box>
-          </CardContent>
-        </Card>
+            }>
+            <Stack spacing={1.75} sx={{ mt: 1 }}>
+              <Stack direction="row" spacing={1.5}>
+                <Field label="First name" value={details.first_name} editing={editing}
+                  onChange={(v) => setDetails(d => ({ ...d, first_name: v }))} />
+                <Field label="Last name" value={details.last_name} editing={editing}
+                  onChange={(v) => setDetails(d => ({ ...d, last_name: v }))} />
+              </Stack>
+              <Field label="Username" value={details.username} editing={editing}
+                onChange={(v) => setDetails(d => ({ ...d, username: v }))} />
+              <Field label="Email" value={details.email} editing={editing} type="email"
+                onChange={(v) => setDetails(d => ({ ...d, email: v }))} />
+            </Stack>
+          </SectionCard>
+        </Reveal>
 
-        {/* Tabs */}
-        <Paper elevation={1}>
-          <Tabs value={activeTab} onChange={handleTabChange} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-            <Tab icon={<PersonIcon />} label="Profile Information" />
-            <Tab icon={<LockIcon />} label="Change Password" />
-            <Tab icon={<SecurityIcon />} label="Privacy & Data" />
-          </Tabs>
-
-          {/* Profile Information Tab */}
-          {activeTab === 0 && (
-            <Box sx={{ p: 3 }}>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h6">Profile Information</Typography>
-                <Box display="flex" gap={1}>
-                  {!editMode ? (
-                    <Button
-                      variant="contained"
-                      startIcon={<EditIcon />}
-                      onClick={() => setEditMode(true)}
-                    >
-                      Edit Profile
-                    </Button>
-                  ) : (
-                    <>
-                      <Button
-                        variant="outlined"
-                        startIcon={<CancelIcon />}
-                        onClick={() => {
-                          setEditMode(false);
-                          setProfileForm({
-                            username: user?.username || '',
-                            email: user?.email || '',
-                            first_name: user?.firstName || '',
-                            last_name: user?.lastName || ''
-                          });
-                          setProfileErrors({});
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        variant="contained"
-                        startIcon={<SaveIcon />}
-                        onClick={handleProfileSave}
-                        disabled={isLoading}
-                        sx={{
-                          background: 'linear-gradient(135deg, #0A84FF, #BF5AF2)',
-                          boxShadow: '0 8px 20px rgba(10,132,255,0.35)',
-                          '&:hover': {
-                            background: 'linear-gradient(135deg, #0A84FF, #BF5AF2)',
-                            boxShadow: '0 10px 24px rgba(10,132,255,0.45)',
-                          },
-                        }}
-                      >
-                        {isLoading ? 'Saving...' : 'Save Changes'}
-                      </Button>
-                    </>
-                  )}
-                </Box>
+        {/* Password */}
+        <Reveal index={2}>
+          <SectionCard icon={<LockIcon />} color={accents.amber} title="Password">
+            <Stack spacing={1.75} sx={{ mt: 1 }}>
+              <TextField size="small" fullWidth label="Current password" type={showPw ? 'text' : 'password'}
+                value={pw.old_password} onChange={(e) => setPw(p => ({ ...p, old_password: e.target.value }))}
+                InputProps={{ endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setShowPw(s => !s)} edge="end">
+                      {showPw ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                    </IconButton>
+                  </InputAdornment>) }} />
+              <Box>
+                <TextField size="small" fullWidth label="New password" type={showPw ? 'text' : 'password'}
+                  value={pw.new_password} onChange={(e) => setPw(p => ({ ...p, new_password: e.target.value }))} />
+                {pw.new_password && (
+                  <Box sx={{ mt: 1 }}>
+                    <LinearProgress variant="determinate" value={(strength.score / 4) * 100}
+                      sx={{ height: 5, borderRadius: 999, '& .MuiLinearProgress-bar': { backgroundColor: strength.color } }} />
+                    <Typography variant="caption" sx={{ color: strength.color, fontWeight: 600 }}>{strength.label}</Typography>
+                  </Box>
+                )}
               </Box>
+              <TextField size="small" fullWidth label="Confirm new password" type={showPw ? 'text' : 'password'}
+                value={pw.new_password_confirm} onChange={(e) => setPw(p => ({ ...p, new_password_confirm: e.target.value }))}
+                error={!!pw.new_password_confirm && pw.new_password !== pw.new_password_confirm}
+                helperText={pw.new_password_confirm && pw.new_password !== pw.new_password_confirm ? "Doesn't match" : ' '} />
+              <Button variant="contained" onClick={savePassword}
+                disabled={savingPw || !pw.old_password || !pw.new_password}>
+                {savingPw ? 'Changing…' : 'Change password'}
+              </Button>
+            </Stack>
+          </SectionCard>
+        </Reveal>
 
-              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1 }}>
-                Personal Details
-              </Typography>
-              <Grid container spacing={3} sx={{ mt: 0, mb: 1 }}>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="First Name"
-                    value={profileForm.first_name}
-                    onChange={handleProfileInputChange('first_name')}
-                    error={!!profileErrors.first_name}
-                    helperText={profileErrors.first_name}
-                    disabled={!editMode}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <PersonIcon />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                </Grid>
-
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Last Name"
-                    value={profileForm.last_name}
-                    onChange={handleProfileInputChange('last_name')}
-                    error={!!profileErrors.last_name}
-                    helperText={profileErrors.last_name}
-                    disabled={!editMode}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <PersonIcon />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                </Grid>
-              </Grid>
-
-              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1 }}>
-                Account Details
-              </Typography>
-              <Grid container spacing={3} sx={{ mt: 0, mb: 1 }}>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Username"
-                    value={profileForm.username}
-                    onChange={handleProfileInputChange('username')}
-                    error={!!profileErrors.username}
-                    helperText={profileErrors.username}
-                    disabled={!editMode}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <PersonIcon />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                </Grid>
-
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Email Address"
-                    type="email"
-                    value={profileForm.email}
-                    onChange={handleProfileInputChange('email')}
-                    error={!!profileErrors.email}
-                    helperText={profileErrors.email}
-                    disabled={!editMode}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <EmailIcon />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                </Grid>
-              </Grid>
-
-              {!editMode && (
-                <Box sx={{ mt: 2 }}>
-                  <FormHelperText>
-                    Click "Edit Profile" to modify your information.
-                  </FormHelperText>
+        {/* Danger zone */}
+        <Reveal index={3}>
+          <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'rgba(255,69,58,0.4)' }}>
+            <CardContent>
+              <Box display="flex" alignItems="center" gap={1.5} sx={{ mb: 1 }}>
+                <Box sx={{ width: 30, height: 30, borderRadius: '9px', backgroundColor: 'rgba(255,69,58,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <DeleteSweepIcon sx={{ color: accents.red, fontSize: 18 }} />
                 </Box>
-              )}
-            </Box>
-          )}
-
-          {/* Password Change Tab */}
-          {activeTab === 1 && (
-            <Box sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Change Password
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Danger zone</Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Permanently delete all your expenses, splits, groups and health logs. This can't be undone.
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Ensure your account is secure by regularly updating your password.
-              </Typography>
-
-              <Card
-                sx={{
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  backgroundColor: (theme) =>
-                    theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
-                  backdropFilter: 'blur(20px)',
-                }}
-              >
-                <CardContent sx={{ p: 3 }}>
-                  <Grid container spacing={3}>
-                    <Grid item xs={12}>
-                      <TextField
-                        fullWidth
-                        label="Current Password"
-                        type={showPasswords.old ? 'text' : 'password'}
-                        value={passwordForm.old_password}
-                        onChange={handlePasswordInputChange('old_password')}
-                        error={!!passwordErrors.old_password}
-                        helperText={passwordErrors.old_password}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <LockIcon />
-                            </InputAdornment>
-                          ),
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <IconButton
-                                aria-label="toggle current password visibility"
-                                onClick={() => togglePasswordVisibility('old')}
-                                edge="end"
-                              >
-                                {showPasswords.old ? <VisibilityOff /> : <Visibility />}
-                              </IconButton>
-                            </InputAdornment>
-                          ),
-                        }}
-                      />
-                    </Grid>
-
-                    <Grid item xs={12}>
-                      <Divider sx={{ my: 0.5 }}>
-                        <Typography variant="caption" color="text.secondary">NEW PASSWORD</Typography>
-                      </Divider>
-                    </Grid>
-
-                    <Grid item xs={12}>
-                      <TextField
-                        fullWidth
-                        label="New Password"
-                        type={showPasswords.new ? 'text' : 'password'}
-                        value={passwordForm.new_password}
-                        onChange={handlePasswordInputChange('new_password')}
-                        error={!!passwordErrors.new_password}
-                        helperText={passwordErrors.new_password}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <LockIcon />
-                            </InputAdornment>
-                          ),
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <IconButton
-                                aria-label="toggle new password visibility"
-                                onClick={() => togglePasswordVisibility('new')}
-                                edge="end"
-                              >
-                                {showPasswords.new ? <VisibilityOff /> : <Visibility />}
-                              </IconButton>
-                            </InputAdornment>
-                          ),
-                        }}
-                      />
-                      <PasswordStrengthIndicator />
-                    </Grid>
-
-                    <Grid item xs={12}>
-                      <TextField
-                        fullWidth
-                        label="Confirm New Password"
-                        type={showPasswords.confirm ? 'text' : 'password'}
-                        value={passwordForm.new_password_confirm}
-                        onChange={handlePasswordInputChange('new_password_confirm')}
-                        error={!!passwordErrors.new_password_confirm}
-                        helperText={passwordErrors.new_password_confirm}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <LockIcon />
-                            </InputAdornment>
-                          ),
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <IconButton
-                                aria-label="toggle confirm password visibility"
-                                onClick={() => togglePasswordVisibility('confirm')}
-                                edge="end"
-                              >
-                                {showPasswords.confirm ? <VisibilityOff /> : <Visibility />}
-                              </IconButton>
-                            </InputAdornment>
-                          ),
-                        }}
-                      />
-                      <FormHelperText>
-                        Your new password must be different from previously used passwords.
-                      </FormHelperText>
-                    </Grid>
-                  </Grid>
-
-                  {/* Password Requirements */}
-                  <Box
-                    sx={{
-                      mt: 3,
-                      p: 2,
-                      borderRadius: 2,
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      backgroundColor: (theme) =>
-                        theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                    }}
-                  >
-                    <Typography variant="subtitle2" gutterBottom>
-                      New Password Requirements
-                    </Typography>
-                    <Box display="flex" flexWrap="wrap" gap={2}>
-                      {[
-                        { met: passwordForm.new_password.length >= 8, label: '8+ characters' },
-                        { met: /[A-Z]/.test(passwordForm.new_password), label: 'Uppercase letter' },
-                        { met: /[a-z]/.test(passwordForm.new_password), label: 'Lowercase letter' },
-                        { met: /[0-9]/.test(passwordForm.new_password), label: 'Number' },
-                      ].map((req) => (
-                        <Box key={req.label} display="flex" alignItems="center" gap={0.5}>
-                          <CheckCircleIcon
-                            sx={{ fontSize: 16, color: req.met ? 'success.main' : 'text.disabled' }}
-                          />
-                          <Typography variant="caption" color={req.met ? 'success.main' : 'text.secondary'}>
-                            {req.label}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
-
-                  <Box display="flex" justifyContent="flex-end" sx={{ mt: 3 }}>
-                    <Button
-                      variant="contained"
-                      size="large"
-                      onClick={handlePasswordChange}
-                      disabled={isLoading}
-                      startIcon={<SaveIcon />}
-                      sx={{
-                        background: 'linear-gradient(135deg, #0A84FF, #BF5AF2)',
-                        boxShadow: '0 8px 20px rgba(10,132,255,0.35)',
-                        '&:hover': {
-                          background: 'linear-gradient(135deg, #0A84FF, #BF5AF2)',
-                          boxShadow: '0 10px 24px rgba(10,132,255,0.45)',
-                        },
-                      }}
-                    >
-                      {isLoading ? 'Updating Password...' : 'Update Password'}
-                    </Button>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Box>
-          )}
-
-          {/* Privacy & Data Tab */}
-          {activeTab === 2 && (
-            <Box sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Privacy & Data Management
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Manage your privacy settings and data. These actions are irreversible.
-              </Typography>
-
-              {/* Clear Data Success Message */}
-              <Snackbar open={clearDataSuccess} autoHideDuration={2000} onClose={() => setClearDataSuccess(false)}>
-                <Alert onClose={() => setClearDataSuccess(false)} severity="success" sx={{ width: '100%' }}>
-                  All data cleared successfully! Redirecting to login...
-                </Alert>
-              </Snackbar>
-
-              {/* Clear All Data Section - destructive action, error accent */}
-              <Card
-                sx={{
-                  mb: 3,
-                  border: '1px solid',
-                  borderColor: 'error.main',
-                  backgroundColor: (theme) =>
-                    theme.palette.mode === 'dark' ? 'rgba(255,69,58,0.06)' : 'rgba(255,59,48,0.04)',
-                  backdropFilter: 'blur(20px)',
-                }}
-              >
-                <CardContent>
-                  <Box display="flex" alignItems="center" gap={2} mb={2}>
-                    <Box
-                      sx={{
-                        width: 40, height: 40, borderRadius: '12px',
-                        background: 'linear-gradient(135deg, #FF453A, #FF9F0A)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 6px 16px rgba(255,69,58,0.35)',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <WarningIcon sx={{ fontSize: 22, color: '#fff' }} />
-                    </Box>
-                    <Typography variant="h6" color="error.main">
-                      Clear All Data
-                    </Typography>
-                  </Box>
-
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    This action will:
-                  </Typography>
-
-                  <Box sx={{ pl: 2, mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      • Clear all browser cookies and session data
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      • Remove all local storage data
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      • Invalidate your current session
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      • Log you out and redirect to login page
-                    </Typography>
-                  </Box>
-
-                  <Typography variant="body2" color="error" sx={{ mb: 3, fontWeight: 600 }}>
-                    This action cannot be undone.
-                  </Typography>
-
-                  <Button
-                    variant="contained"
-                    color="error"
-                    startIcon={isClearingData ? <CircularProgress size={16} color="inherit" /> : <DeleteIcon />}
-                    onClick={() => setConfirmClearOpen(true)}
-                    disabled={isClearingData}
-                    size="large"
-                  >
-                    {isClearingData ? 'Clearing Data...' : 'Clear All Data & Logout'}
+              {!confirmClear ? (
+                <Stack direction="row" spacing={1.5}>
+                  <Button color="error" variant="outlined" startIcon={<DeleteSweepIcon />} onClick={() => setConfirmClear(true)}>
+                    Clear all data
                   </Button>
-                </CardContent>
-              </Card>
+                  <Button color="inherit" startIcon={<LogoutIcon />} onClick={() => logout?.()}>
+                    Log out
+                  </Button>
+                </Stack>
+              ) : (
+                <Stack direction="row" spacing={1.5}>
+                  <Button color="error" variant="contained" onClick={doClear} disabled={clearing}>
+                    {clearing ? 'Clearing…' : 'Yes, delete everything'}
+                  </Button>
+                  <Button color="inherit" onClick={() => setConfirmClear(false)}>Cancel</Button>
+                </Stack>
+              )}
+            </CardContent>
+          </Card>
+        </Reveal>
 
-              {/* Privacy Information - safe, informational */}
-              <Card
-                sx={{
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  backgroundColor: (theme) =>
-                    theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
-                  backdropFilter: 'blur(20px)',
-                }}
-              >
-                <CardContent>
-                  <Box display="flex" alignItems="center" gap={2} mb={1.5}>
-                    <Box
-                      sx={{
-                        width: 40, height: 40, borderRadius: '12px',
-                        background: 'linear-gradient(135deg, #30D158, #0A84FF)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 6px 16px rgba(48,209,88,0.3)',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <SecurityIcon sx={{ fontSize: 22, color: '#fff' }} />
-                    </Box>
-                    <Typography variant="subtitle1">
-                      Data Retention
-                    </Typography>
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Your personal data is stored securely and is only used to provide you with the best experience.
-                    We respect your privacy and only collect information necessary for the application to function properly.
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Box>
-          )}
-       </Paper>
-
-        {/* Loading Progress */}
-        {isLoading && <LinearProgress sx={{ mt: 2 }} />}
-      </Paper>
-
-      {/* Confirm Clear All Data Dialog */}
-      <Dialog
-        open={confirmClearOpen}
-        onClose={() => !isClearingData && setConfirmClearOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <WarningIcon sx={{ color: 'error.main' }} />
-            Clear all data?
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
-            This will clear your session, cookies, and local storage, then log you out.
-            This action cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmClearOpen(false)} disabled={isClearingData}>
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            onClick={() => {
-              setConfirmClearOpen(false);
-              handleClearAllData();
-            }}
-            disabled={isClearingData}
-            startIcon={isClearingData ? <CircularProgress size={16} color="inherit" /> : <DeleteIcon />}
-          >
-            {isClearingData ? 'Clearing...' : 'Yes, Clear Data'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+        <Snackbar open={!!toast} autoHideDuration={3500} onClose={() => setToast(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} sx={{ bottom: { xs: 24, md: 24 } }}>
+          <Alert severity="success" onClose={() => setToast(null)} sx={{ borderRadius: 3 }}>{toast}</Alert>
+        </Snackbar>
+        <Snackbar open={!!error} autoHideDuration={5000} onClose={() => setError(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+          <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 3 }}>{error}</Alert>
+        </Snackbar>
+      </Container>
     </>
+  );
+}
+
+function SectionCard({ icon, color, title, action, children }) {
+  return (
+    <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', mb: 2.5 }}>
+      <CardContent>
+        <Box display="flex" alignItems="center" justifyContent="space-between">
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Box sx={{ width: 30, height: 30, borderRadius: '9px', backgroundColor: `${color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', color }}>
+              {React.cloneElement(icon, { sx: { fontSize: 18 } })}
+            </Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{title}</Typography>
+          </Box>
+          {action}
+        </Box>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Field({ label, value, editing, onChange, type = 'text' }) {
+  if (editing) {
+    return <TextField size="small" fullWidth label={label} type={type} value={value}
+      onChange={(e) => onChange(e.target.value)} />;
+  }
+  return (
+    <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Typography variant="caption" color="text.secondary">{label}</Typography>
+      <Typography variant="body1" sx={{ fontWeight: 500 }} noWrap>{value || '—'}</Typography>
+    </Box>
   );
 }

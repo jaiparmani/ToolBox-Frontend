@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Card, CardActionArea, Chip, Stack, Typography } from '@mui/material';
+import { Box, Card, CardActionArea, Stack, Typography } from '@mui/material';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import LayersIcon from '@mui/icons-material/Layers';
 import FavoriteIcon from '@mui/icons-material/Favorite';
@@ -8,17 +8,16 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import HandshakeIcon from '@mui/icons-material/Handshake';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { getExpenseSummary, getSplitBalances, getMoneyPulse, getProjection } from '../rest/expenseTrackerApis';
 import OwedHero from '../ui/OwedHero';
 import MoneyPulse from '../ui/MoneyPulse';
 import CashFlowRiver from '../ui/CashFlowRiver';
-import AnimatedNumber from '../ui/AnimatedNumber';
 import Reveal from '../ui/Reveal';
 import { SummarySkeleton } from '../ui/Skeletons';
-import { money } from '../ui/money';
+import { Panel, MetricCard, EmptyState, SectionHeader } from '../ui';
 import { accents } from '../../theme/tokens';
 
 /**
@@ -93,7 +92,6 @@ export default function LandingPage() {
   }, [splits]);
 
   const net = splits?.net || 0;
-  const netPositive = net >= 0;
 
   const stats = [
     { label: 'This month', raw: expense?.totalExpenses ?? 0, icon: TrendingUpIcon, color: accents.red },
@@ -134,14 +132,9 @@ export default function LandingPage() {
       {/* Cash Flow River - what's coming, scrubbable */}
       {projection && projection.series && projection.series.length > 1 && (
         <Reveal index={2}>
-          <Box
-            sx={{
-              mb: 2.5, p: { xs: 2, sm: 2.5 }, borderRadius: 5,
-              border: '1px solid', borderColor: 'divider',
-            }}
-          >
+          <Panel sx={{ mb: 2.5, p: { xs: 2, sm: 2.5 } }}>
             <CashFlowRiver projection={projection} />
-          </Box>
+          </Panel>
         </Reveal>
       )}
 
@@ -151,15 +144,14 @@ export default function LandingPage() {
           {loading ? (
             <Box sx={{ height: 300, borderRadius: 5, border: '1px solid', borderColor: 'divider' }} />
           ) : people.length === 0 ? (
-            <Box
-              onClick={() => navigate('/splits')}
-              sx={{ p: 4, borderRadius: 5, textAlign: 'center', cursor: 'pointer', border: '1px solid', borderColor: 'divider' }}
-            >
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>All square</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Split a bill and the people you share with show up here.
-              </Typography>
-            </Box>
+            <Panel interactive onClick={() => navigate('/splits')}>
+              <EmptyState
+                icon={HandshakeIcon}
+                title="All square"
+                description="Split a bill and the people you share with show up here."
+                dense
+              />
+            </Panel>
           ) : (
             <OwedHero
               people={people}
@@ -179,27 +171,14 @@ export default function LandingPage() {
         ) : (
           <Stack direction="row" spacing={1.5} sx={{ mb: 2.5 }}>
             {stats.map((stat) => (
-              <Card
+              <MetricCard
                 key={stat.label}
-                elevation={0}
-                sx={{ flex: 1, p: 2, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}
-              >
-                <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
-                  <Box
-                    sx={{
-                      width: 26, height: 26, borderRadius: '8px', flexShrink: 0,
-                      backgroundColor: `${stat.color}1f`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >
-                    <stat.icon sx={{ color: stat.color, fontSize: 15 }} />
-                  </Box>
-                  <Typography variant="caption" color="text.secondary" noWrap>{stat.label}</Typography>
-                </Box>
-                <Typography sx={{ fontWeight: 700, fontSize: { xs: '1.3rem', sm: '1.6rem' }, letterSpacing: '-0.02em' }}>
-                  <AnimatedNumber value={stat.raw} format="smart" />
-                </Typography>
-              </Card>
+                icon={stat.icon}
+                color={stat.color}
+                label={stat.label}
+                amount={stat.raw}
+                sx={{ flex: 1 }}
+              />
             ))}
           </Stack>
         )}
@@ -207,9 +186,7 @@ export default function LandingPage() {
 
       {/* Everything else */}
       <Reveal index={3}>
-        <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600, mb: 1.25, px: 0.5 }}>
-          Jump to
-        </Typography>
+        <SectionHeader title="Jump to" sx={{ px: 0.5 }} />
       </Reveal>
       <Box
         sx={{

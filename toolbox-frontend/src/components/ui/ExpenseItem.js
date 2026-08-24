@@ -18,7 +18,7 @@ import { money, relativeDay } from './money';
  * Edit and delete sit behind an overflow menu rather than two 20px icons: at
  * 44px the tap target is honest about being a tap target.
  */
-export default function ExpenseItem({ expense, onEdit, onDelete }) {
+export default function ExpenseItem({ expense, onEdit, onDelete, onOpen }) {
   const [menu, setMenu] = React.useState(null);
   const isIncome = expense.transaction_type === 'income' || expense.type === 'income';
   const category = expense.category;
@@ -46,7 +46,10 @@ export default function ExpenseItem({ expense, onEdit, onDelete }) {
         {(category?.name || expense.description || '?').charAt(0).toUpperCase()}
       </Avatar>
 
-      <Box sx={{ minWidth: 0, flex: 1 }}>
+      <Box
+        onClick={() => onOpen?.(expense)}
+        sx={{ minWidth: 0, flex: 1, cursor: onOpen ? 'pointer' : 'default' }}
+      >
         <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
           {expense.description}
         </Typography>
@@ -74,10 +77,12 @@ export default function ExpenseItem({ expense, onEdit, onDelete }) {
       </Box>
 
       <Typography
+        onClick={() => onOpen?.(expense)}
         sx={{
           fontWeight: 650, flexShrink: 0, letterSpacing: '-0.01em',
           fontSize: { xs: '0.95rem', sm: '1rem' },
           color: isIncome ? 'success.main' : 'text.primary',
+          cursor: onOpen ? 'pointer' : 'default',
         }}
       >
         {isIncome ? '+' : ''}{money(expense.amount)}

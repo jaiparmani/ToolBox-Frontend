@@ -56,6 +56,7 @@ import SectionNav from '../ui/SectionNav';
 import ExpenseItem from '../ui/ExpenseItem';
 import SwipeAction from '../ui/SwipeAction';
 import ExpenseComposer from '../ui/ExpenseComposer';
+import TransactionStory from '../ui/TransactionStory';
 import QuickCapture from '../ui/QuickCapture';
 import ThinkingHint from '../ui/ThinkingHint';
 import ErrorBanner from '../ui/ErrorBanner';
@@ -153,6 +154,7 @@ export default function ExpenseTrackerPage() {
  const [menuType, setMenuType] = useState(null);
 
  // Quick Add (free-text, parsed by the LLM router endpoint) state
+ const [story, setStory] = useState(null);
  const [quickAddText, setQuickAddText] = useState('');
  const [quickAddLoading, setQuickAddLoading] = useState(false);
 
@@ -811,6 +813,16 @@ export default function ExpenseTrackerPage() {
    filters.amountMin, filters.amountMax,
  ].filter(Boolean).length + (filters.tags?.length ? 1 : 0);
 
+ // A one-line story context: this expense's place in its category this month.
+ const storyContext = (expense) => {
+   if (!expense?.category) return null;
+   const sameCat = expenses.filter(e => e.category?.id === expense.category.id
+     && (e.transaction_type === 'expense' || e.type === 'expense'));
+   const total = sameCat.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
+   if (sameCat.length <= 1) return `First ${expense.category.name} expense in this view.`;
+   return `${sameCat.length} ${expense.category.name} expenses shown, ${formatCurrency(total)} in total.`;
+ };
+
  const formatCurrency = (amount) => {
    // Amounts are stored and returned by the server in rupees - it formats them
    // as such in amount_display - so showing them as dollars here misreported
@@ -1253,6 +1265,7 @@ export default function ExpenseTrackerPage() {
                        expense={expense}
                        onEdit={openExpenseForm}
                        onDelete={deleteExpenseHandler}
+                       onOpen={setStory}
                      />
                    </SwipeAction>
                  ))}
@@ -1753,6 +1766,16 @@ export default function ExpenseTrackerPage() {
          </>
        )}
      </Menu>
+
+     {/* Transaction story - rich detail on tapping a row */}
+     <TransactionStory
+       open={!!story}
+       expense={story}
+       context={story ? storyContext(story) : null}
+       onClose={() => setStory(null)}
+       onEdit={openExpenseForm}
+       onDelete={deleteExpenseHandler}
+     />
 
      {/* Expense composer - amount-first, type-tinted, categories as chips */}
      <ExpenseComposer

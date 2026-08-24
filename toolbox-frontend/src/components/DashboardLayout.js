@@ -14,6 +14,13 @@ import LayersIcon from '@mui/icons-material/Layers';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
+import AllInboxIcon from '@mui/icons-material/AllInbox';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import AutoGraphIcon from '@mui/icons-material/AutoGraph';
+import SettingsIcon from '@mui/icons-material/Settings';
+import ConstructionIcon from '@mui/icons-material/Construction';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
+import FunctionsIcon from '@mui/icons-material/Functions';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import LogoutIcon from '@mui/icons-material/Logout';
 import LightModeIcon from '@mui/icons-material/LightMode';
@@ -34,62 +41,21 @@ import { useColorMode } from '../contexts/ColorModeContext';
 import BrandLogo from './motion/BrandLogo';
 
 const NAVIGATION = [
-  {
-    kind: 'header',
-    title: 'Main items',
-  },
-  {
-    segment: 'dashboard',
-    title: 'Dashboard',
-    icon: <DashboardIcon />,
-  },
-  {
-    segment: 'expense-tracker',
-    title: 'Expenses',
-    icon: <BarChartIcon />,
-  },
-  {
-    segment: 'splits',
-    title: 'Splits',
-    icon: <CallSplitIcon />,
-  },
-  {
-    segment: 'hobby-tracker',
-    title: 'Habit Tracker',
-    icon: <LayersIcon />,
-  },
-  {
-    segment: 'health-tracker',
-    title: 'Health Tracker',
-    icon: <FavoriteIcon />,
-  },
-  {
-    segment: 'reports',
-    title: 'Reports',
-    icon: <AssessmentIcon />,
-  },
-  {
-    segment: 'array-sum',
-    title: 'Array Sum Demo',
-    icon: <BarChartIcon />,
-  },
-  {
-    kind: 'divider',
-  },
-  {
-    kind: 'header',
-    title: 'User Management',
-  },
-  {
-    segment: 'profile',
-    title: 'My Profile',
-    icon: <AccountCircleIcon />,
-  },
-  {
-    segment: 'api-keys',
-    title: 'API Keys',
-    icon: <VpnKeyIcon />,
-  },
+  { kind: 'header', title: 'Money' },
+  { segment: 'dashboard', title: 'Home', icon: <DashboardIcon /> },
+  { segment: 'inbox', title: 'Inbox', icon: <AllInboxIcon /> },
+  { segment: 'expense-tracker', title: 'Activity', icon: <TimelineIcon /> },
+  { segment: 'reports', title: 'Insights', icon: <AutoGraphIcon /> },
+  { segment: 'splits', title: 'Shared', icon: <CallSplitIcon /> },
+  { kind: 'divider' },
+  { segment: 'profile', title: 'Settings', icon: <SettingsIcon /> },
+  { kind: 'divider' },
+  { kind: 'header', title: 'Tools' },
+  { segment: 'health-tracker', title: 'Health', icon: <FavoriteIcon /> },
+  { segment: 'hobby-tracker', title: 'Habits', icon: <LayersIcon /> },
+  { segment: 'api-keys', title: 'API Keys', icon: <VpnKeyIcon /> },
+  { segment: 'array-sum', title: 'Array Sum', icon: <FunctionsIcon /> },
+  { segment: 'qr-generator', title: 'QR Code', icon: <QrCode2Icon /> },
 ];
 const demoTheme = extendTheme({
   colorSchemes: {

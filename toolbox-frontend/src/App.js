@@ -6,7 +6,9 @@ import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { motion, shadows, surfaces } from './theme/tokens';
 import CssBaseline from '@mui/material/CssBaseline';
+import Box from '@mui/material/Box';
 import { AuthProvider } from './contexts/AuthContext';
+import AuroraBackground from './components/motion/AuroraBackground';
 import { ColorModeContext } from './contexts/ColorModeContext';
 
 const STORAGE_KEY = 'toolbox-color-mode';
@@ -37,8 +39,11 @@ const getTheme = (mode) => createTheme({
     background: mode === 'dark'
       // Not pure black: a near-black with a touch of blue gives the glass
       // panels something to sit on, so edges read as depth instead of seams.
-      ? { default: surfaces.dark.canvas, paper: '#151518' }
-      : { default: surfaces.light.canvas, paper: '#ffffff' },
+      // transparent canvas: the AuroraBackground shows through everything.
+      // Surfaces stay glassy (translucent + blur) so the colour drifts behind
+      // the content instead of a flat fill.
+      ? { default: 'transparent', paper: 'rgba(20,20,24,0.86)' }
+      : { default: 'transparent', paper: 'rgba(255,255,255,0.86)' },
     divider: mode === 'dark' ? surfaces.dark.hairline : surfaces.light.hairline,
   },
   typography: {
@@ -84,6 +89,11 @@ const getTheme = (mode) => createTheme({
       styleOverrides: {
         root: {
           borderRadius: 18,
+          backgroundColor: mode === 'dark' ? 'rgba(24,24,28,0.82)' : 'rgba(255,255,255,0.84)',
+          backdropFilter: 'blur(30px) saturate(1.6)',
+          WebkitBackdropFilter: 'blur(30px) saturate(1.6)',
+          border: '1px solid',
+          borderColor: mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.5)',
           boxShadow: mode === 'dark' ? shadows.dark.card : shadows.light.card,
           transition: `transform ${motion.normal}ms ${motion.ease}, box-shadow ${motion.normal}ms ${motion.ease}, border-color ${motion.normal}ms ${motion.ease}`,
           '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
@@ -125,6 +135,11 @@ const getTheme = (mode) => createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
+        },
+        // Only the raised paper variants get the glass; flat/outlined stay clean.
+        elevation: {
+          backdropFilter: 'blur(24px) saturate(1.4)',
+          WebkitBackdropFilter: 'blur(24px) saturate(1.4)',
         },
       },
     },
@@ -290,10 +305,14 @@ function App() {
         <ColorModeContext.Provider value={colorMode}>
           <ThemeProvider theme={theme}>
             <CssBaseline />
+            <AuroraBackground />
             <AuthProvider>
-              <BrowserRouter basename={process.env.PUBLIC_URL}>
-                <Router />
-              </BrowserRouter>
+              {/* Everything sits above the living background */}
+              <Box sx={{ position: 'relative', zIndex: 1, minHeight: '100vh' }}>
+                <BrowserRouter basename={process.env.PUBLIC_URL}>
+                  <Router />
+                </BrowserRouter>
+              </Box>
             </AuthProvider>
           </ThemeProvider>
         </ColorModeContext.Provider>

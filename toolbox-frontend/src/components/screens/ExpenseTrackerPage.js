@@ -1001,7 +1001,7 @@ export default function ExpenseTrackerPage() {
          borderRadius: 3,
          overflow: 'hidden',
          backgroundColor: (theme) =>
-           theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+           theme.palette.mode === 'dark' ? 'rgba(30,30,36,0.55)' : 'rgba(255,255,255,0.78)',
          backdropFilter: 'blur(20px)',
        }}
      >
@@ -1027,7 +1027,7 @@ export default function ExpenseTrackerPage() {
                p: { xs: 1.5, sm: 2.5 }, mb: { xs: 2, sm: 3 }, borderRadius: 3,
                border: '1px solid', borderColor: 'divider',
                backgroundColor: (theme) =>
-                 theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
+                 theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
              }}
            >
              <QuickCapture
@@ -1117,7 +1117,7 @@ export default function ExpenseTrackerPage() {
                border: '1px solid',
                borderColor: 'divider',
                backgroundColor: (theme) =>
-                 theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
+                 theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
              }}
            >
              <Box
@@ -1521,7 +1521,7 @@ export default function ExpenseTrackerPage() {
              sx={{
                p: 2.5, mb: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider',
                backgroundColor: (theme) =>
-                 theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
+                 theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
              }}
            >
              <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">

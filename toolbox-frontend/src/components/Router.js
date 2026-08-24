@@ -1,5 +1,6 @@
 import React from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import PageTransition from './motion/PageTransition'
 import { authUtils } from './rest/authUtils'
 import DashboardLayoutBasic from './DashboardLayout'
 import HobbyTracker from './screens/HobbyTracker'
@@ -48,8 +49,10 @@ const PublicRoute = ({ children }) => {
 }
 
 export default function Router() {
+  const location = useLocation();
   return (
-    <Routes>
+    <PageTransition key={location.pathname}>
+    <Routes location={location}>
       {/* Public Routes */}
       <Route path="/login" element={
         <PublicRoute>
@@ -137,5 +140,6 @@ export default function Router() {
       {/* Catch all route */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </PageTransition>
   )
 }

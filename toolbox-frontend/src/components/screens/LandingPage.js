@@ -11,8 +11,10 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { getExpenseSummary, getSplitBalances } from '../rest/expenseTrackerApis';
+import { getExpenseSummary, getSplitBalances, getMoneyPulse, getProjection } from '../rest/expenseTrackerApis';
 import OwedHero from '../ui/OwedHero';
+import MoneyPulse from '../ui/MoneyPulse';
+import CashFlowRiver from '../ui/CashFlowRiver';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import Reveal from '../ui/Reveal';
 import { SummarySkeleton } from '../ui/Skeletons';
@@ -49,6 +51,8 @@ export default function LandingPage() {
   const { user } = useAuth();
   const [expense, setExpense] = useState(null);
   const [splits, setSplits] = useState(null);
+  const [pulse, setPulse] = useState(null);
+  const [projection, setProjection] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -57,9 +61,13 @@ export default function LandingPage() {
     Promise.allSettled([
       getExpenseSummary({ dateFrom: month, dateTo: today }),
       getSplitBalances(),
-    ]).then(([e, s]) => {
+      getMoneyPulse(),
+      getProjection(30),
+    ]).then(([e, s, pl, pr]) => {
       if (e.status === 'fulfilled') setExpense(e.value);
       if (s.status === 'fulfilled') setSplits(s.value);
+      if (pl.status === 'fulfilled') setPulse(pl.value);
+      if (pr.status === 'fulfilled') setProjection(pr.value);
       setLoading(false);
     });
   }, []);
@@ -114,8 +122,31 @@ export default function LandingPage() {
         </Box>
       </Reveal>
 
+      {/* Money Pulse - the ambient 'where do I stand' read */}
+      {(pulse || loading) && (
+        <Reveal index={1}>
+          <Box sx={{ mb: 2.5 }}>
+            <MoneyPulse pulse={pulse} loading={loading && !pulse} />
+          </Box>
+        </Reveal>
+      )}
+
+      {/* Cash Flow River - what's coming, scrubbable */}
+      {projection && projection.series && projection.series.length > 1 && (
+        <Reveal index={2}>
+          <Box
+            sx={{
+              mb: 2.5, p: { xs: 2, sm: 2.5 }, borderRadius: 5,
+              border: '1px solid', borderColor: 'divider',
+            }}
+          >
+            <CashFlowRiver projection={projection} />
+          </Box>
+        </Reveal>
+      )}
+
       {/* The headline: a compact balance ring, not the full constellation */}
-      <Reveal index={1}>
+      <Reveal index={3}>
         <Box sx={{ mb: 2.5 }}>
           {loading ? (
             <Box sx={{ height: 300, borderRadius: 5, border: '1px solid', borderColor: 'divider' }} />

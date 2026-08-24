@@ -614,6 +614,46 @@ export const splitInGroup = async ({ groupId, amount, description, splitWithMe =
     }
 };
 
+// ── Money intelligence (projection + pulse + recurring) ─────────────────────
+
+export const getMoneyPulse = async () => {
+    try {
+        const r = await authenticatedFetch(`${API_BASE_URL}/money/pulse/`);
+        return await r.json();
+    } catch (error) { throw handleApiError(error, 'read your money pulse'); }
+};
+
+export const getProjection = async (days = 30) => {
+    try {
+        const r = await authenticatedFetch(`${API_BASE_URL}/money/projection/?days=${days}`);
+        return await r.json();
+    } catch (error) { throw handleApiError(error, 'load your cash-flow projection'); }
+};
+
+export const getRecurring = async () => {
+    try {
+        const r = await authenticatedFetch(`${API_BASE_URL}/recurring/`);
+        const data = await r.json();
+        return (Array.isArray(data) ? data : data.results || []);
+    } catch (error) { throw handleApiError(error, 'load recurring items'); }
+};
+
+export const createRecurring = async (rule) => {
+    try {
+        const r = await authenticatedFetch(`${API_BASE_URL}/recurring/`, {
+            method: 'POST', body: JSON.stringify(rule),
+        });
+        return await r.json();
+    } catch (error) { throw handleApiError(error, 'add a recurring item'); }
+};
+
+export const deleteRecurring = async (id) => {
+    try {
+        await authenticatedFetch(`${API_BASE_URL}/recurring/${id}/`, { method: 'DELETE' });
+        return true;
+    } catch (error) { throw handleApiError(error, 'remove a recurring item'); }
+};
+
 // Legacy function for backward compatibility
 export const addExpenseApiLegacy = (user, amount, category, date, description, onSuccess, onError) => {
     addExpenseApi({

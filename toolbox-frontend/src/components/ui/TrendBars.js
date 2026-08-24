@@ -11,7 +11,7 @@ import { money, moneySmart } from './money';
  * interpolated over. One hue (magnitude is the whole story); the busiest day
  * is labelled directly and the rest carry their figure in the tooltip.
  */
-export default function TrendBars({ data, title = 'Daily spend' }) {
+export default function TrendBars({ data, title = 'Daily spend', formatValue = moneySmart, formatFull = money }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const hue = isDark ? chart.sequential.dark : chart.sequential.light;
@@ -27,7 +27,7 @@ export default function TrendBars({ data, title = 'Daily spend' }) {
       <Box display="flex" alignItems="baseline" justifyContent="space-between" sx={{ mb: 1.5 }}>
         <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600 }}>{title}</Typography>
         <Typography variant="caption" color="text.secondary">
-          peak {moneySmart(peakDay.value)}
+          peak {formatValue(peakDay.value)}
         </Typography>
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: 96 }}>
@@ -35,7 +35,7 @@ export default function TrendBars({ data, title = 'Daily spend' }) {
           const h = Math.max((d.value / peak) * 100, d.value > 0 ? 6 : 2);
           const label = new Date(d.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
           return (
-            <Tooltip key={d.date} title={`${label}: ${money(d.value)}`} placement="top" arrow>
+            <Tooltip key={d.date} title={`${label}: ${formatFull(d.value)}`} placement="top" arrow>
               <Box
                 sx={{
                   flex: 1, minWidth: 4, height: `${h}%`, borderRadius: '4px 4px 2px 2px',

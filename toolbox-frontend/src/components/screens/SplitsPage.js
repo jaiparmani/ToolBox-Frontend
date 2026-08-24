@@ -18,6 +18,7 @@ import AnimatedNumber from '../ui/AnimatedNumber';
 import Reveal from '../ui/Reveal';
 import ErrorBanner from '../ui/ErrorBanner';
 import { BalanceSkeleton } from '../ui/Skeletons';
+import SwipeAction from '../ui/SwipeAction';
 import { money, relativeDay } from '../ui/money';
 import GroupStrip from '../ui/GroupStrip';
 import {
@@ -211,13 +212,10 @@ export default function SplitsPage() {
     }
   };
 
-  const settle = async (person) => {
+  // The core settle, no confirm - used by the swipe gesture, where the swipe
+  // itself is the intent.
+  const settleDirect = async (person) => {
     const owedByMe = person.net < 0;
-    const label = owedByMe
-      ? `Mark the ${money(Math.abs(person.net))} you owe ${person.name} as paid?`
-      : `Mark ${person.name}'s ${money(person.net)} as settled?`;
-    if (!window.confirm(label)) return;
-
     setSettling(person.id);
     try {
       const result = await settleUpWith(
@@ -514,6 +512,13 @@ export default function SplitsPage() {
             <Stack spacing={1.25}>
               {(selected ? people.filter(p => p.id === selected.id) : people).map((person, i) => (
                 <Reveal key={person.id} index={i + 2}>
+                  <SwipeAction
+                    onAction={() => settleDirect(person)}
+                    color="#30D158"
+                    icon={<DoneAllIcon sx={{ color: '#fff' }} />}
+                    label={person.net < 0 ? 'Mark paid' : 'Settle'}
+                    borderRadius={12}
+                  >
                   <Card
                     elevation={0}
                     sx={{
@@ -549,7 +554,13 @@ export default function SplitsPage() {
                             <Button
                               size="small"
                               startIcon={<DoneAllIcon />}
-                              onClick={() => settle(person)}
+                              onClick={() => {
+                                const owedByMe = person.net < 0;
+                                const label = owedByMe
+                                  ? `Mark the ${money(Math.abs(person.net))} you owe ${person.name} as paid?`
+                                  : `Mark ${person.name}'s ${money(person.net)} as settled?`;
+                                if (window.confirm(label)) settleDirect(person);
+                              }}
                               disabled={settling === person.id}
                               sx={{ mt: 0.5 }}
                             >
@@ -580,6 +591,7 @@ export default function SplitsPage() {
                       )}
                     </CardContent>
                   </Card>
+                  </SwipeAction>
                 </Reveal>
               ))}
             </Stack>

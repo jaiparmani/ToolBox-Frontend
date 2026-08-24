@@ -55,6 +55,7 @@ import NavbarComponent from '../NavbarComponent';
 import SummaryStrip from '../ui/SummaryStrip';
 import SectionNav from '../ui/SectionNav';
 import ExpenseItem from '../ui/ExpenseItem';
+import SwipeAction from '../ui/SwipeAction';
 import QuickCapture from '../ui/QuickCapture';
 import ThinkingHint from '../ui/ThinkingHint';
 import ErrorBanner from '../ui/ErrorBanner';
@@ -609,9 +610,7 @@ export default function ExpenseTrackerPage() {
    }
  };
 
- const deleteExpenseHandler = async (expenseId) => {
-   if (!window.confirm('Are you sure you want to delete this expense?')) return;
-
+ const deleteExpenseDirect = async (expenseId) => {
    setLoading(true);
    try {
      await deleteExpense(expenseId);
@@ -623,6 +622,11 @@ export default function ExpenseTrackerPage() {
    } finally {
      setLoading(false);
    }
+ };
+
+ // The menu delete keeps a confirm; the swipe gesture is its own confirmation.
+ const deleteExpenseHandler = (expenseId) => {
+   if (window.confirm('Delete this expense?')) deleteExpenseDirect(expenseId);
  };
 
  // Category handlers
@@ -1238,12 +1242,20 @@ export default function ExpenseTrackerPage() {
              ) : (
                <Box sx={{ px: { xs: 1, sm: 1.5 } }}>
                  {expenses.map((expense) => (
-                   <ExpenseItem
+                   <SwipeAction
                      key={expense.id}
-                     expense={expense}
-                     onEdit={openExpenseForm}
-                     onDelete={deleteExpenseHandler}
-                   />
+                     onAction={() => deleteExpenseDirect(expense.id)}
+                     color="#FF453A"
+                     icon={<DeleteIcon sx={{ color: '#fff' }} />}
+                     label="Delete"
+                     borderRadius={0}
+                   >
+                     <ExpenseItem
+                       expense={expense}
+                       onEdit={openExpenseForm}
+                       onDelete={deleteExpenseHandler}
+                     />
+                   </SwipeAction>
                  ))}
                </Box>
              )}

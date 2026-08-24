@@ -12,7 +12,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { getExpenseSummary, getSplitBalances } from '../rest/expenseTrackerApis';
-import MoneyConstellation from '../ui/MoneyConstellation';
+import OwedHero from '../ui/OwedHero';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import Reveal from '../ui/Reveal';
 import { SummarySkeleton } from '../ui/Skeletons';
@@ -114,70 +114,31 @@ export default function LandingPage() {
         </Box>
       </Reveal>
 
-      {/* The headline: who owes whom, front and centre */}
+      {/* The headline: a compact balance ring, not the full constellation */}
       <Reveal index={1}>
-        <Card
-          elevation={0}
-          onClick={() => navigate('/splits')}
-          sx={{
-            mb: 2.5, borderRadius: 5, cursor: 'pointer', position: 'relative', overflow: 'hidden',
-            border: '1px solid', borderColor: 'divider',
-            '&::before': {
-              content: '""', position: 'absolute', inset: 0,
-              background: netPositive
-                ? 'radial-gradient(circle at 50% -10%, rgba(57,135,229,0.20), transparent 62%)'
-                : 'radial-gradient(circle at 50% -10%, rgba(217,79,61,0.20), transparent 62%)',
-              pointerEvents: 'none',
-            },
-            transition: 'transform 0.25s ease',
-            '&:hover': { transform: 'translateY(-3px)' },
-          }}
-        >
-          <Box sx={{ position: 'relative', p: { xs: 2, sm: 3 } }}>
-            <Box display="flex" alignItems="center" justifyContent="space-between">
-              <Stack direction="row" spacing={1} alignItems="center">
-                <CallSplitIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                <Typography variant="overline" color="text.secondary">
-                  {people.length === 0 ? 'Splits' : netPositive ? "You're owed overall" : 'You owe overall'}
-                </Typography>
-              </Stack>
-              <Chip
-                label="Open"
-                size="small"
-                icon={<ArrowForwardIcon sx={{ fontSize: 15 }} />}
-                sx={{ '& .MuiChip-icon': { order: 1, ml: -0.5, mr: 0.75 } }}
-              />
+        <Box sx={{ mb: 2.5 }}>
+          {loading ? (
+            <Box sx={{ height: 300, borderRadius: 5, border: '1px solid', borderColor: 'divider' }} />
+          ) : people.length === 0 ? (
+            <Box
+              onClick={() => navigate('/splits')}
+              sx={{ p: 4, borderRadius: 5, textAlign: 'center', cursor: 'pointer', border: '1px solid', borderColor: 'divider' }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>All square</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Split a bill and the people you share with show up here.
+              </Typography>
             </Box>
-
-            {loading ? (
-              <Box sx={{ py: 4 }}><SummarySkeleton /></Box>
-            ) : people.length === 0 ? (
-              <Box sx={{ py: 3, textAlign: 'center' }}>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>All square</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Split a bill and the people you share with will appear here.
-                </Typography>
-              </Box>
-            ) : (
-              <>
-                <Typography
-                  sx={{
-                    fontWeight: 700, letterSpacing: '-0.03em', mt: 0.5,
-                    fontSize: { xs: '2.4rem', sm: '3rem' },
-                    color: netPositive ? '#3987e5' : '#d94f3d',
-                  }}
-                >
-                  <AnimatedNumber value={Math.abs(net)} />
-                </Typography>
-                {/* Tapping the card navigates; the constellation is a preview,
-                    so its own node taps are disabled here to keep one action. */}
-                <Box sx={{ pointerEvents: 'none' }}>
-                  <MoneyConstellation people={people.slice(0, 6)} selectedId={null} onSelect={() => {}} />
-                </Box>
-              </>
-            )}
-          </Box>
-        </Card>
+          ) : (
+            <OwedHero
+              people={people}
+              totalOwed={splits?.totalOwedToYou || 0}
+              totalYouOwe={splits?.totalYouOwe || 0}
+              net={net}
+              onOpen={() => navigate('/splits')}
+            />
+          )}
+        </Box>
       </Reveal>
 
       {/* Money at a glance */}

@@ -1,269 +1,258 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Grid, Card, CardActionArea, CardContent } from '@mui/material';
+import { Box, Card, CardActionArea, Chip, Stack, Typography } from '@mui/material';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import LayersIcon from '@mui/icons-material/Layers';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import AssessmentIcon from '@mui/icons-material/Assessment';
-import FunctionsIcon from '@mui/icons-material/Functions';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import MonitorWeightIcon from '@mui/icons-material/MonitorWeight';
-import OpacityIcon from '@mui/icons-material/Opacity';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { getExpenseSummary } from '../rest/expenseTrackerApis';
-import { getMetricsSummary } from '../rest/healthApis';
+import { getExpenseSummary, getSplitBalances } from '../rest/expenseTrackerApis';
+import MoneyConstellation from '../ui/MoneyConstellation';
+import AnimatedNumber from '../ui/AnimatedNumber';
+import Reveal from '../ui/Reveal';
+import { SummarySkeleton } from '../ui/Skeletons';
+import { money } from '../ui/money';
+import { accents } from '../../theme/tokens';
 
-const FEATURES = [
-  {
-    to: '/expense-tracker',
-    icon: BarChartIcon,
-    title: 'Expenses',
-    description: 'Track spending, income, and see where it all goes.',
-    gradient: 'linear-gradient(135deg, #0A84FF, #64D2FF)',
-    glow: 'rgba(10,132,255,0.45)',
-  },
-  {
-    to: '/health-tracker',
-    icon: FavoriteIcon,
-    title: 'Health Tracker',
-    description: 'Log weight, water, sleep, and steps in one place.',
-    gradient: 'linear-gradient(135deg, #FF375F, #FF9F0A)',
-    glow: 'rgba(255,55,95,0.45)',
-  },
-  {
-    to: '/hobby-tracker',
-    icon: LayersIcon,
-    title: 'Habit Tracker',
-    description: 'Build streaks and keep your routines on track.',
-    gradient: 'linear-gradient(135deg, #30D158, #64D2FF)',
-    glow: 'rgba(48,209,88,0.45)',
-  },
-  {
-    to: '/reports',
-    icon: AssessmentIcon,
-    title: 'Reports',
-    description: 'Category breakdowns and monthly trends at a glance.',
-    gradient: 'linear-gradient(135deg, #BF5AF2, #FF375F)',
-    glow: 'rgba(191,90,242,0.45)',
-  },
-  {
-    to: '/array-sum',
-    icon: FunctionsIcon,
-    title: 'Array Sum Demo',
-    description: 'A small utility tool for quick number crunching.',
-    gradient: 'linear-gradient(135deg, #FF9F0A, #FFD60A)',
-    glow: 'rgba(255,159,10,0.45)',
-  },
-];
+/**
+ * The front door.
+ *
+ * The app is about people and money flows, so the dashboard leads with the
+ * one picture that says how you stand with everyone - the constellation -
+ * rather than a wall of feature tiles. The tiles are still there, but below
+ * the thing you actually opened the app to check.
+ */
 
 const getGreeting = () => {
   const hour = new Date().getHours();
+  if (hour < 5) return 'Still up';
   if (hour < 12) return 'Good morning';
   if (hour < 18) return 'Good afternoon';
   return 'Good evening';
 };
 
-const fadeInUp = {
-  '@keyframes fadeInUp': {
-    from: { opacity: 0, transform: 'translateY(24px)' },
-    to: { opacity: 1, transform: 'translateY(0)' },
-  },
-};
+const FEATURES = [
+  { to: '/expense-tracker', icon: BarChartIcon, title: 'Expenses', hint: 'Track spending', color: accents.blue },
+  { to: '/splits', icon: CallSplitIcon, title: 'Splits', hint: 'Who owes whom', color: accents.amber },
+  { to: '/health-tracker', icon: FavoriteIcon, title: 'Health', hint: 'Weight, water, sleep', color: accents.red },
+  { to: '/reports', icon: AssessmentIcon, title: 'Reports', hint: 'Trends & breakdowns', color: accents.purple },
+  { to: '/hobby-tracker', icon: LayersIcon, title: 'Habits', hint: 'Streaks & routines', color: accents.green },
+];
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [expenseSummary, setExpenseSummary] = useState(null);
-  const [healthSummary, setHealthSummary] = useState(null);
+  const [expense, setExpense] = useState(null);
+  const [splits, setSplits] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
-    getExpenseSummary({ dateFrom: today, dateTo: today })
-      .then(setExpenseSummary)
-      .catch(() => setExpenseSummary(null));
-    getMetricsSummary()
-      .then(setHealthSummary)
-      .catch(() => setHealthSummary(null));
+    const month = today.slice(0, 8) + '01';
+    Promise.allSettled([
+      getExpenseSummary({ dateFrom: month, dateTo: today }),
+      getSplitBalances(),
+    ]).then(([e, s]) => {
+      if (e.status === 'fulfilled') setExpense(e.value);
+      if (s.status === 'fulfilled') setSplits(s.value);
+      setLoading(false);
+    });
   }, []);
 
-  const displayName = user?.username || user?.email || 'there';
-  const weight = healthSummary?.weight;
-  const water = healthSummary?.water;
+  const displayName = user?.username || 'there';
+
+  // Same merge the splits page uses: one net figure per person, either direction.
+  const people = useMemo(() => {
+    if (!splits) return [];
+    const byName = new Map();
+    splits.balances.forEach(b => byName.set(b.name.toLowerCase(), {
+      id: `p${b.personId}`, personId: b.personId, name: b.name, net: b.owed,
+    }));
+    splits.youOwe.forEach(d => {
+      const key = d.name.toLowerCase();
+      const existing = byName.get(key);
+      if (existing) existing.net -= d.owed;
+      else byName.set(key, { id: `u${d.userId}`, name: d.name, net: -d.owed });
+    });
+    return [...byName.values()]
+      .filter(p => p.net !== 0)
+      .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+  }, [splits]);
+
+  const net = splits?.net || 0;
+  const netPositive = net >= 0;
 
   const stats = [
-    {
-      label: "Today's spending",
-      value: expenseSummary ? `₹${expenseSummary.totalExpenses.toFixed(2)}` : '—',
-      icon: TrendingDownIcon,
-      color: '#FF453A',
-    },
-    {
-      label: 'Net balance',
-      value: expenseSummary ? `₹${expenseSummary.netBalance.toFixed(2)}` : '—',
-      icon: AccountBalanceIcon,
-      color: '#0A84FF',
-    },
-    {
-      label: 'Latest weight',
-      value: weight?.latest_value != null ? `${weight.latest_value} ${weight.unit}` : '—',
-      icon: MonitorWeightIcon,
-      color: '#FF375F',
-    },
-    {
-      label: 'Water this week',
-      value: water?.week_total != null ? `${water.week_total} ${water.unit}` : '—',
-      icon: OpacityIcon,
-      color: '#64D2FF',
-    },
+    { label: 'This month', raw: expense?.totalExpenses ?? 0, icon: TrendingUpIcon, color: accents.red },
+    { label: 'Net balance', raw: expense?.netBalance ?? 0, icon: AccountBalanceIcon, color: accents.blue },
   ];
 
   return (
-    <Box>
-      {/* Hero with gradient-mesh backdrop */}
-      <Box
-        sx={{
-          position: 'relative',
-          textAlign: 'center',
-          py: { xs: 7, sm: 12 },
-          px: 2,
-          mb: 2,
-          borderRadius: '28px',
-          overflow: 'hidden',
-          backgroundColor: 'background.paper',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            inset: 0,
-            background: `
-              radial-gradient(circle at 15% 20%, rgba(10,132,255,0.35), transparent 42%),
-              radial-gradient(circle at 85% 15%, rgba(191,90,242,0.28), transparent 45%),
-              radial-gradient(circle at 50% 100%, rgba(255,55,95,0.22), transparent 55%)
-            `,
-            opacity: (theme) => (theme.palette.mode === 'dark' ? 1 : 0.6),
-          },
-        }}
-      >
-        <Box sx={{ position: 'relative', ...fadeInUp, animation: 'fadeInUp 0.7s ease-out' }}>
+    <Box sx={{ pb: { xs: 4, md: 2 } }}>
+      {/* Greeting */}
+      <Reveal>
+        <Box sx={{ px: { xs: 0.5, sm: 1 }, pt: { xs: 1, sm: 2 }, mb: 2.5 }}>
           <Typography
-            variant="h2"
             sx={{
-              fontSize: { xs: '2.25rem', sm: '3.75rem' },
-              mb: 1.5,
-              backgroundImage: 'linear-gradient(135deg, #0A84FF 10%, #BF5AF2 55%, #FF375F 100%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              color: 'transparent',
+              fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05,
+              fontSize: { xs: '2rem', sm: '2.75rem' },
+              backgroundImage: `linear-gradient(120deg, ${accents.blue} 10%, ${accents.purple} 60%, ${accents.red} 100%)`,
+              backgroundClip: 'text', WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent', color: 'transparent',
             }}
           >
             {getGreeting()}, {displayName}.
           </Typography>
-          <Typography
-            variant="h5"
-            sx={{
-              color: 'text.secondary',
-              fontWeight: 400,
-              maxWidth: 560,
-              mx: 'auto',
-            }}
-          >
-            Everything in your toolbox, in one clean view.
+          <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
+            Here's where your money stands today.
           </Typography>
         </Box>
-      </Box>
+      </Reveal>
 
-      {/* Live stats - glass cards */}
-      <Grid container spacing={2} sx={{ mb: 6 }}>
-        {stats.map((stat, i) => {
-          const StatIcon = stat.icon;
-          return (
-            <Grid item xs={6} lg={3} key={stat.label}>
+      {/* The headline: who owes whom, front and centre */}
+      <Reveal index={1}>
+        <Card
+          elevation={0}
+          onClick={() => navigate('/splits')}
+          sx={{
+            mb: 2.5, borderRadius: 5, cursor: 'pointer', position: 'relative', overflow: 'hidden',
+            border: '1px solid', borderColor: 'divider',
+            '&::before': {
+              content: '""', position: 'absolute', inset: 0,
+              background: netPositive
+                ? 'radial-gradient(circle at 50% -10%, rgba(57,135,229,0.20), transparent 62%)'
+                : 'radial-gradient(circle at 50% -10%, rgba(217,79,61,0.20), transparent 62%)',
+              pointerEvents: 'none',
+            },
+            transition: 'transform 0.25s ease',
+            '&:hover': { transform: 'translateY(-3px)' },
+          }}
+        >
+          <Box sx={{ position: 'relative', p: { xs: 2, sm: 3 } }}>
+            <Box display="flex" alignItems="center" justifyContent="space-between">
+              <Stack direction="row" spacing={1} alignItems="center">
+                <CallSplitIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+                <Typography variant="overline" color="text.secondary">
+                  {people.length === 0 ? 'Splits' : netPositive ? "You're owed overall" : 'You owe overall'}
+                </Typography>
+              </Stack>
+              <Chip
+                label="Open"
+                size="small"
+                icon={<ArrowForwardIcon sx={{ fontSize: 15 }} />}
+                sx={{ '& .MuiChip-icon': { order: 1, ml: -0.5, mr: 0.75 } }}
+              />
+            </Box>
+
+            {loading ? (
+              <Box sx={{ py: 4 }}><SummarySkeleton /></Box>
+            ) : people.length === 0 ? (
+              <Box sx={{ py: 3, textAlign: 'center' }}>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>All square</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Split a bill and the people you share with will appear here.
+                </Typography>
+              </Box>
+            ) : (
+              <>
+                <Typography
+                  sx={{
+                    fontWeight: 700, letterSpacing: '-0.03em', mt: 0.5,
+                    fontSize: { xs: '2.4rem', sm: '3rem' },
+                    color: netPositive ? '#3987e5' : '#d94f3d',
+                  }}
+                >
+                  <AnimatedNumber value={Math.abs(net)} />
+                </Typography>
+                {/* Tapping the card navigates; the constellation is a preview,
+                    so its own node taps are disabled here to keep one action. */}
+                <Box sx={{ pointerEvents: 'none' }}>
+                  <MoneyConstellation people={people.slice(0, 6)} selectedId={null} onSelect={() => {}} />
+                </Box>
+              </>
+            )}
+          </Box>
+        </Card>
+      </Reveal>
+
+      {/* Money at a glance */}
+      <Reveal index={2}>
+        {loading ? (
+          <Box sx={{ mb: 2.5 }}><SummarySkeleton /></Box>
+        ) : (
+          <Stack direction="row" spacing={1.5} sx={{ mb: 2.5 }}>
+            {stats.map((stat) => (
               <Card
+                key={stat.label}
                 elevation={0}
-                sx={{
-                  ...fadeInUp,
-                  animation: `fadeInUp 0.7s ease-out ${0.1 + i * 0.06}s both`,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  backgroundColor: (theme) =>
-                    theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
-                  backdropFilter: 'blur(20px)',
-                  transition: 'transform 0.25s ease, border-color 0.25s ease',
-                  '&:hover': {
-                    transform: 'translateY(-3px)',
-                    borderColor: stat.color,
-                  },
-                }}
+                sx={{ flex: 1, p: 2, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}
               >
-                <CardContent sx={{ py: 2.5 }}>
-                  <StatIcon sx={{ color: stat.color, fontSize: 20, mb: 1 }} />
-                  <Typography variant="h5" sx={{ mb: 0.5 }}>
-                    {stat.value}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {stat.label}
-                  </Typography>
-                </CardContent>
+                <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
+                  <Box
+                    sx={{
+                      width: 26, height: 26, borderRadius: '8px', flexShrink: 0,
+                      backgroundColor: `${stat.color}1f`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <stat.icon sx={{ color: stat.color, fontSize: 15 }} />
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" noWrap>{stat.label}</Typography>
+                </Box>
+                <Typography sx={{ fontWeight: 700, fontSize: { xs: '1.3rem', sm: '1.6rem' }, letterSpacing: '-0.02em' }}>
+                  <AnimatedNumber value={stat.raw} format="smart" />
+                </Typography>
               </Card>
-            </Grid>
-          );
-        })}
-      </Grid>
+            ))}
+          </Stack>
+        )}
+      </Reveal>
 
-      {/* Feature grid */}
-      <Typography variant="h4" sx={{ mb: 3 }}>
-        Explore
-      </Typography>
-      <Grid container spacing={3}>
-        {FEATURES.map(({ to, icon: Icon, title, description, gradient, glow }, i) => (
-          <Grid item xs={12} lg={4} key={to}>
+      {/* Everything else */}
+      <Reveal index={3}>
+        <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600, mb: 1.25, px: 0.5 }}>
+          Jump to
+        </Typography>
+      </Reveal>
+      <Box
+        sx={{
+          display: 'grid', gap: 1.25,
+          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(5, 1fr)' },
+        }}
+      >
+        {FEATURES.map((f, i) => (
+          <Reveal key={f.to} index={4 + i}>
             <Card
               elevation={0}
               sx={{
-                ...fadeInUp,
-                animation: `fadeInUp 0.7s ease-out ${0.2 + i * 0.08}s both`,
-                height: '100%',
-                border: '1px solid',
-                borderColor: 'divider',
-                transition: 'transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease',
-                '&:hover': {
-                  transform: 'translateY(-6px)',
-                  borderColor: 'transparent',
-                  boxShadow: `0 20px 40px ${glow}`,
-                },
+                borderRadius: 4, height: '100%', border: '1px solid', borderColor: 'divider',
+                transition: 'transform 0.2s ease, border-color 0.2s ease',
+                '&:hover': { transform: 'translateY(-4px)', borderColor: f.color },
               }}
             >
-              <CardActionArea onClick={() => navigate(to)} sx={{ height: '100%', p: 1 }}>
-                <CardContent>
-                  <Box
-                    sx={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: '16px',
-                      background: gradient,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      mb: 2,
-                      boxShadow: `0 8px 20px ${glow}`,
-                    }}
-                  >
-                    <Icon sx={{ color: '#fff', fontSize: 28 }} />
-                  </Box>
-                  <Typography variant="h6" sx={{ mb: 0.5 }}>
-                    {title}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {description}
-                  </Typography>
-                </CardContent>
+              <CardActionArea onClick={() => navigate(f.to)} sx={{ p: 2, height: '100%' }}>
+                <Box
+                  sx={{
+                    width: 42, height: 42, borderRadius: '13px', mb: 1.5,
+                    background: `linear-gradient(135deg, ${f.color}, ${f.color}bb)`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: `0 6px 16px ${f.color}55`,
+                  }}
+                >
+                  <f.icon sx={{ color: '#fff', fontSize: 22 }} />
+                </Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.2 }}>{f.title}</Typography>
+                <Typography variant="caption" color="text.secondary">{f.hint}</Typography>
               </CardActionArea>
             </Card>
-          </Grid>
+          </Reveal>
         ))}
-      </Grid>
+      </Box>
     </Box>
   );
 }

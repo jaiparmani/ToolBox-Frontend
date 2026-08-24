@@ -26,6 +26,63 @@ export default function MoneyConstellation({ people, selectedId, onSelect, centr
   const isDark = theme.palette.mode === 'dark';
   const flow = isDark ? chart.flow.dark : chart.flow.light;
   const compact = useMediaQuery(theme.breakpoints.down('sm'));
+  const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+  // Drag-to-rotate: grab the ring, spin it, and it springs back to rest like a
+  // dial. Driven straight through a ref rather than React state or a motion
+  // library - the rotation is written to the element's transform on each
+  // pointermove, so a fast drag can't be starved by re-renders. On release a
+  // CSS transition with an overshoot curve carries it home.
+  const rotorRef = React.useRef(null);
+  const svgRef = React.useRef(null);
+  const rotation = React.useRef(0);
+  const dragging = React.useRef(false);
+  const lastAngle = React.useRef(0);
+  const moved = React.useRef(false);
+
+  const angleFromEvent = (e) => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return 0;
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    return Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI);
+  };
+
+  const applyRotation = () => {
+    if (rotorRef.current) rotorRef.current.style.transform = `rotate(${rotation.current}deg)`;
+  };
+
+  const onDragStart = (e) => {
+    if (reduce || !rotorRef.current) return;
+    dragging.current = true;
+    moved.current = false;
+    lastAngle.current = angleFromEvent(e);
+    // no transition while dragging - the ring should track the finger exactly
+    rotorRef.current.style.transition = 'none';
+    rotorRef.current.setPointerCapture?.(e.pointerId);
+  };
+  const onDragMove = (e) => {
+    if (!dragging.current) return;
+    const a = angleFromEvent(e);
+    let delta = a - lastAngle.current;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    if (Math.abs(delta) > 0.4) moved.current = true;
+    rotation.current += delta;
+    lastAngle.current = a;
+    applyRotation();
+  };
+  const onDragEnd = (e) => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    rotorRef.current?.releasePointerCapture?.(e.pointerId);
+    // spring home with a soft overshoot
+    if (rotorRef.current) {
+      rotorRef.current.style.transition = 'transform 720ms cubic-bezier(0.34, 1.56, 0.64, 1)';
+      rotation.current = 0;
+      applyRotation();
+    }
+  };
 
   const size = compact ? 320 : 420;
   const centre = size / 2;
@@ -59,12 +116,25 @@ export default function MoneyConstellation({ people, selectedId, onSelect, centr
 
   return (
     <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
+      <div
+        ref={rotorRef}
+        onPointerDown={onDragStart}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+        style={{
+          width: '100%', maxWidth: size, willChange: 'transform',
+          transformOrigin: '50% 50%',
+          touchAction: 'none', cursor: reduce ? 'default' : 'grab',
+        }}
+      >
       <Box
         component="svg"
+        ref={svgRef}
         viewBox={`0 0 ${size} ${size}`}
         role="img"
         aria-label={`Money owed between you and ${nodes.length} people`}
-        sx={{ width: '100%', maxWidth: size, height: 'auto', overflow: 'visible' }}
+        sx={{ width: '100%', height: 'auto', overflow: 'visible', display: 'block' }}
       >
         <defs>
           <filter id="flowGlow" x="-50%" y="-50%" width="200%" height="200%">
@@ -121,11 +191,10 @@ export default function MoneyConstellation({ people, selectedId, onSelect, centr
           return (
             <g
               key={node.id}
-              onClick={() => onSelect(selected ? null : node)}
+              onClick={() => { if (!moved.current) onSelect(selected ? null : node); }}
               style={{
                 cursor: 'pointer',
                 opacity: dimmed ? 0.35 : 1,
-                transformOrigin: `${node.x}px ${node.y}px`,
                 animation: `popIn ${motionTokens.slow}ms ${motionTokens.emphasis} both`,
                 animationDelay: `${120 + i * 70}ms`,
                 transition: `opacity ${motionTokens.normal}ms ${motionTokens.ease}`,
@@ -180,6 +249,7 @@ export default function MoneyConstellation({ people, selectedId, onSelect, centr
           }
         `}</style>
       </Box>
+      </div>
     </Box>
   );
 }

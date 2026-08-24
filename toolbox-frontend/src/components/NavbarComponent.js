@@ -21,6 +21,7 @@ import { clearAllData } from './rest/userApis';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import LogoutIcon from '@mui/icons-material/Logout';
 import HomeIcon from '@mui/icons-material/Home';
+import BrandLogo from './motion/BrandLogo';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import { useColorMode } from '../contexts/ColorModeContext';
@@ -98,12 +99,13 @@ export default function NavbarComponent() {
                 </IconButton>
               </Tooltip>
             )}
+            <Box sx={{ display: 'flex', mr: 1 }}><BrandLogo size={26} /></Box>
             <Typography
               variant="h6"
               component="div"
               noWrap
               sx={{
-                fontWeight: 600,
+                fontWeight: 700,
                 color: 'primary.contrastText',
                 minWidth: 0,
                 // "ToolBox Dashboard" wrapped to two lines on a phone and ran
@@ -112,8 +114,7 @@ export default function NavbarComponent() {
                 fontSize: { xs: '1.05rem', sm: '1.25rem' },
               }}
             >
-              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>ToolBox Dashboard</Box>
-              <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>ToolBox</Box>
+ToolBox
             </Typography>
           </Box>
 

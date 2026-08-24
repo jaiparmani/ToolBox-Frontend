@@ -30,6 +30,7 @@ import UserProfilePage from './screens/UserProfilePage';
 import { authUtils } from './rest/authUtils';
 import { clearAllData } from './rest/userApis';
 import { useColorMode } from '../contexts/ColorModeContext';
+import BrandLogo from './motion/BrandLogo';
 
 const NAVIGATION = [
   {
@@ -239,6 +240,7 @@ export default function DashboardLayoutBasic(props) {
       navigation={NAVIGATION}
       theme={demoTheme}
       window={demoWindow}
+      branding={{ title: 'ToolBox', logo: <BrandLogo size={30} />, homeUrl: '/' }}
     >
       <ThemeSync mode={mode} />
       <DashboardLayout

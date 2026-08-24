@@ -16,6 +16,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../../contexts/AuthContext';
 import { clearAllData } from '../rest/userApis.js';
 import Reveal from '../ui/Reveal';
+import { ConfirmDialog } from '../ui';
 import { accents } from '../../theme/tokens';
 
 /**
@@ -221,26 +222,28 @@ export default function UserProfilePage() {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 Permanently delete all your expenses, splits, groups and health logs. This can't be undone.
               </Typography>
-              {!confirmClear ? (
-                <Stack direction="row" spacing={1.5}>
-                  <Button color="error" variant="outlined" startIcon={<DeleteSweepIcon />} onClick={() => setConfirmClear(true)}>
-                    Clear all data
-                  </Button>
-                  <Button color="inherit" startIcon={<LogoutIcon />} onClick={() => logout?.()}>
-                    Log out
-                  </Button>
-                </Stack>
-              ) : (
-                <Stack direction="row" spacing={1.5}>
-                  <Button color="error" variant="contained" onClick={doClear} disabled={clearing}>
-                    {clearing ? 'Clearing…' : 'Yes, delete everything'}
-                  </Button>
-                  <Button color="inherit" onClick={() => setConfirmClear(false)}>Cancel</Button>
-                </Stack>
-              )}
+              <Stack direction="row" spacing={1.5}>
+                <Button color="error" variant="outlined" startIcon={<DeleteSweepIcon />} onClick={() => setConfirmClear(true)}>
+                  Clear all data
+                </Button>
+                <Button color="inherit" startIcon={<LogoutIcon />} onClick={() => logout?.()}>
+                  Log out
+                </Button>
+              </Stack>
             </CardContent>
           </Card>
         </Reveal>
+
+        <ConfirmDialog
+          open={confirmClear}
+          title="Delete everything?"
+          message="This permanently deletes all your expenses, splits, groups and health logs. It can't be undone."
+          confirmLabel="Yes, delete everything"
+          destructive
+          loading={clearing}
+          onConfirm={doClear}
+          onCancel={() => setConfirmClear(false)}
+        />
 
         <Snackbar open={!!toast} autoHideDuration={3500} onClose={() => setToast(null)}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} sx={{ bottom: { xs: 24, md: 24 } }}>

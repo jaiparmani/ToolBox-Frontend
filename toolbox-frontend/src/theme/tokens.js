@@ -26,6 +26,7 @@ export const accents = {
   cyan: '#64D2FF',    // cool highlight
   mint: '#30D6A5',    // positive / on-track
   emerald: '#30D158',
+  green: '#30D158',   // alias of emerald; used for income / positive accents
   amber: '#FF9F0A',   // caution / attention
   red: '#FF453A',     // negative / danger
   purple: '#BF5AF2',

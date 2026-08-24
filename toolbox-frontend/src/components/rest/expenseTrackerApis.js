@@ -510,6 +510,110 @@ export const getSplits = async ({ personId, settled } = {}) => {
     }
 };
 
+/**
+ * Groups you split within. A group is a filter over the same splits the
+ * person view uses, so nothing here is a separate set of numbers.
+ */
+const asGroup = (g) => ({
+    id: g.id,
+    name: g.name,
+    emoji: g.emoji || '',
+    memberCount: g.member_count ?? (g.members || []).length,
+    members: (g.members || []).map(m => ({
+        personId: m.id, name: m.name, linkedUsername: m.linked_username || null,
+    })),
+    isArchived: g.is_archived,
+});
+
+export const getGroups = async () => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/groups/`);
+        const data = await response.json();
+        return (Array.isArray(data) ? data : data.results || []).map(asGroup);
+    } catch (error) {
+        throw handleApiError(error, 'load your groups');
+    }
+};
+
+export const createGroup = async (name, emoji = '') => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/groups/`, {
+            method: 'POST',
+            body: JSON.stringify({ name, emoji })
+        });
+        return asGroup(await response.json());
+    } catch (error) {
+        throw handleApiError(error, 'create the group');
+    }
+};
+
+// Members can be an account ({userId}) or just a name ({name}), so a group can
+// exist before everyone in it has signed up.
+export const addGroupMembers = async (groupId, members) => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/groups/${groupId}/add_members/`, {
+            method: 'POST',
+            body: JSON.stringify({
+                members: members.map(m => (m.userId ? { user_id: m.userId } : { name: m.name }))
+            })
+        });
+        return asGroup(await response.json());
+    } catch (error) {
+        throw handleApiError(error, 'add members');
+    }
+};
+
+export const getGroupBalances = async (groupId) => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/groups/${groupId}/balances/`);
+        const data = await response.json();
+        return {
+            group: asGroup(data.group),
+            totalSpent: parseFloat(data.total_spent || 0),
+            expenseCount: data.expense_count || 0,
+            totalOutstanding: parseFloat(data.total_outstanding || 0),
+            members: (data.members || []).map(m => ({
+                personId: m.person_id, name: m.name,
+                linkedUsername: m.linked_username || null,
+                owed: parseFloat(m.owed || 0),
+                unsettledCount: m.unsettled_count || 0,
+            })),
+        };
+    } catch (error) {
+        throw handleApiError(error, 'load the group');
+    }
+};
+
+export const getGroupExpenses = async (groupId) => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/groups/${groupId}/expenses/`);
+        const data = await response.json();
+        return (data || []).map(transformExpenseForUI);
+    } catch (error) {
+        throw handleApiError(error, 'load group expenses');
+    }
+};
+
+// Splitting inside a group: with no participants the server uses the members.
+export const splitInGroup = async ({ groupId, amount, description, splitWithMe = true }) => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/create_split/`, {
+            method: 'POST',
+            body: JSON.stringify({
+                group_id: groupId, amount, description, split_with_me: splitWithMe, participants: []
+            })
+        });
+        const data = await response.json();
+        return {
+            expense: transformExpenseForUI(data.expense),
+            splits: data.splits || [],
+            yourShare: parseFloat(data.your_share || 0),
+        };
+    } catch (error) {
+        throw handleApiError(error, 'split within the group');
+    }
+};
+
 // Legacy function for backward compatibility
 export const addExpenseApiLegacy = (user, amount, category, date, description, onSuccess, onError) => {
     addExpenseApi({

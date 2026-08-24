@@ -5,6 +5,8 @@ import {
   Paper, Snackbar, Alert, Stack, Typography,
 } from '@mui/material';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import GroupsIcon from '@mui/icons-material/Groups';
 import AddIcon from '@mui/icons-material/Add';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -16,7 +18,14 @@ import Reveal from '../ui/Reveal';
 import ErrorBanner from '../ui/ErrorBanner';
 import { BalanceSkeleton } from '../ui/Skeletons';
 import { money, relativeDay } from '../ui/money';
-import { getSplitBalances, settleUpWith, getSplits } from '../rest/expenseTrackerApis';
+import GroupStrip from '../ui/GroupStrip';
+import {
+  getSplitBalances, settleUpWith, getSplits,
+  getGroups, createGroup, getGroupBalances, getGroupExpenses, splitInGroup,
+} from '../rest/expenseTrackerApis';
+import {
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField, LinearProgress,
+} from '@mui/material';
 
 /**
  * Splitting lives on its own page now.
@@ -42,6 +51,14 @@ export default function SplitsPage() {
   const [success, setSuccess] = useState(null);
   const [settling, setSettling] = useState(null);
 
+  // Groups. `openGroup` switches the page into that group's own view rather
+  // than navigating away, so the constellation can simply re-scope itself.
+  const [groups, setGroups] = useState([]);
+  const [openGroup, setOpenGroup] = useState(null);
+  const [groupView, setGroupView] = useState({ loading: false, data: null, expenses: [] });
+  const [newGroup, setNewGroup] = useState({ open: false, name: '', emoji: '', saving: false });
+  const [groupSplit, setGroupSplit] = useState({ amount: '', description: '', saving: false });
+
   const load = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true }));
     try {
@@ -60,7 +77,72 @@ export default function SplitsPage() {
     }
   }, []);
 
-  useEffect(() => { if (isAuthenticated) load(); }, [isAuthenticated, load]);
+  const loadGroups = useCallback(async () => {
+    try {
+      setGroups(await getGroups());
+    } catch (err) {
+      // A groups failure shouldn't take the balances down with it.
+      setGroups([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) { load(); loadGroups(); }
+  }, [isAuthenticated, load, loadGroups]);
+
+  const enterGroup = async (group) => {
+    setOpenGroup(group);
+    setSelected(null);
+    setGroupView({ loading: true, data: null, expenses: [] });
+    try {
+      const [data, expenses] = await Promise.all([
+        getGroupBalances(group.id), getGroupExpenses(group.id),
+      ]);
+      setGroupView({ loading: false, data, expenses });
+    } catch (err) {
+      setGroupView({ loading: false, data: null, expenses: [] });
+      setError(err.message || 'Could not open that group');
+    }
+  };
+
+  const leaveGroup = () => { setOpenGroup(null); setGroupView({ loading: false, data: null, expenses: [] }); };
+
+  const saveGroup = async () => {
+    if (!newGroup.name.trim()) { setError('Give the group a name'); return; }
+    setNewGroup(prev => ({ ...prev, saving: true }));
+    try {
+      const created = await createGroup(newGroup.name.trim(), newGroup.emoji.trim());
+      setNewGroup({ open: false, name: '', emoji: '', saving: false });
+      setSuccess(`Created ${created.name}`);
+      await loadGroups();
+      enterGroup(created);
+    } catch (err) {
+      setNewGroup(prev => ({ ...prev, saving: false }));
+      setError(err.message || 'Could not create the group');
+    }
+  };
+
+  const addGroupSplit = async () => {
+    const amount = parseFloat(groupSplit.amount);
+    if (!amount || amount <= 0) { setError('Enter an amount'); return; }
+    if (!groupSplit.description.trim()) { setError('What was it for?'); return; }
+    if (!groupView.data?.members?.length) {
+      setError('Add someone to the group first'); return;
+    }
+    setGroupSplit(prev => ({ ...prev, saving: true }));
+    try {
+      const result = await splitInGroup({
+        groupId: openGroup.id, amount, description: groupSplit.description.trim(),
+      });
+      setSuccess(`Split ${money(result.expense.amount)} across the group`);
+      setGroupSplit({ amount: '', description: '', saving: false });
+      enterGroup(openGroup);
+      load();
+    } catch (err) {
+      setGroupSplit(prev => ({ ...prev, saving: false }));
+      setError(err.message || 'Could not split that');
+    }
+  };
 
   // One list of people, whichever direction the money runs. Someone can appear
   // on both sides, so the two are merged into a single net figure per person.
@@ -189,7 +271,158 @@ export default function SplitsPage() {
           </Paper>
         </Reveal>
 
-        {state.loading ? (
+        {/* Groups: a way in, above everything else */}
+        {!openGroup && (
+          <Reveal>
+            <Box sx={{ mb: 2 }}>
+              <GroupStrip
+                groups={groups}
+                activeId={openGroup?.id}
+                onOpen={enterGroup}
+                onCreate={() => setNewGroup({ open: true, name: '', emoji: '', saving: false })}
+              />
+            </Box>
+          </Reveal>
+        )}
+
+        {openGroup ? (
+          /* ---- The group universe ---- */
+          <Box>
+            <Box display="flex" alignItems="center" gap={1} sx={{ mb: 2 }}>
+              <IconButton onClick={leaveGroup} aria-label="Back to everyone">
+                <ArrowBackIcon />
+              </IconButton>
+              <Typography sx={{ fontSize: 24 }}>{openGroup.emoji || '👥'}</Typography>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="h6" sx={{ fontWeight: 650 }} noWrap>{openGroup.name}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {groupView.data
+                    ? `${groupView.data.members.length} people · ${groupView.data.expenseCount} expenses`
+                    : 'loading…'}
+                </Typography>
+              </Box>
+            </Box>
+
+            {groupView.loading ? (
+              <BalanceSkeleton />
+            ) : groupView.data ? (
+              <>
+                <Reveal>
+                  <Paper
+                    elevation={0}
+                    sx={{ p: 2.5, mb: 2, borderRadius: 4, textAlign: 'center', border: '1px solid', borderColor: 'divider' }}
+                  >
+                    <Typography variant="overline" color="text.secondary">Spent in this group</Typography>
+                    <Typography sx={{ fontWeight: 700, fontSize: '2rem', letterSpacing: '-0.03em' }}>
+                      <AnimatedNumber value={groupView.data.totalSpent} />
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {money(groupView.data.totalOutstanding)} still to come back to you
+                    </Typography>
+                  </Paper>
+                </Reveal>
+
+                {groupView.data.members.length > 0 && (
+                  <Reveal index={1}>
+                    <Paper
+                      elevation={0}
+                      sx={{ p: { xs: 1, sm: 2 }, mb: 2, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}
+                    >
+                      {/* The same picture, scoped to this group's members */}
+                      <MoneyConstellation
+                        centreLabel={openGroup.emoji || 'You'}
+                        people={groupView.data.members.map(m => ({
+                          id: `g${m.personId}`, personId: m.personId, name: m.name, net: m.owed,
+                        }))}
+                        selectedId={null}
+                        onSelect={() => {}}
+                      />
+                    </Paper>
+                  </Reveal>
+                )}
+
+                {/* Split without leaving the group */}
+                <Reveal index={2}>
+                  <Paper
+                    elevation={0}
+                    sx={{ p: 2, mb: 2, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}
+                  >
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600, mb: 1.5 }}>
+                      Add a bill — divided across everyone here
+                    </Typography>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                      <TextField
+                        size="small" type="number" label="Amount" sx={{ width: { xs: '100%', sm: 140 } }}
+                        value={groupSplit.amount}
+                        onChange={(e) => setGroupSplit(prev => ({ ...prev, amount: e.target.value }))}
+                      />
+                      <TextField
+                        size="small" label="What for?" fullWidth
+                        value={groupSplit.description}
+                        onChange={(e) => setGroupSplit(prev => ({ ...prev, description: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') addGroupSplit(); }}
+                      />
+                      <Button
+                        variant="contained" onClick={addGroupSplit}
+                        disabled={groupSplit.saving}
+                        sx={{ flexShrink: 0 }}
+                      >
+                        {groupSplit.saving ? 'Adding…' : 'Split'}
+                      </Button>
+                    </Stack>
+                    {groupSplit.saving && <LinearProgress sx={{ mt: 1.5, borderRadius: 999 }} />}
+                  </Paper>
+                </Reveal>
+
+                <Stack spacing={1}>
+                  {groupView.data.members.map((m, i) => (
+                    <Reveal key={m.personId} index={i + 3}>
+                      <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+                        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                          <Box display="flex" justifyContent="space-between" alignItems="center">
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>{m.name}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {m.owed > 0 ? `${m.unsettledCount} unsettled` : 'settled up'}
+                                {m.linkedUsername ? ' · has an account' : ''}
+                              </Typography>
+                            </Box>
+                            <Typography sx={{ fontWeight: 700, color: m.owed > 0 ? '#3987e5' : 'text.secondary' }}>
+                              {m.owed > 0 ? '+' : ''}{money(m.owed)}
+                            </Typography>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Reveal>
+                  ))}
+                </Stack>
+
+                {groupView.expenses.length > 0 && (
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600, mb: 1 }}>
+                      Bills in this group
+                    </Typography>
+                    <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', px: 1.5 }}>
+                      {groupView.expenses.slice(0, 8).map((e) => (
+                        <Box
+                          key={e.id}
+                          display="flex" justifyContent="space-between" alignItems="center"
+                          sx={{ py: 1.25, borderBottom: '1px solid', borderColor: 'divider', '&:last-of-type': { borderBottom: 'none' } }}
+                        >
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>{e.description}</Typography>
+                            <Typography variant="caption" color="text.secondary">{relativeDay(e.date)}</Typography>
+                          </Box>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{money(e.amount)}</Typography>
+                        </Box>
+                      ))}
+                    </Paper>
+                  </Box>
+                )}
+              </>
+            ) : null}
+          </Box>
+        ) : state.loading ? (
           <BalanceSkeleton />
         ) : people.length === 0 ? (
           <Paper
@@ -313,6 +546,40 @@ export default function SplitsPage() {
             {success}
           </Alert>
         </Snackbar>
+
+        <Dialog open={newGroup.open} onClose={() => setNewGroup(prev => ({ ...prev, open: false }))} maxWidth="xs" fullWidth>
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <GroupsIcon color="primary" />
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 650, lineHeight: 1.2 }}>New group</Typography>
+              <Typography variant="body2" color="text.secondary">A flat, a trip, a regular table</Typography>
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <Stack direction="row" spacing={1.5} sx={{ mt: 1 }}>
+              <TextField
+                label="Icon" placeholder="🏖" sx={{ width: 90 }}
+                value={newGroup.emoji}
+                onChange={(e) => setNewGroup(prev => ({ ...prev, emoji: e.target.value.slice(0, 4) }))}
+              />
+              <TextField
+                label="Name *" fullWidth autoFocus
+                value={newGroup.name}
+                onChange={(e) => setNewGroup(prev => ({ ...prev, name: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveGroup(); }}
+              />
+            </Stack>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+              People join a group the first time you split with them in it.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setNewGroup(prev => ({ ...prev, open: false }))} color="inherit">Cancel</Button>
+            <Button onClick={saveGroup} variant="contained" disabled={newGroup.saving || !newGroup.name.trim()}>
+              {newGroup.saving ? 'Creating…' : 'Create'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         <Fab
           color="primary"

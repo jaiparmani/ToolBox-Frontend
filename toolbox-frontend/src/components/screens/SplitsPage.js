@@ -19,6 +19,7 @@ import Reveal from '../ui/Reveal';
 import ErrorBanner from '../ui/ErrorBanner';
 import { BalanceSkeleton } from '../ui/Skeletons';
 import SwipeAction from '../ui/SwipeAction';
+import { AnimatePresence, motion, LayoutGroup } from 'framer-motion';
 import { money, relativeDay } from '../ui/money';
 import GroupStrip from '../ui/GroupStrip';
 import {
@@ -508,10 +509,22 @@ export default function SplitsPage() {
               </Paper>
             </Reveal>
 
-            {/* Selecting filters this list instead of navigating away */}
-            <Stack spacing={1.25}>
+            {/* Selecting filters this list; the survivor magic-moves into place
+                and the person's detail expands under it (a shared-layout
+                transition rather than an instant swap). */}
+            <LayoutGroup>
+            <Stack spacing={1.25} component={motion.div} layout>
+              <AnimatePresence initial={false}>
               {(selected ? people.filter(p => p.id === selected.id) : people).map((person, i) => (
-                <Reveal key={person.id} index={i + 2}>
+                <motion.div
+                  key={person.id}
+                  layout
+                  layoutId={`person-card-${person.id}`}
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.94 }}
+                  transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                >
                   <SwipeAction
                     onAction={() => settleDirect(person)}
                     color="#30D158"
@@ -592,9 +605,11 @@ export default function SplitsPage() {
                     </CardContent>
                   </Card>
                   </SwipeAction>
-                </Reveal>
+                </motion.div>
               ))}
+              </AnimatePresence>
             </Stack>
+            </LayoutGroup>
 
             {selected && (
               <Box textAlign="center" sx={{ mt: 2 }}>

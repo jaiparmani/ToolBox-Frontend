@@ -7,6 +7,7 @@ import {
 import CallSplitIcon from '@mui/icons-material/CallSplit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import GroupsIcon from '@mui/icons-material/Groups';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import AddIcon from '@mui/icons-material/Add';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -22,9 +23,11 @@ import GroupStrip from '../ui/GroupStrip';
 import {
   getSplitBalances, settleUpWith, getSplits,
   getGroups, createGroup, getGroupBalances, getGroupExpenses, splitInGroup,
+  addGroupMembers, searchSplitUsers,
 } from '../rest/expenseTrackerApis';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, LinearProgress,
+  Autocomplete,
 } from '@mui/material';
 
 /**
@@ -58,6 +61,7 @@ export default function SplitsPage() {
   const [groupView, setGroupView] = useState({ loading: false, data: null, expenses: [] });
   const [newGroup, setNewGroup] = useState({ open: false, name: '', emoji: '', saving: false });
   const [groupSplit, setGroupSplit] = useState({ amount: '', description: '', saving: false });
+  const [addPeople, setAddPeople] = useState({ open: false, picked: [], options: [], saving: false });
 
   const load = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true }));
@@ -119,6 +123,30 @@ export default function SplitsPage() {
     } catch (err) {
       setNewGroup(prev => ({ ...prev, saving: false }));
       setError(err.message || 'Could not create the group');
+    }
+  };
+
+  const openAddPeople = () => {
+    setAddPeople({ open: true, picked: [], options: [], saving: false });
+    searchSplitUsers('').then(options => setAddPeople(prev => ({ ...prev, options }))).catch(() => {});
+  };
+
+  const saveAddPeople = async () => {
+    if (!addPeople.picked.length) { setError('Pick or type someone to add'); return; }
+    setAddPeople(prev => ({ ...prev, saving: true }));
+    try {
+      // A picked option carries a userId (links to their account); free text is
+      // just a name, for someone without an account yet.
+      const members = addPeople.picked.map(p =>
+        typeof p === 'string' ? { name: p } : { userId: p.userId });
+      await addGroupMembers(openGroup.id, members);
+      setSuccess('Added to the group');
+      setAddPeople({ open: false, picked: [], options: [], saving: false });
+      enterGroup(openGroup);
+      loadGroups();
+    } catch (err) {
+      setAddPeople(prev => ({ ...prev, saving: false }));
+      setError(err.message || 'Could not add them');
     }
   };
 
@@ -293,14 +321,23 @@ export default function SplitsPage() {
                 <ArrowBackIcon />
               </IconButton>
               <Typography sx={{ fontSize: 24 }}>{openGroup.emoji || '👥'}</Typography>
-              <Box sx={{ minWidth: 0 }}>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 650 }} noWrap>{openGroup.name}</Typography>
                 <Typography variant="caption" color="text.secondary">
                   {groupView.data
-                    ? `${groupView.data.members.length} people · ${groupView.data.expenseCount} expenses`
+                    ? `${groupView.data.members.length} ${groupView.data.members.length === 1 ? 'person' : 'people'} · ${groupView.data.expenseCount} ${groupView.data.expenseCount === 1 ? 'bill' : 'bills'}`
                     : 'loading…'}
                 </Typography>
               </Box>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<PersonAddIcon />}
+                onClick={openAddPeople}
+                sx={{ flexShrink: 0 }}
+              >
+                Add people
+              </Button>
             </Box>
 
             {groupView.loading ? (
@@ -322,6 +359,24 @@ export default function SplitsPage() {
                   </Paper>
                 </Reveal>
 
+                {groupView.data.members.length === 0 && (
+                  <Reveal index={1}>
+                    <Paper
+                      elevation={0}
+                      sx={{ p: 4, mb: 2, borderRadius: 4, textAlign: 'center', border: '1px dashed', borderColor: 'divider' }}
+                    >
+                      <PersonAddIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>No one here yet</Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Add the people you split with in this group.
+                      </Typography>
+                      <Button variant="contained" startIcon={<PersonAddIcon />} onClick={openAddPeople}>
+                        Add people
+                      </Button>
+                    </Paper>
+                  </Reveal>
+                )}
+
                 {groupView.data.members.length > 0 && (
                   <Reveal index={1}>
                     <Paper
@@ -341,7 +396,8 @@ export default function SplitsPage() {
                   </Reveal>
                 )}
 
-                {/* Split without leaving the group */}
+                {/* Split without leaving the group - only once there are members */}
+                {groupView.data.members.length > 0 && (
                 <Reveal index={2}>
                   <Paper
                     elevation={0}
@@ -373,6 +429,7 @@ export default function SplitsPage() {
                     {groupSplit.saving && <LinearProgress sx={{ mt: 1.5, borderRadius: 999 }} />}
                   </Paper>
                 </Reveal>
+                )}
 
                 <Stack spacing={1}>
                   {groupView.data.members.map((m, i) => (
@@ -577,6 +634,45 @@ export default function SplitsPage() {
             <Button onClick={() => setNewGroup(prev => ({ ...prev, open: false }))} color="inherit">Cancel</Button>
             <Button onClick={saveGroup} variant="contained" disabled={newGroup.saving || !newGroup.name.trim()}>
               {newGroup.saving ? 'Creating…' : 'Create'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={addPeople.open} onClose={() => setAddPeople(prev => ({ ...prev, open: false }))} maxWidth="xs" fullWidth>
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <PersonAddIcon color="primary" />
+            <Typography variant="h6" sx={{ fontWeight: 650 }}>Add people</Typography>
+          </DialogTitle>
+          <DialogContent>
+            <Autocomplete
+              multiple
+              freeSolo
+              options={addPeople.options}
+              value={addPeople.picked}
+              getOptionLabel={(o) => (typeof o === 'string' ? o : o.username)}
+              filterSelectedOptions
+              onInputChange={(e, value, reason) => {
+                if (reason === 'input' && value.length >= 2) {
+                  searchSplitUsers(value).then(options => setAddPeople(prev => ({ ...prev, options }))).catch(() => {});
+                }
+              }}
+              onChange={(e, values) => setAddPeople(prev => ({ ...prev, picked: values }))}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  autoFocus
+                  label="People"
+                  placeholder="Search accounts, or type a name"
+                  helperText="People with an account see the group in their own view"
+                  sx={{ mt: 1 }}
+                />
+              )}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setAddPeople(prev => ({ ...prev, open: false }))} color="inherit">Cancel</Button>
+            <Button onClick={saveAddPeople} variant="contained" disabled={addPeople.saving || !addPeople.picked.length}>
+              {addPeople.saving ? 'Adding…' : 'Add'}
             </Button>
           </DialogActions>
         </Dialog>

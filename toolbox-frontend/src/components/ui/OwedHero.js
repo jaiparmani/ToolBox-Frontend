@@ -81,9 +81,26 @@ export default function OwedHero({ people, totalOwed, totalYouOwe, net, onOpen }
               <stop offset="1" stopColor={isDark ? '#64D2FF' : '#2a78d6'} />
             </linearGradient>
           </defs>
+          <defs>
+            <linearGradient id="shimmerArc" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stopColor={heroColour} stopOpacity="0" />
+              <stop offset="1" stopColor={heroColour} stopOpacity="0.9" />
+            </linearGradient>
+          </defs>
           {/* track */}
           <circle cx={size / 2} cy={size / 2} r={r} fill="none"
             stroke={isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'} strokeWidth={stroke} />
+          {/* a bright short arc that sweeps the ring forever - the 'alive' touch */}
+          <circle
+            cx={size / 2} cy={size / 2} r={r} fill="none"
+            stroke="url(#shimmerArc)" strokeWidth={stroke} strokeLinecap="round"
+            strokeDasharray={`${c * 0.12} ${c}`}
+            style={{
+              transformOrigin: '50% 50%',
+              animation: 'sweep 3.8s linear infinite',
+              mixBlendMode: isDark ? 'screen' : 'multiply',
+            }}
+          />
           {/* owed-to-you arc */}
           {owedFrac > 0 && (
             <circle
@@ -108,7 +125,17 @@ export default function OwedHero({ people, totalOwed, totalYouOwe, net, onOpen }
 
         {/* Centre figure */}
         <Box sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <Typography sx={{ fontWeight: 700, letterSpacing: '-0.03em', fontSize: '2.1rem', lineHeight: 1, color: heroColour }}>
+          <Typography
+            sx={{
+              fontWeight: 700, letterSpacing: '-0.03em', fontSize: '2.1rem', lineHeight: 1, color: heroColour,
+              animation: 'glowPulse 3.8s ease-in-out infinite',
+              '@keyframes glowPulse': {
+                '0%, 100%': { textShadow: `0 0 0px ${heroColour}00` },
+                '50%': { textShadow: `0 0 18px ${heroColour}66` },
+              },
+              '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+            }}
+          >
             <AnimatedNumber value={Math.abs(net)} />
           </Typography>
           {(totalOwed > 0 || totalYouOwe > 0) && (
@@ -159,6 +186,7 @@ export default function OwedHero({ people, totalOwed, totalYouOwe, net, onOpen }
 
       <style>{`
         @keyframes drawArc { from { stroke-dasharray: 0 ${c}; } }
+        @keyframes sweep { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
         @media (prefers-reduced-motion: reduce) { circle { animation: none !important; } }
       `}</style>
     </Box>

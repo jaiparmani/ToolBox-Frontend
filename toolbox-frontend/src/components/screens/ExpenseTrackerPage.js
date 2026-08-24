@@ -56,6 +56,7 @@ import SummaryStrip from '../ui/SummaryStrip';
 import SectionNav from '../ui/SectionNav';
 import ExpenseItem from '../ui/ExpenseItem';
 import SwipeAction from '../ui/SwipeAction';
+import ExpenseComposer from '../ui/ExpenseComposer';
 import QuickCapture from '../ui/QuickCapture';
 import ThinkingHint from '../ui/ThinkingHint';
 import ErrorBanner from '../ui/ErrorBanner';
@@ -1755,164 +1756,18 @@ export default function ExpenseTrackerPage() {
        )}
      </Menu>
 
-     {/* Expense Form Dialog */}
-     <Dialog open={expenseForm.open} onClose={closeExpenseForm} maxWidth="md" fullWidth>
-       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-         <Box
-           sx={{
-             width: 40, height: 40, borderRadius: '12px',
-             background: 'linear-gradient(135deg, #0A84FF, #64D2FF)',
-             display: 'flex', alignItems: 'center', justifyContent: 'center',
-             boxShadow: '0 6px 16px rgba(10,132,255,0.4)',
-             flexShrink: 0,
-           }}
-         >
-           <AddIcon sx={{ color: '#fff', fontSize: 20 }} />
-         </Box>
-         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-           <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
-             {expenseForm.editing ? 'Edit Expense' : 'Add New Expense'}
-           </Typography>
-           <Typography variant="body2" color="text.secondary">
-             {expenseForm.editing ? 'Update the details below' : 'Track a new expense or income entry'}
-           </Typography>
-         </Box>
-         <IconButton onClick={closeExpenseForm} size="small">
-           <CloseIcon fontSize="small" />
-         </IconButton>
-       </DialogTitle>
-       <DialogContent>
-         <Grid container spacing={3} sx={{ mt: 1 }}>
-           <Grid item xs={12} md={6}>
-             <TextField
-               fullWidth
-               label="Amount *"
-               type="number"
-               value={expenseForm.data.amount}
-               onChange={(e) => setExpenseForm(prev => ({
-                 ...prev,
-                 data: { ...prev.data, amount: e.target.value }
-               }))}
-               InputProps={{
-                 startAdornment: <InputAdornment position="start">$</InputAdornment>,
-               }}
-             />
-           </Grid>
-           <Grid item xs={12} md={6}>
-             <DatePickerComponent
-               value={expenseForm.data.date}
-               onChange={(date) => setExpenseForm(prev => ({
-                 ...prev,
-                 data: { ...prev.data, date }
-               }))}
-             />
-           </Grid>
-           <Grid item xs={12} md={6}>
-             <AutocompleteComponent
-               options={categories.map(cat => ({ label: cat.name, id: cat.id }))}
-               label="Category *"
-               value={expenseForm.data.categoryId}
-               onChange={(value) => setExpenseForm(prev => ({
-                 ...prev,
-                 data: { ...prev.data, categoryId: value }
-               }))}
-             />
-           </Grid>
-           <Grid item xs={12} md={6}>
-             <AutocompleteComponent
-               options={[
-                 { label: 'Expense', id: 'expense' },
-                 { label: 'Income', id: 'income' },
-                 { label: 'Debt', id: 'debt' },
-                 { label: 'Credit', id: 'credit' }
-               ]}
-               label="Transaction Type"
-               value={expenseForm.data.transactionType}
-               onChange={(value) => setExpenseForm(prev => ({
-                 ...prev,
-                 data: { ...prev.data, transactionType: value }
-               }))}
-             />
-           </Grid>
-           <Grid item xs={12}>
-             <TextField
-               fullWidth
-               label="Description *"
-               multiline
-               rows={2}
-               value={expenseForm.data.description}
-               onChange={(e) => setExpenseForm(prev => ({
-                 ...prev,
-                 data: { ...prev.data, description: e.target.value }
-               }))}
-             />
-           </Grid>
-           <Grid item xs={12} md={6}>
-             <TextField
-               fullWidth
-               label="Location"
-               value={expenseForm.data.location}
-               onChange={(e) => setExpenseForm(prev => ({
-                 ...prev,
-                 data: { ...prev.data, location: e.target.value }
-               }))}
-             />
-           </Grid>
-           <Grid item xs={12} md={6}>
-             <TextField
-               fullWidth
-               label="Payment Method"
-               value={expenseForm.data.paymentMethod}
-               onChange={(e) => setExpenseForm(prev => ({
-                 ...prev,
-                 data: { ...prev.data, paymentMethod: e.target.value }
-               }))}
-             />
-           </Grid>
-           <Grid item xs={12}>
-             <Box
-               sx={{
-                 borderRadius: 2,
-                 border: '1px solid',
-                 borderColor: 'divider',
-                 px: 2, py: 0.5,
-               }}
-             >
-               <FormControlLabel
-                 control={
-                   <Switch
-                     checked={expenseForm.data.isRecurring}
-                     onChange={(e) => setExpenseForm(prev => ({
-                       ...prev,
-                       data: { ...prev.data, isRecurring: e.target.checked }
-                     }))}
-                   />
-                 }
-                 label="Recurring expense"
-               />
-             </Box>
-           </Grid>
-           <Grid item xs={12}>
-             <AutocompleteComponent
-               options={tags.map(tag => ({ label: tag.name, id: tag.id }))}
-               label="Tags"
-               value={expenseForm.data.tagIds}
-               onChange={(value) => setExpenseForm(prev => ({
-                 ...prev,
-                 data: { ...prev.data, tagIds: value }
-               }))}
-               multiple
-             />
-           </Grid>
-         </Grid>
-       </DialogContent>
-       <DialogActions>
-         <Button onClick={closeExpenseForm} color="inherit">Cancel</Button>
-         <Button onClick={saveExpense} variant="contained">
-           {expenseForm.editing ? 'Update' : 'Add'} Expense
-         </Button>
-       </DialogActions>
-     </Dialog>
+     {/* Expense composer - amount-first, type-tinted, categories as chips */}
+     <ExpenseComposer
+       open={expenseForm.open}
+       editing={expenseForm.editing}
+       data={expenseForm.data}
+       saving={loading}
+       categories={categories}
+       tags={tags}
+       onClose={closeExpenseForm}
+       onChange={(patch) => setExpenseForm(prev => ({ ...prev, data: { ...prev.data, ...patch } }))}
+       onSave={saveExpense}
+     />
 
      {/* Category Form Dialog */}
      <Dialog open={categoryForm.open} onClose={closeCategoryForm} maxWidth="sm" fullWidth>

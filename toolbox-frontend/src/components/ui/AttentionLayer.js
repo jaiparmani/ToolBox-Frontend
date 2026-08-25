@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Stack, Typography } from '@mui/material';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import { SectionHeader } from './PageHeader';
 
@@ -81,7 +82,18 @@ export default function AttentionLayer({ items = [], loading }) {
                 <Typography variant="body2" sx={{ fontWeight: 650, lineHeight: 1.2 }} noWrap>{it.title}</Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }} noWrap>{it.detail}</Typography>
               </Box>
-              <ChevronRightRoundedIcon sx={{ color: 'text.disabled', flexShrink: 0 }} />
+              {it.onDismiss ? (
+                <Box
+                  role="button"
+                  aria-label="Dismiss"
+                  onClick={(e) => { e.stopPropagation(); it.onDismiss(); }}
+                  sx={{ flexShrink: 0, display: 'flex', p: 0.25, borderRadius: 1, color: 'text.disabled', '&:hover': { color: 'text.primary' } }}
+                >
+                  <CloseRoundedIcon sx={{ fontSize: 18 }} />
+                </Box>
+              ) : (
+                <ChevronRightRoundedIcon sx={{ color: 'text.disabled', flexShrink: 0 }} />
+              )}
             </Box>
           );
         })}

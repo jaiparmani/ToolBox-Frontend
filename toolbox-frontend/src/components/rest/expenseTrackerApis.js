@@ -614,6 +614,29 @@ export const getRecurring = async () => {
     } catch (error) { throw handleApiError(error, 'load recurring items'); }
 };
 
+// ── Copilot: proactive, actionable cards from the user's own data ────────────
+export const getCopilotCards = async () => {
+    try {
+        const r = await authenticatedFetch(`${API_BASE_URL}/copilot/`);
+        const data = await r.json();
+        return (Array.isArray(data) ? data : data.results || []);
+    } catch (error) { throw handleApiError(error, 'load copilot cards'); }
+};
+
+export const dismissCopilotCard = async (id) => {
+    try {
+        await authenticatedFetch(`${API_BASE_URL}/copilot/${id}/dismiss/`, { method: 'POST' });
+        return true;
+    } catch (error) { throw handleApiError(error, 'dismiss that card'); }
+};
+
+export const actCopilotCard = async (id) => {
+    try {
+        await authenticatedFetch(`${API_BASE_URL}/copilot/${id}/act/`, { method: 'POST' });
+        return true;
+    } catch (error) { throw handleApiError(error, 'act on that card'); }
+};
+
 export const createRecurring = async (rule) => {
     try {
         const r = await authenticatedFetch(`${API_BASE_URL}/recurring/`, {

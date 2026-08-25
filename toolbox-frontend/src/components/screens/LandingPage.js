@@ -13,14 +13,14 @@ import HandshakeRoundedIcon from '@mui/icons-material/HandshakeRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { useMoney } from '../../contexts/MoneyContext';
-import { getExpenseSummary, getSplitBalances } from '../rest/expenseTrackerApis';
+import { getExpenseSummary, getSplitBalances, getCopilotCards, dismissCopilotCard } from '../rest/expenseTrackerApis';
 import OwedHero from '../ui/OwedHero';
 import Reveal from '../ui/Reveal';
 import { SummarySkeleton } from '../ui/Skeletons';
 import {
   Panel, MetricCard, EmptyState, SectionHeader,
   FinancialWeather, SafeToSpendHero, MoneyPulse, CashFlowRiver, AttentionLayer,
-  TransactionStoryDrawer, buildStoryFromEvent, deriveProjectionAttention,
+  TransactionStoryDrawer, buildStoryFromEvent, copilotToItem,
 } from '../ui';
 import { accents } from '../../theme/tokens';
 import { money } from '../ui/money';
@@ -56,6 +56,7 @@ export default function LandingPage() {
   const { projection, pulse, loading: loadingMoney } = useMoney();
   const [expense, setExpense] = useState(null);
   const [splits, setSplits] = useState(null);
+  const [copilot, setCopilot] = useState([]);
   const [loading, setLoading] = useState(true);
   const [story, setStory] = useState(null);
 
@@ -65,12 +66,19 @@ export default function LandingPage() {
     Promise.allSettled([
       getExpenseSummary({ dateFrom: month, dateTo: today }),
       getSplitBalances(),
-    ]).then(([e, s]) => {
+      getCopilotCards(),
+    ]).then(([e, s, c]) => {
       if (e.status === 'fulfilled') setExpense(e.value);
       if (s.status === 'fulfilled') setSplits(s.value);
+      if (c.status === 'fulfilled') setCopilot(c.value);
       setLoading(false);
     });
   }, []);
+
+  const handleDismiss = (id) => {
+    setCopilot(prev => prev.filter(c => c.id !== id));
+    dismissCopilotCard(id).catch(() => {});
+  };
 
   const displayName = user?.username || 'there';
 
@@ -94,12 +102,11 @@ export default function LandingPage() {
 
   const net = splits?.net || 0;
 
-  // The attention layer, derived from data the dashboard already holds. Every
-  // item is a real condition with a real number — nothing is invented. The
-  // projection items come from the shared helper the Inbox uses too.
+  // The attention layer is the copilot's live cards — each a real condition
+  // with the figure behind it — plus a compact open-settlements summary. Cards
+  // can be dismissed inline; tapping opens the card's suggested action.
   const attention = useMemo(() => {
-    const items = deriveProjectionAttention({ projection, pulse })
-      .map(it => ({ ...it, onClick: () => navigate(it.to) }));
+    const items = copilot.map(card => copilotToItem(card, { navigate, onDismiss: handleDismiss }));
     if (people.length > 0) {
       items.push({
         id: 'settle', icon: HandshakeRoundedIcon, tone: accents.blue,
@@ -109,7 +116,8 @@ export default function LandingPage() {
       });
     }
     return items;
-  }, [pulse, projection, people, net, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [copilot, people, net, navigate]);
 
   const stats = [
     { label: 'Spent this month', raw: expense?.totalExpenses ?? 0, icon: TrendingUpIcon, color: accents.red },

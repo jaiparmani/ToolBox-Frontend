@@ -5,24 +5,21 @@ import CallSplitIcon from '@mui/icons-material/CallSplit';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InboxIcon from '@mui/icons-material/AllInbox';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { useMoney } from '../../contexts/MoneyContext';
-import { getSplitBalances } from '../rest/expenseTrackerApis';
+import { getSplitBalances, getCopilotCards, dismissCopilotCard } from '../rest/expenseTrackerApis';
 import Reveal from '../ui/Reveal';
 import { BalanceSkeleton } from '../ui/Skeletons';
 import { money } from '../ui/money';
-import {
-  PageHeader, SectionHeader, EmptyState, FinancialWeather, deriveProjectionAttention,
-} from '../ui';
+import { PageHeader, SectionHeader, EmptyState, FinancialWeather, copilotIcon, copilotTone } from '../ui';
 import { accents } from '../../theme/tokens';
 
 /**
- * Money Inbox — the review queue. Everything the app can see that might need a
- * decision, as intelligent *events* rather than table rows: projection-derived
- * concerns (short runway, unusual spend, bills ahead) up top, then unsettled
- * balances in both directions. Each event is a real condition with its number
- * and a way to act. Reuses the same attention derivation as the dashboard.
+ * Money Inbox — the review queue. The copilot's proactive cards up top (each a
+ * real condition with the figure behind it, dismissable or actionable), then
+ * unsettled balances in both directions.
  */
 export default function InboxPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -30,10 +27,11 @@ export default function InboxPage() {
   const { projection, pulse, loading: loadingMoney } = useMoney();
   const [loading, setLoading] = useState(true);
   const [settlements, setSettlements] = useState([]);
+  const [copilot, setCopilot] = useState([]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [b] = await Promise.allSettled([getSplitBalances()]);
+    const [b, c] = await Promise.allSettled([getSplitBalances(), getCopilotCards()]);
     const next = [];
     if (b.status === 'fulfilled') {
       (b.value.balances || []).filter(p => p.owed > 0).forEach(p => next.push({
@@ -49,16 +47,21 @@ export default function InboxPage() {
       next.sort((a, b2) => Math.abs(b2.amount) - Math.abs(a.amount));
     }
     setSettlements(next);
+    if (c.status === 'fulfilled') setCopilot(c.value);
     setLoading(false);
   }, []);
 
   useEffect(() => { if (isAuthenticated) load(); }, [isAuthenticated, load]);
 
+  const handleDismiss = (id) => {
+    setCopilot(prev => prev.filter(c => c.id !== id));
+    dismissCopilotCard(id).catch(() => {});
+  };
+
   if (isLoading || !isAuthenticated) return null;
 
-  const concerns = deriveProjectionAttention({ projection, pulse });
   const busy = loading || loadingMoney;
-  const nothing = !busy && concerns.length === 0 && settlements.length === 0;
+  const nothing = !busy && copilot.length === 0 && settlements.length === 0;
 
   return (
     <Container maxWidth="sm" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 6 }}>
@@ -88,13 +91,20 @@ export default function InboxPage() {
         </Reveal>
       ) : (
         <>
-          {concerns.length > 0 && (
+          {copilot.length > 0 && (
             <Reveal index={1}>
-              <SectionHeader title="Concerns" count={concerns.length} />
+              <SectionHeader title="Needs attention" count={copilot.length} />
               <Stack spacing={1.25} sx={{ mb: 3 }}>
-                {concerns.map((c) => (
-                  <EventRow key={c.id} icon={c.icon} tone={c.tone} title={c.title} detail={c.detail}
-                    onClick={() => navigate(c.to)} />
+                {copilot.map((card) => (
+                  <EventRow
+                    key={card.id}
+                    icon={copilotIcon(card)}
+                    tone={copilotTone(card)}
+                    title={card.title}
+                    detail={card.body}
+                    onClick={() => card.action_route && navigate(card.action_route)}
+                    onDismiss={() => handleDismiss(card.id)}
+                  />
                 ))}
               </Stack>
             </Reveal>
@@ -122,8 +132,9 @@ export default function InboxPage() {
   );
 }
 
-/** One inbox event — an intelligent row with tone, title, supporting line and action. */
-function EventRow({ icon: Icon, tone, title, detail, right, onClick }) {
+/** One inbox event — an intelligent row with tone, title, supporting line, an
+ *  action, and an optional dismiss. */
+function EventRow({ icon: Icon, tone, title, detail, right, onClick, onDismiss }) {
   return (
     <Box
       role="button"
@@ -147,7 +158,15 @@ function EventRow({ icon: Icon, tone, title, detail, right, onClick }) {
         <Typography variant="caption" color="text.secondary">{detail}</Typography>
       </Box>
       {right}
-      <ChevronRightIcon sx={{ color: 'text.disabled', flexShrink: 0 }} />
+      {onDismiss ? (
+        <Box role="button" aria-label="Dismiss"
+          onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+          sx={{ flexShrink: 0, display: 'flex', p: 0.5, borderRadius: 1, color: 'text.disabled', '&:hover': { color: 'text.primary' } }}>
+          <CloseRoundedIcon sx={{ fontSize: 18 }} />
+        </Box>
+      ) : (
+        <ChevronRightIcon sx={{ color: 'text.disabled', flexShrink: 0 }} />
+      )}
     </Box>
   );
 }

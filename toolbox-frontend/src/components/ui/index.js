@@ -28,6 +28,7 @@ export { default as SafeToSpendHero } from './SafeToSpendHero';
 export { default as FinancialWeather, deriveWeather, WEATHER } from './FinancialWeather';
 export { default as FinancialWeatherBar } from './FinancialWeatherBar';
 export { default as AttentionLayer } from './AttentionLayer';
+export { default as InsightConstellation } from './InsightConstellation';
 export { deriveProjectionAttention } from './moneyAttention';
 export { default as MoneyPulse } from './MoneyPulse';
 export { default as CashFlowRiver } from './CashFlowRiver';

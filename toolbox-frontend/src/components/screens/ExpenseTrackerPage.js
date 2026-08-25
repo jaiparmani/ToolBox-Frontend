@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Box, Container, Typography, Paper, Grid, Card, CardContent,
@@ -132,15 +133,29 @@ export default function ExpenseTrackerPage() {
  });
 
  // Filtering and pagination state
+ const [searchParams, setSearchParams] = useSearchParams();
  const [filters, setFilters] = useState({
    search: '',
-   category: '',
+   // Seed the category filter from ?category=<id> so a drill-in from Insights
+   // lands on that category's actual transactions.
+   category: searchParams.get('category') || '',
    dateFrom: '',
    dateTo: '',
    amountMin: '',
    amountMax: '',
    tags: []
  });
+
+ // A ?category arriving after mount (client-side navigation) applies too, then
+ // the param is cleared so it doesn't stick to later manual filter changes.
+ useEffect(() => {
+   const cat = searchParams.get('category');
+   if (cat) {
+     setFilters(prev => ({ ...prev, category: cat }));
+     setSearchParams({}, { replace: true });
+   }
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [searchParams]);
  const [pagination, setPagination] = useState({
    page: 0,
    pageSize: 10,

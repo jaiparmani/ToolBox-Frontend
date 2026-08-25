@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Box, Container, IconButton, Paper, Stack, Typography } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -14,7 +15,7 @@ import Reveal from '../ui/Reveal';
 import CategoryBreakdown from '../ui/CategoryBreakdown';
 import TrendBars from '../ui/TrendBars';
 import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
-import { PageHeader, MetricCard, ChartContainer, EmptyState, FinancialWeatherBar } from '../ui';
+import { PageHeader, MetricCard, ChartContainer, EmptyState, FinancialWeatherBar, InsightConstellation } from '../ui';
 import { accents } from '../../theme/tokens';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -27,6 +28,7 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
  */
 export default function ReportsPage() {
   const { isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
@@ -59,6 +61,12 @@ export default function ReportsPage() {
 
   const categories = useMemo(() =>
     (report?.category_totals || []).map(c => ({ label: c.category__name, value: parseFloat(c.total) })),
+    [report]);
+
+  const constellation = useMemo(() =>
+    (report?.category_totals || [])
+      .filter(c => c.category__id != null)
+      .map(c => ({ id: c.category__id, label: c.category__name || 'Uncategorised', value: parseFloat(c.total), color: c.category__color })),
     [report]);
 
   if (isLoading) return null;
@@ -137,8 +145,21 @@ export default function ReportsPage() {
         </ChartContainer>
       </Reveal>
 
+      {/* Explore — the category constellation, every node drills into its transactions */}
+      {!loading && constellation.length > 0 && (
+        <Reveal index={3}>
+          <ChartContainer sx={{ mb: 2.5 }}>
+            <InsightConstellation
+              data={constellation}
+              title="Explore spending"
+              onSelect={(n) => navigate(`/expense-tracker?category=${n.id}`)}
+            />
+          </ChartContainer>
+        </Reveal>
+      )}
+
       {/* When */}
-      <Reveal index={3}>
+      <Reveal index={4}>
         <ChartContainer title="When">
           {loading ? <Box sx={{ height: 120 }} />
             : (report?.daily_totals?.length) ? <TrendBars data={report.daily_totals} />

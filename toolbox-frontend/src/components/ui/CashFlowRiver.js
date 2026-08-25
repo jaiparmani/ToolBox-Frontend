@@ -47,7 +47,8 @@ export default function CashFlowRiver({ projection, onSelectEvent }) {
     const events = [];
     series.forEach((d, i) => (d.events || []).forEach(ev =>
       events.push({ ...ev, i, x: x(i), y: y(d.balance), date: d.date })));
-    return { x, y, zeroY, linePts, areaPts, events, lo, hi };
+    const maxFlow = events.reduce((m, e) => Math.max(m, e.amount || 0), 0) || 1;
+    return { x, y, zeroY, linePts, areaPts, events, maxFlow, lo, hi };
   }, [series, W, H]);
 
   if (!geom) return (
@@ -81,11 +82,15 @@ export default function CashFlowRiver({ projection, onSelectEvent }) {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
         <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600 }}>
           Next {projection.horizon_days} days
         </Typography>
-        <Typography variant="caption" color="text.secondary">drag to scrub</Typography>
+        <Stack direction="row" spacing={1.25} alignItems="center">
+          <LegendDot color={inColor} label="in" up />
+          <LegendDot color={outColor} label="out" />
+          <Typography variant="caption" color="text.disabled" sx={{ display: { xs: 'none', sm: 'block' } }}>drag to scrub</Typography>
+        </Stack>
       </Box>
 
       <Box
@@ -102,6 +107,16 @@ export default function CashFlowRiver({ projection, onSelectEvent }) {
             <stop offset="0" stopColor={inColor} stopOpacity="0.42" />
             <stop offset="1" stopColor={inColor} stopOpacity="0.02" />
           </linearGradient>
+          {/* income stream: bright at the river, fading as it rises in */}
+          <linearGradient id="streamIn" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={inColor} stopOpacity="0.02" />
+            <stop offset="1" stopColor={inColor} stopOpacity="0.55" />
+          </linearGradient>
+          {/* expense stream: bright at the river, fading as it drops out */}
+          <linearGradient id="streamOut" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={outColor} stopOpacity="0.55" />
+            <stop offset="1" stopColor={outColor} stopOpacity="0.02" />
+          </linearGradient>
         </defs>
 
         {/* zero baseline when the balance dips negative */}
@@ -111,6 +126,20 @@ export default function CashFlowRiver({ projection, onSelectEvent }) {
         )}
 
         <polygon points={geom.areaPts} fill="url(#river)" />
+
+        {/* Event streams — money entering (income, rising in from above) and
+            leaving (bills, dropping out below), each sized by its amount. */}
+        {geom.events.map((ev, k) => {
+          const isIn = ev.type === 'income';
+          const h = 26 + (ev.amount / geom.maxFlow) * (H * 0.42);
+          const w = 7;
+          const yTop = isIn ? ev.y - h : ev.y;
+          return (
+            <rect key={`s${k}`} x={ev.x - w / 2} y={yTop} width={w} height={h} rx={w / 2}
+              fill={isIn ? 'url(#streamIn)' : 'url(#streamOut)'} />
+          );
+        })}
+
         <polyline points={geom.linePts} fill="none" stroke={inColor} strokeWidth="2.5"
           vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
 
@@ -166,6 +195,18 @@ export default function CashFlowRiver({ projection, onSelectEvent }) {
             tone={projection.runway_days != null && projection.runway_days <= 14 ? outColor : theme.palette.text.primary} />
         </Stack>
       )}
+    </Box>
+  );
+}
+
+function LegendDot({ color, label, up }) {
+  return (
+    <Box display="inline-flex" alignItems="center" gap={0.4}>
+      <Box sx={{
+        width: 0, height: 0, borderLeft: '4px solid transparent', borderRight: '4px solid transparent',
+        ...(up ? { borderBottom: `6px solid ${color}` } : { borderTop: `6px solid ${color}` }),
+      }} />
+      <Typography variant="caption" sx={{ color, fontWeight: 600 }}>{label}</Typography>
     </Box>
   );
 }

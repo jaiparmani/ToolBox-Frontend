@@ -29,6 +29,7 @@ export { default as FinancialWeather, deriveWeather, WEATHER } from './Financial
 export { default as AttentionLayer } from './AttentionLayer';
 export { default as MoneyPulse } from './MoneyPulse';
 export { default as CashFlowRiver } from './CashFlowRiver';
+export { default as TransactionStoryDrawer, buildStoryFromEvent, buildStoryFromExpense } from './TransactionStoryDrawer';
 
 // Money helpers
 export { money, moneyWhole, moneySmart, relativeDay } from './money';

@@ -22,6 +22,7 @@ import { SummarySkeleton } from '../ui/Skeletons';
 import {
   Panel, MetricCard, EmptyState, SectionHeader,
   FinancialWeather, SafeToSpendHero, MoneyPulse, CashFlowRiver, AttentionLayer,
+  TransactionStoryDrawer, buildStoryFromEvent,
 } from '../ui';
 import { accents } from '../../theme/tokens';
 import { money } from '../ui/money';
@@ -59,6 +60,7 @@ export default function LandingPage() {
   const [pulse, setPulse] = useState(null);
   const [projection, setProjection] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [story, setStory] = useState(null);
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -191,7 +193,10 @@ export default function LandingPage() {
       {hasProjection && (
         <Reveal index={3}>
           <Panel sx={{ mb: 2.5, p: { xs: 2, sm: 2.5 } }}>
-            <CashFlowRiver projection={projection} />
+            <CashFlowRiver
+              projection={projection}
+              onSelectEvent={(ev) => setStory(buildStoryFromEvent(ev, ev.date))}
+            />
           </Panel>
         </Reveal>
       )}
@@ -290,6 +295,9 @@ export default function LandingPage() {
           </Reveal>
         ))}
       </Box>
+
+      {/* One reusable detail surface for any inspectable stream/event */}
+      <TransactionStoryDrawer open={!!story} story={story} onClose={() => setStory(null)} />
     </Box>
   );
 }

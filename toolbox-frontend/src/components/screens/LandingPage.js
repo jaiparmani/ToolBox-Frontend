@@ -165,6 +165,7 @@ export default function LandingPage() {
             <CashFlowRiver
               projection={projection}
               onSelectEvent={(ev) => setStory(buildStoryFromEvent(ev, ev.date))}
+              onSelectCategory={(id) => navigate(`/expense-tracker?category=${id}`)}
             />
           </Panel>
         </Reveal>

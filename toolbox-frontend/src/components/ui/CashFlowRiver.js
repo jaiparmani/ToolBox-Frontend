@@ -18,7 +18,7 @@ import { money, moneySmart } from './money';
  * the selected day in React state, so it stays exact under the frequent
  * re-renders this screen does - the same approach the constellation uses.
  */
-export default function CashFlowRiver({ projection, onSelectEvent }) {
+export default function CashFlowRiver({ projection, onSelectEvent, onSelectCategory }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const compact = useMediaQuery(theme.breakpoints.down('sm'));
@@ -187,14 +187,74 @@ export default function CashFlowRiver({ projection, onSelectEvent }) {
           )}
         </Box>
       ) : (
-        <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} justifyContent="space-between">
-          <Mini label="Safe today" value={moneySmart(projection.safe_to_spend_today)} tone={inColor} />
-          <Mini label="Income due" value={moneySmart(projection.upcoming_income)} tone={inColor} />
-          <Mini label="Bills due" value={moneySmart(projection.upcoming_bills)} tone={outColor} />
-          <Mini label="Runway" value={projection.runway_days != null ? `${projection.runway_days}d` : 'clear'}
-            tone={projection.runway_days != null && projection.runway_days <= 14 ? outColor : theme.palette.text.primary} />
-        </Stack>
+        <>
+          <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} justifyContent="space-between">
+            <Mini label="Safe today" value={moneySmart(projection.safe_to_spend_today)} tone={inColor} />
+            <Mini label="Income due" value={moneySmart(projection.upcoming_income)} tone={inColor} />
+            <Mini label="Bills due" value={moneySmart(projection.upcoming_bills)} tone={outColor} />
+            <Mini label="Runway" value={projection.runway_days != null ? `${projection.runway_days}d` : 'clear'}
+              tone={projection.runway_days != null && projection.runway_days <= 14 ? outColor : theme.palette.text.primary} />
+          </Stack>
+          <MixBar
+            mix={projection.discretionary_mix}
+            daily={projection.daily_discretionary}
+            isDark={isDark}
+            onSelectCategory={onSelectCategory}
+          />
+        </>
       )}
+    </Box>
+  );
+}
+
+/**
+ * Where the ordinary daily spend goes — the discretionary drain broken into its
+ * recent category mix as a stacked bar. Each segment drills into that category's
+ * transactions. Colours fall back to the categorical palette when the source
+ * colours don't separate the categories (they often share a default).
+ */
+function MixBar({ mix, daily, isDark, onSelectCategory }) {
+  const palette = (chart.categorical && chart.categorical[isDark ? 'dark' : 'light']) || [];
+  if (!mix || mix.length === 0) return null;
+  const degenerate = new Set(mix.map(m => m.color).filter(Boolean)).size <= mix.length / 2;
+  const colorFor = (m, i) => (!degenerate && m.color) || palette[i % palette.length] || '#3987e5';
+
+  return (
+    <Box sx={{ mt: 2 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="baseline" sx={{ mb: 0.75 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+          Where your daily spend goes
+        </Typography>
+        <Typography variant="caption" color="text.secondary">≈{moneySmart(daily)}/day</Typography>
+      </Box>
+      <Box sx={{ display: 'flex', height: 12, borderRadius: 999, overflow: 'hidden', gap: '2px' }}>
+        {mix.map((m, i) => (
+          <Box
+            key={m.category_id ?? `other-${i}`}
+            role={m.category_id != null && onSelectCategory ? 'button' : undefined}
+            tabIndex={m.category_id != null && onSelectCategory ? 0 : undefined}
+            onClick={() => m.category_id != null && onSelectCategory?.(m.category_id)}
+            onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && m.category_id != null) { e.preventDefault(); onSelectCategory?.(m.category_id); } }}
+            aria-label={`${m.category}: ${Math.round(m.share * 100)}% of daily spend`}
+            title={`${m.category} · ${Math.round(m.share * 100)}%`}
+            sx={{
+              width: `${Math.max(m.share * 100, 2)}%`, backgroundColor: colorFor(m, i),
+              cursor: m.category_id != null && onSelectCategory ? 'pointer' : 'default',
+              transition: 'opacity 0.15s ease', '&:hover': { opacity: 0.82 },
+            }}
+          />
+        ))}
+      </Box>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, mt: 1 }}>
+        {mix.slice(0, 4).map((m, i) => (
+          <Box key={m.category_id ?? `l-${i}`} display="flex" alignItems="center" gap={0.5}>
+            <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: colorFor(m, i) }} />
+            <Typography variant="caption" color="text.secondary">
+              {m.category} {Math.round(m.share * 100)}%
+            </Typography>
+          </Box>
+        ))}
+      </Box>
     </Box>
   );
 }

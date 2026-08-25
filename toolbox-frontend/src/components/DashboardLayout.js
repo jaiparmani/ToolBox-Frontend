@@ -38,6 +38,7 @@ import UserProfilePage from './screens/UserProfilePage';
 import { authUtils } from './rest/authUtils';
 import { clearAllData } from './rest/userApis';
 import { useColorMode } from '../contexts/ColorModeContext';
+import { MoneyProvider } from '../contexts/MoneyContext';
 import BrandLogo from './motion/BrandLogo';
 import CommandPalette from './ui/CommandPalette';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
@@ -249,16 +250,18 @@ export default function DashboardLayoutBasic(props) {
       branding={{ title: 'ToolBox', logo: <BrandLogo size={30} />, homeUrl: '/' }}
     >
       <ThemeSync mode={mode} />
-      <DashboardLayout
-        slots={{ sidebarFooter: SidebarFooterAccount, toolbarActions: CommandTrigger }}
-      >
-        {/* Global command palette — ⌘K anywhere, or the toolbar button */}
-        <CommandPalette />
-        {/* Every nested route renders here, inside the one shell */}
-        <Box sx={{ p: { xs: 0, sm: 1 } }}>
-          <Outlet />
-        </Box>
-      </DashboardLayout>
+      <MoneyProvider>
+        <DashboardLayout
+          slots={{ sidebarFooter: SidebarFooterAccount, toolbarActions: CommandTrigger }}
+        >
+          {/* Global command palette — ⌘K anywhere, or the toolbar button */}
+          <CommandPalette />
+          {/* Every nested route renders here, inside the one shell */}
+          <Box sx={{ p: { xs: 0, sm: 1 } }}>
+            <Outlet />
+          </Box>
+        </DashboardLayout>
+      </MoneyProvider>
     </AppProvider>
   );
 }

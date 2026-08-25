@@ -62,6 +62,7 @@ import ThinkingHint from '../ui/ThinkingHint';
 import ErrorBanner from '../ui/ErrorBanner';
 import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { money } from '../ui/money';
+import { FinancialWeatherBar } from '../ui';
 
 // Color palette for categories
 const categoryColors = [
@@ -901,6 +902,9 @@ export default function ExpenseTrackerPage() {
          pb: { xs: 'calc(72px + env(safe-area-inset-bottom))', md: 4 },
        }}
      >
+     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
+       <FinancialWeatherBar compact />
+     </Box>
      {/* Header - stays reachable, shrinks to icons on a phone */}
      <Paper
        elevation={0}

@@ -9,20 +9,18 @@ import CallSplitIcon from '@mui/icons-material/CallSplit';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import HandshakeIcon from '@mui/icons-material/Handshake';
-import TrendingUpRoundedIcon from '@mui/icons-material/TrendingUpRounded';
-import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
-import BoltRoundedIcon from '@mui/icons-material/BoltRounded';
 import HandshakeRoundedIcon from '@mui/icons-material/HandshakeRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { getExpenseSummary, getSplitBalances, getMoneyPulse, getProjection } from '../rest/expenseTrackerApis';
+import { useMoney } from '../../contexts/MoneyContext';
+import { getExpenseSummary, getSplitBalances } from '../rest/expenseTrackerApis';
 import OwedHero from '../ui/OwedHero';
 import Reveal from '../ui/Reveal';
 import { SummarySkeleton } from '../ui/Skeletons';
 import {
   Panel, MetricCard, EmptyState, SectionHeader,
   FinancialWeather, SafeToSpendHero, MoneyPulse, CashFlowRiver, AttentionLayer,
-  TransactionStoryDrawer, buildStoryFromEvent,
+  TransactionStoryDrawer, buildStoryFromEvent, deriveProjectionAttention,
 } from '../ui';
 import { accents } from '../../theme/tokens';
 import { money } from '../ui/money';
@@ -55,10 +53,9 @@ const FEATURES = [
 export default function LandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { projection, pulse, loading: loadingMoney } = useMoney();
   const [expense, setExpense] = useState(null);
   const [splits, setSplits] = useState(null);
-  const [pulse, setPulse] = useState(null);
-  const [projection, setProjection] = useState(null);
   const [loading, setLoading] = useState(true);
   const [story, setStory] = useState(null);
 
@@ -68,13 +65,9 @@ export default function LandingPage() {
     Promise.allSettled([
       getExpenseSummary({ dateFrom: month, dateTo: today }),
       getSplitBalances(),
-      getMoneyPulse(),
-      getProjection(30),
-    ]).then(([e, s, pl, pr]) => {
+    ]).then(([e, s]) => {
       if (e.status === 'fulfilled') setExpense(e.value);
       if (s.status === 'fulfilled') setSplits(s.value);
-      if (pl.status === 'fulfilled') setPulse(pl.value);
-      if (pr.status === 'fulfilled') setProjection(pr.value);
       setLoading(false);
     });
   }, []);
@@ -102,35 +95,11 @@ export default function LandingPage() {
   const net = splits?.net || 0;
 
   // The attention layer, derived from data the dashboard already holds. Every
-  // item is a real condition with a real number — nothing is invented.
+  // item is a real condition with a real number — nothing is invented. The
+  // projection items come from the shared helper the Inbox uses too.
   const attention = useMemo(() => {
-    const items = [];
-    const inp = pulse?.inputs || {};
-
-    if (projection?.runway_days != null && projection.runway_days <= 7) {
-      items.push({
-        id: 'runway', icon: BoltRoundedIcon, tone: accents.red,
-        title: `Runway is short — ~${projection.runway_days} day${projection.runway_days === 1 ? '' : 's'}`,
-        detail: 'At your recent pace and bills ahead', onClick: () => navigate('/reports'),
-      });
-    }
-    if (inp.prior_7_days_spend > 0 && inp.last_7_days_spend > inp.prior_7_days_spend * 1.25) {
-      const pct = Math.round(((inp.last_7_days_spend - inp.prior_7_days_spend) / inp.prior_7_days_spend) * 100);
-      items.push({
-        id: 'unusual', icon: TrendingUpRoundedIcon, tone: accents.amber,
-        title: `Spending up ${pct}% this week`,
-        detail: `${money(inp.last_7_days_spend)} vs ${money(inp.prior_7_days_spend)} prior`,
-        onClick: () => navigate('/expense-tracker'),
-      });
-    }
-    if (projection?.upcoming_bills > 0) {
-      items.push({
-        id: 'bills', icon: ReceiptLongRoundedIcon, tone: accents.violet,
-        title: `${money(projection.upcoming_bills)} in bills ahead`,
-        detail: projection.next_income_date ? `Next income ${new Date(projection.next_income_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : 'In the next 30 days',
-        onClick: () => navigate('/reports'),
-      });
-    }
+    const items = deriveProjectionAttention({ projection, pulse })
+      .map(it => ({ ...it, onClick: () => navigate(it.to) }));
     if (people.length > 0) {
       items.push({
         id: 'settle', icon: HandshakeRoundedIcon, tone: accents.blue,
@@ -166,25 +135,25 @@ export default function LandingPage() {
             {getGreeting()}, {displayName}.
           </Typography>
           <Box sx={{ mt: 1.5 }}>
-            <FinancialWeather projection={projection} pulse={pulse} loading={loading} onClick={() => navigate('/reports')} />
+            <FinancialWeather projection={projection} pulse={pulse} loading={loadingMoney} onClick={() => navigate('/reports')} />
           </Box>
         </Box>
       </Reveal>
 
       {/* The hero: Safe to spend today */}
-      {(hasProjection || loading) && (
+      {(hasProjection || loadingMoney) && (
         <Reveal index={1}>
           <Box sx={{ mb: 2.5 }}>
-            <SafeToSpendHero projection={projection} pulse={pulse} loading={loading && !projection} />
+            <SafeToSpendHero projection={projection} pulse={pulse} loading={loadingMoney && !projection} />
           </Box>
         </Reveal>
       )}
 
       {/* Money Pulse — the why, with the working one tap away */}
-      {(pulse || loading) && (
+      {(pulse || loadingMoney) && (
         <Reveal index={2}>
           <Box sx={{ mb: 2.5 }}>
-            <MoneyPulse pulse={pulse} loading={loading && !pulse} />
+            <MoneyPulse pulse={pulse} loading={loadingMoney && !pulse} />
           </Box>
         </Reveal>
       )}
@@ -202,10 +171,10 @@ export default function LandingPage() {
       )}
 
       {/* Attention layer */}
-      {(attention.length > 0 || (!loading && hasProjection)) && (
+      {(attention.length > 0 || (!loadingMoney && hasProjection)) && (
         <Reveal index={4}>
           <Box sx={{ mb: 2.5 }}>
-            <AttentionLayer items={attention} loading={loading} />
+            <AttentionLayer items={attention} loading={loadingMoney} />
           </Box>
         </Reveal>
       )}

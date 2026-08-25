@@ -21,6 +21,7 @@ import SwipeAction from '../ui/SwipeAction';
 import { AnimatePresence, motion, LayoutGroup } from 'framer-motion';
 import { money, relativeDay } from '../ui/money';
 import GroupStrip from '../ui/GroupStrip';
+import { FinancialWeatherBar } from '../ui';
 import {
   getSplitBalances, settleUpWith, getSplits,
   getGroups, createGroup, getGroupBalances, getGroupExpenses, splitInGroup,
@@ -248,6 +249,12 @@ export default function SplitsPage() {
     <>
       <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 12 }}>
         <ErrorBanner error={error} onClose={() => setError(null)} />
+
+        {!openGroup && (
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
+            <FinancialWeatherBar compact />
+          </Box>
+        )}
 
         {/* The headline: one number saying which way you stand overall */}
         <Reveal>

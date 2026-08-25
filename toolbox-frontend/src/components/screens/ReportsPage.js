@@ -14,7 +14,7 @@ import Reveal from '../ui/Reveal';
 import CategoryBreakdown from '../ui/CategoryBreakdown';
 import TrendBars from '../ui/TrendBars';
 import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
-import { PageHeader, MetricCard, ChartContainer, EmptyState } from '../ui';
+import { PageHeader, MetricCard, ChartContainer, EmptyState, FinancialWeatherBar } from '../ui';
 import { accents } from '../../theme/tokens';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -100,6 +100,7 @@ export default function ReportsPage() {
             </Stack>
           }
         />
+        <Box sx={{ mb: 2.5 }}><FinancialWeatherBar /></Box>
       </Reveal>
 
       {/* Animated stat grid */}

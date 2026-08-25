@@ -21,6 +21,14 @@ export { default as SegmentedControl } from './SegmentedControl';
 export { default as ConfirmDialog } from './ConfirmDialog';
 export { ToastProvider, useToast } from './Toast';
 export { default as ErrorBanner } from './ErrorBanner';
+export { default as CommandPalette } from './CommandPalette';
+
+// Money OS — the cinematic finance surfaces
+export { default as SafeToSpendHero } from './SafeToSpendHero';
+export { default as FinancialWeather, deriveWeather, WEATHER } from './FinancialWeather';
+export { default as AttentionLayer } from './AttentionLayer';
+export { default as MoneyPulse } from './MoneyPulse';
+export { default as CashFlowRiver } from './CashFlowRiver';
 
 // Money helpers
 export { money, moneyWhole, moneySmart, relativeDay } from './money';

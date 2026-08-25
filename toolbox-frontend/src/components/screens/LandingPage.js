@@ -9,24 +9,30 @@ import CallSplitIcon from '@mui/icons-material/CallSplit';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import HandshakeIcon from '@mui/icons-material/Handshake';
+import TrendingUpRoundedIcon from '@mui/icons-material/TrendingUpRounded';
+import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
+import BoltRoundedIcon from '@mui/icons-material/BoltRounded';
+import HandshakeRoundedIcon from '@mui/icons-material/HandshakeRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { getExpenseSummary, getSplitBalances, getMoneyPulse, getProjection } from '../rest/expenseTrackerApis';
 import OwedHero from '../ui/OwedHero';
-import MoneyPulse from '../ui/MoneyPulse';
-import CashFlowRiver from '../ui/CashFlowRiver';
 import Reveal from '../ui/Reveal';
 import { SummarySkeleton } from '../ui/Skeletons';
-import { Panel, MetricCard, EmptyState, SectionHeader } from '../ui';
+import {
+  Panel, MetricCard, EmptyState, SectionHeader,
+  FinancialWeather, SafeToSpendHero, MoneyPulse, CashFlowRiver, AttentionLayer,
+} from '../ui';
 import { accents } from '../../theme/tokens';
+import { money } from '../ui/money';
 
 /**
- * The front door.
+ * The dashboard, reimagined as a Money OS.
  *
- * The app is about people and money flows, so the dashboard leads with the
- * one picture that says how you stand with everyone - the constellation -
- * rather than a wall of feature tiles. The tiles are still there, but below
- * the thing you actually opened the app to check.
+ * It reads top-to-bottom as a single answer to "where do I stand": the climate
+ * (Financial Weather), the one number that matters (Safe to spend), why
+ * (Money Pulse), what's coming (Cash Flow River), what needs you (Attention),
+ * and who you stand with (the balance ring). Everything below is a quiet index.
  */
 
 const getGreeting = () => {
@@ -38,10 +44,10 @@ const getGreeting = () => {
 };
 
 const FEATURES = [
-  { to: '/expense-tracker', icon: BarChartIcon, title: 'Expenses', hint: 'Track spending', color: accents.blue },
-  { to: '/splits', icon: CallSplitIcon, title: 'Splits', hint: 'Who owes whom', color: accents.amber },
+  { to: '/expense-tracker', icon: BarChartIcon, title: 'Activity', hint: 'Every transaction', color: accents.blue },
+  { to: '/splits', icon: CallSplitIcon, title: 'Shared', hint: 'Who owes whom', color: accents.amber },
   { to: '/health-tracker', icon: FavoriteIcon, title: 'Health', hint: 'Weight, water, sleep', color: accents.red },
-  { to: '/reports', icon: AssessmentIcon, title: 'Reports', hint: 'Trends & breakdowns', color: accents.purple },
+  { to: '/reports', icon: AssessmentIcon, title: 'Insights', hint: 'Trends & breakdowns', color: accents.purple },
   { to: '/hobby-tracker', icon: LayersIcon, title: 'Habits', hint: 'Streaks & routines', color: accents.green },
 ];
 
@@ -93,53 +99,114 @@ export default function LandingPage() {
 
   const net = splits?.net || 0;
 
+  // The attention layer, derived from data the dashboard already holds. Every
+  // item is a real condition with a real number — nothing is invented.
+  const attention = useMemo(() => {
+    const items = [];
+    const inp = pulse?.inputs || {};
+
+    if (projection?.runway_days != null && projection.runway_days <= 7) {
+      items.push({
+        id: 'runway', icon: BoltRoundedIcon, tone: accents.red,
+        title: `Runway is short — ~${projection.runway_days} day${projection.runway_days === 1 ? '' : 's'}`,
+        detail: 'At your recent pace and bills ahead', onClick: () => navigate('/reports'),
+      });
+    }
+    if (inp.prior_7_days_spend > 0 && inp.last_7_days_spend > inp.prior_7_days_spend * 1.25) {
+      const pct = Math.round(((inp.last_7_days_spend - inp.prior_7_days_spend) / inp.prior_7_days_spend) * 100);
+      items.push({
+        id: 'unusual', icon: TrendingUpRoundedIcon, tone: accents.amber,
+        title: `Spending up ${pct}% this week`,
+        detail: `${money(inp.last_7_days_spend)} vs ${money(inp.prior_7_days_spend)} prior`,
+        onClick: () => navigate('/expense-tracker'),
+      });
+    }
+    if (projection?.upcoming_bills > 0) {
+      items.push({
+        id: 'bills', icon: ReceiptLongRoundedIcon, tone: accents.violet,
+        title: `${money(projection.upcoming_bills)} in bills ahead`,
+        detail: projection.next_income_date ? `Next income ${new Date(projection.next_income_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : 'In the next 30 days',
+        onClick: () => navigate('/reports'),
+      });
+    }
+    if (people.length > 0) {
+      items.push({
+        id: 'settle', icon: HandshakeRoundedIcon, tone: accents.blue,
+        title: `${people.length} open settlement${people.length === 1 ? '' : 's'}`,
+        detail: net >= 0 ? `You're owed ${money(Math.abs(net))} overall` : `You owe ${money(Math.abs(net))} overall`,
+        onClick: () => navigate('/inbox'),
+      });
+    }
+    return items;
+  }, [pulse, projection, people, net, navigate]);
+
   const stats = [
-    { label: 'This month', raw: expense?.totalExpenses ?? 0, icon: TrendingUpIcon, color: accents.red },
+    { label: 'Spent this month', raw: expense?.totalExpenses ?? 0, icon: TrendingUpIcon, color: accents.red },
     { label: 'Net balance', raw: expense?.netBalance ?? 0, icon: AccountBalanceIcon, color: accents.blue },
   ];
 
+  const hasProjection = projection && projection.series && projection.series.length > 1;
+
   return (
     <Box sx={{ pb: { xs: 4, md: 2 } }}>
-      {/* Greeting */}
+      {/* Greeting + climate */}
       <Reveal>
-        <Box sx={{ px: { xs: 0.5, sm: 1 }, pt: { xs: 1, sm: 2 }, mb: 2.5 }}>
+        <Box sx={{ px: { xs: 0.5, sm: 1 }, pt: { xs: 1, sm: 2 }, mb: 2 }}>
           <Typography
             sx={{
-              fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05,
-              fontSize: { xs: '2rem', sm: '2.75rem' },
-              backgroundImage: `linear-gradient(120deg, ${accents.blue} 10%, ${accents.purple} 60%, ${accents.red} 100%)`,
+              fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.02,
+              fontSize: { xs: '1.9rem', sm: '2.5rem' },
+              backgroundImage: `linear-gradient(120deg, ${accents.blue} 10%, ${accents.violet} 55%, ${accents.red} 100%)`,
               backgroundClip: 'text', WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent', color: 'transparent',
             }}
           >
             {getGreeting()}, {displayName}.
           </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
-            Here's where your money stands today.
-          </Typography>
+          <Box sx={{ mt: 1.5 }}>
+            <FinancialWeather projection={projection} pulse={pulse} loading={loading} onClick={() => navigate('/reports')} />
+          </Box>
         </Box>
       </Reveal>
 
-      {/* Money Pulse - the ambient 'where do I stand' read */}
-      {(pulse || loading) && (
+      {/* The hero: Safe to spend today */}
+      {(hasProjection || loading) && (
         <Reveal index={1}>
+          <Box sx={{ mb: 2.5 }}>
+            <SafeToSpendHero projection={projection} pulse={pulse} loading={loading && !projection} />
+          </Box>
+        </Reveal>
+      )}
+
+      {/* Money Pulse — the why, with the working one tap away */}
+      {(pulse || loading) && (
+        <Reveal index={2}>
           <Box sx={{ mb: 2.5 }}>
             <MoneyPulse pulse={pulse} loading={loading && !pulse} />
           </Box>
         </Reveal>
       )}
 
-      {/* Cash Flow River - what's coming, scrubbable */}
-      {projection && projection.series && projection.series.length > 1 && (
-        <Reveal index={2}>
+      {/* Cash Flow River — what's coming, scrubbable */}
+      {hasProjection && (
+        <Reveal index={3}>
           <Panel sx={{ mb: 2.5, p: { xs: 2, sm: 2.5 } }}>
             <CashFlowRiver projection={projection} />
           </Panel>
         </Reveal>
       )}
 
-      {/* The headline: a compact balance ring, not the full constellation */}
-      <Reveal index={3}>
+      {/* Attention layer */}
+      {(attention.length > 0 || (!loading && hasProjection)) && (
+        <Reveal index={4}>
+          <Box sx={{ mb: 2.5 }}>
+            <AttentionLayer items={attention} loading={loading} />
+          </Box>
+        </Reveal>
+      )}
+
+      {/* Who you stand with */}
+      <Reveal index={5}>
         <Box sx={{ mb: 2.5 }}>
           {loading ? (
             <Box sx={{ height: 300, borderRadius: 5, border: '1px solid', borderColor: 'divider' }} />
@@ -164,8 +231,8 @@ export default function LandingPage() {
         </Box>
       </Reveal>
 
-      {/* Money at a glance */}
-      <Reveal index={2}>
+      {/* Month context — two quiet facts, not a card wall */}
+      <Reveal index={6}>
         {loading ? (
           <Box sx={{ mb: 2.5 }}><SummarySkeleton /></Box>
         ) : (
@@ -184,8 +251,8 @@ export default function LandingPage() {
         )}
       </Reveal>
 
-      {/* Everything else */}
-      <Reveal index={3}>
+      {/* Quiet index of everything else */}
+      <Reveal index={7}>
         <SectionHeader title="Jump to" sx={{ px: 0.5 }} />
       </Reveal>
       <Box
@@ -195,11 +262,12 @@ export default function LandingPage() {
         }}
       >
         {FEATURES.map((f, i) => (
-          <Reveal key={f.to} index={4 + i}>
+          <Reveal key={f.to} index={8 + i}>
             <Card
               elevation={0}
               sx={{
                 borderRadius: 4, height: '100%', border: '1px solid', borderColor: 'divider',
+                backgroundColor: 'transparent',
                 transition: 'transform 0.2s ease, border-color 0.2s ease',
                 '&:hover': { transform: 'translateY(-4px)', borderColor: f.color },
               }}

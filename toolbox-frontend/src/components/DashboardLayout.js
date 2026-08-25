@@ -39,6 +39,8 @@ import { authUtils } from './rest/authUtils';
 import { clearAllData } from './rest/userApis';
 import { useColorMode } from '../contexts/ColorModeContext';
 import BrandLogo from './motion/BrandLogo';
+import CommandPalette from './ui/CommandPalette';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 
 const NAVIGATION = [
   { kind: 'header', title: 'Money' },
@@ -195,6 +197,32 @@ function SidebarFooterAccount({ mini }) {
   );
 }
 
+// The ⌘K affordance in the top toolbar. Opens the global CommandPalette via a
+// decoupled window event (the palette also owns the keyboard shortcut itself).
+function CommandTrigger() {
+  const openPalette = () => window.dispatchEvent(new Event('toolbox:command-palette'));
+  return (
+    <Tooltip title="Command palette (⌘K)">
+      <Box
+        onClick={openPalette}
+        role="button"
+        aria-label="Open command palette"
+        sx={{
+          display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer',
+          px: { xs: 1, sm: 1.5 }, py: 0.6, borderRadius: 2,
+          border: '1px solid', borderColor: 'divider', color: 'text.secondary',
+          transition: 'border-color 0.2s ease, color 0.2s ease',
+          '&:hover': { borderColor: 'primary.main', color: 'text.primary' },
+        }}
+      >
+        <SearchRoundedIcon fontSize="small" />
+        <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>Search</Typography>
+        <Box sx={{ display: { xs: 'none', sm: 'block' }, px: 0.6, py: 0.1, borderRadius: 1, border: '1px solid', borderColor: 'divider', fontSize: '0.7rem', fontWeight: 600 }}>⌘K</Box>
+      </Box>
+    </Tooltip>
+  );
+}
+
 export default function DashboardLayoutBasic(props) {
   const { window } = props;
   const { mode } = useColorMode();
@@ -222,8 +250,10 @@ export default function DashboardLayoutBasic(props) {
     >
       <ThemeSync mode={mode} />
       <DashboardLayout
-        slots={{ sidebarFooter: SidebarFooterAccount, toolbarActions: () => null }}
+        slots={{ sidebarFooter: SidebarFooterAccount, toolbarActions: CommandTrigger }}
       >
+        {/* Global command palette — ⌘K anywhere, or the toolbar button */}
+        <CommandPalette />
         {/* Every nested route renders here, inside the one shell */}
         <Box sx={{ p: { xs: 0, sm: 1 } }}>
           <Outlet />

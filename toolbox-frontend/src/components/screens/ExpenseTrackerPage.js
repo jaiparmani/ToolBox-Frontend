@@ -57,13 +57,13 @@ import SectionNav from '../ui/SectionNav';
 import ExpenseItem from '../ui/ExpenseItem';
 import SwipeAction from '../ui/SwipeAction';
 import ExpenseComposer from '../ui/ExpenseComposer';
-import TransactionStory from '../ui/TransactionStory';
 import QuickCapture from '../ui/QuickCapture';
 import ThinkingHint from '../ui/ThinkingHint';
 import ErrorBanner from '../ui/ErrorBanner';
 import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { money } from '../ui/money';
-import { FinancialWeatherBar } from '../ui';
+import { FinancialWeatherBar, TransactionStoryDrawer, buildStoryFromExpense } from '../ui';
+import { accents } from '../../theme/tokens';
 
 // Color palette for categories
 const categoryColors = [
@@ -1786,14 +1786,18 @@ export default function ExpenseTrackerPage() {
        )}
      </Menu>
 
-     {/* Transaction story - rich detail on tapping a row */}
-     <TransactionStory
+     {/* Transaction story - the shared drawer, rich detail on tapping a row */}
+     <TransactionStoryDrawer
        open={!!story}
-       expense={story}
-       context={story ? storyContext(story) : null}
+       story={story ? {
+         ...buildStoryFromExpense(story, expenses),
+         context: storyContext(story),
+         actions: [
+           { label: 'Edit', icon: EditIcon, onClick: () => { setStory(null); openExpenseForm(story); } },
+           { label: 'Delete', icon: DeleteIcon, tone: accents.red, onClick: () => { setStory(null); deleteExpenseHandler(story.id); } },
+         ],
+       } : null}
        onClose={() => setStory(null)}
-       onEdit={openExpenseForm}
-       onDelete={deleteExpenseHandler}
      />
 
      {/* Expense composer - amount-first, type-tinted, categories as chips */}

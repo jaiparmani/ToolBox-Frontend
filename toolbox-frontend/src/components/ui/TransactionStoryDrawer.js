@@ -80,8 +80,8 @@ export default function TransactionStoryDrawer({ open, story, onClose }) {
         )}
       </Box>
 
-      {/* Scrollable body */}
-      <Box sx={{ px: 3, py: 2.5, overflowY: 'auto', flex: 1 }}>
+      {/* Scrollable body (minHeight:0 lets it shrink and scroll inside the capped drawer) */}
+      <Box sx={{ px: 3, py: 2.5, overflowY: 'auto', flex: 1, minHeight: 0 }}>
         <Stack spacing={1.5}>
           {dateObj && (
             <Fact icon={<EventRoundedIcon />} label={story.upcoming ? 'Due' : 'When'}

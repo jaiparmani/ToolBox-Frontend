@@ -19,7 +19,7 @@ import Reveal from '../ui/Reveal';
 import { SummarySkeleton } from '../ui/Skeletons';
 import {
   Panel, MetricCard, EmptyState, SectionHeader,
-  FinancialWeather, SafeToSpendHero, MoneyPulse, CashFlowRiver, AttentionLayer,
+  FinancialWeather, SafeToSpendHero, MoneyCommandBar, MoneyPulse, CashFlowRiver, AttentionLayer,
   TransactionStoryDrawer, buildStoryFromEvent, copilotToItem,
 } from '../ui';
 import { accents } from '../../theme/tokens';
@@ -147,6 +147,15 @@ export default function LandingPage() {
           </Box>
         </Box>
       </Reveal>
+
+      {/* Ask anything — computed from the real projection */}
+      {hasProjection && (
+        <Reveal index={1}>
+          <Box sx={{ mb: 2.5 }}>
+            <MoneyCommandBar />
+          </Box>
+        </Reveal>
+      )}
 
       {/* The hero: Safe to spend today */}
       {(hasProjection || loadingMoney) && (

@@ -22,6 +22,7 @@ export default function CashFlowRiver({ projection, onSelectEvent, onSelectCateg
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const compact = useMediaQuery(theme.breakpoints.down('sm'));
+  const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   const series = projection?.series || [];
   const svgRef = React.useRef(null);
@@ -142,6 +143,19 @@ export default function CashFlowRiver({ projection, onSelectEvent, onSelectCateg
 
         <polyline points={geom.linePts} fill="none" stroke={inColor} strokeWidth="2.5"
           vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+
+        {/* Live current: a shimmer of dashes drifting along the stream, so the
+            river reads as flowing. Motion-gated. */}
+        {!reduce && (
+          <polyline points={geom.linePts} fill="none" stroke={isDark ? '#eaf3ff' : '#ffffff'} strokeWidth="2.5"
+            vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round"
+            strokeDasharray="1 14" opacity="0.85"
+            style={{ animation: 'riverFlow 1.6s linear infinite' }} />
+        )}
+        <style>{`
+          @keyframes riverFlow { to { stroke-dashoffset: -15; } }
+          @media (prefers-reduced-motion: reduce) { polyline { animation: none !important; } }
+        `}</style>
 
         {/* event markers */}
         {geom.events.map((ev, k) => (

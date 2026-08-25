@@ -55,7 +55,7 @@ export default function AttentionLayer({ items = [], loading }) {
           '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none',
         }}
       >
-        {items.map((it) => {
+        {items.map((it, i) => {
           const Icon = it.icon;
           return (
             <Box
@@ -73,6 +73,11 @@ export default function AttentionLayer({ items = [], loading }) {
                 transition: 'transform 0.2s ease, border-color 0.2s ease',
                 '&:hover': { transform: 'translateY(-3px)', borderColor: `${it.tone}aa` },
                 '&:focus-visible': { outline: `2px solid ${it.tone}`, outlineOffset: 2 },
+                // A card animates in as it arrives - staggered, motion-gated.
+                animation: `attnIn 420ms cubic-bezier(0.34,1.56,0.64,1) both`,
+                animationDelay: `${i * 70}ms`,
+                '@keyframes attnIn': { from: { opacity: 0, transform: 'translateY(14px) scale(0.96)' }, to: { opacity: 1, transform: 'none' } },
+                '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
               }}
             >
               <Box sx={{ width: 38, height: 38, borderRadius: '11px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: `${it.tone}22` }}>

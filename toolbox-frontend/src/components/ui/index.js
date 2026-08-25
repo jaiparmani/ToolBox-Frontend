@@ -25,6 +25,7 @@ export { default as CommandPalette } from './CommandPalette';
 
 // Money OS — the cinematic finance surfaces
 export { default as SafeToSpendHero } from './SafeToSpendHero';
+export { default as MoneyCommandBar } from './MoneyCommandBar';
 export { default as FinancialWeather, deriveWeather, WEATHER } from './FinancialWeather';
 export { default as FinancialWeatherBar } from './FinancialWeatherBar';
 export { default as AttentionLayer } from './AttentionLayer';

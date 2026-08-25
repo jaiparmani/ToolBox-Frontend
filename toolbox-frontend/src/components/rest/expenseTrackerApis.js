@@ -614,6 +614,16 @@ export const getRecurring = async () => {
     } catch (error) { throw handleApiError(error, 'load recurring items'); }
 };
 
+// ── "Can I afford it?" — natural-language, computed from the projection ───────
+export const askAffordability = async (question) => {
+    try {
+        const r = await authenticatedFetch(`${API_BASE_URL}/money/afford/`, {
+            method: 'POST', body: JSON.stringify({ question }),
+        });
+        return await r.json();
+    } catch (error) { throw handleApiError(error, 'work that out'); }
+};
+
 // ── Copilot: proactive, actionable cards from the user's own data ────────────
 export const getCopilotCards = async () => {
     try {

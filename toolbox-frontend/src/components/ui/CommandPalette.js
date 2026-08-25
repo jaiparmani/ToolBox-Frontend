@@ -10,6 +10,7 @@ import MoveToInboxRoundedIcon from '@mui/icons-material/MoveToInboxRounded';
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import AddCircleRoundedIcon from '@mui/icons-material/AddCircleRounded';
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
+import AutorenewRoundedIcon from '@mui/icons-material/AutorenewRounded';
 import { accents, motion } from '../../theme/tokens';
 
 /**
@@ -35,6 +36,7 @@ export default function CommandPalette() {
     { id: 'home', group: 'Go to', label: 'Dashboard', hint: 'Money OS', icon: SpaceDashboardRoundedIcon, color: accents.violet, run: () => navigate('/dashboard') },
     { id: 'activity', group: 'Go to', label: 'Activity', hint: 'All transactions', icon: ReceiptLongRoundedIcon, color: accents.blue, run: () => navigate('/expense-tracker') },
     { id: 'inbox', group: 'Go to', label: 'Inbox', hint: 'Review queue', icon: MoveToInboxRoundedIcon, color: accents.cyan, run: () => navigate('/inbox') },
+    { id: 'recurring', group: 'Go to', label: 'Recurring', hint: 'Income & bills', icon: AutorenewRoundedIcon, color: accents.violet, run: () => navigate('/recurring') },
     { id: 'insights', group: 'Go to', label: 'Insights', hint: 'Trends & breakdowns', icon: InsightsRoundedIcon, color: accents.purple, run: () => navigate('/reports') },
     { id: 'splits', group: 'Go to', label: 'Shared', hint: 'Who owes whom', icon: CallSplitRoundedIcon, color: accents.amber, run: () => navigate('/splits') },
     { id: 'health', group: 'Go to', label: 'Health', hint: 'Weight, water, sleep', icon: FavoriteRoundedIcon, color: accents.red, run: () => navigate('/health-tracker') },

@@ -13,6 +13,7 @@ import UserRegistrationPage from './screens/UserRegistrationPage'
 import UserProfilePage from './screens/UserProfilePage'
 import LandingPage from './screens/LandingPage'
 import InboxPage from './screens/InboxPage'
+import RecurringPage from './screens/RecurringPage'
 import QRCodeGenerator from './screens/QRCodeGenerator'
 import ApiKeysPage from './screens/ApiKeysPage'
 import SplitsPage from './screens/SplitsPage'
@@ -73,6 +74,7 @@ export default function Router() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/dashboard" element={<LandingPage />} />
         <Route path="/inbox" element={<InboxPage />} />
+        <Route path="/recurring" element={<RecurringPage />} />
         <Route path="/profile" element={<UserProfilePage />} />
         <Route path="/hobby-tracker" element={<HobbyTracker />} />
         <Route path="/expense-tracker" element={<ExpenseTrackerPage />} />

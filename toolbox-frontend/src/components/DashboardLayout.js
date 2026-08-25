@@ -17,6 +17,7 @@ import CallSplitIcon from '@mui/icons-material/CallSplit';
 import AllInboxIcon from '@mui/icons-material/AllInbox';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import AutoGraphIcon from '@mui/icons-material/AutoGraph';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ConstructionIcon from '@mui/icons-material/Construction';
 import QrCode2Icon from '@mui/icons-material/QrCode2';
@@ -48,6 +49,7 @@ const NAVIGATION = [
   { segment: 'dashboard', title: 'Home', icon: <DashboardIcon /> },
   { segment: 'inbox', title: 'Inbox', icon: <AllInboxIcon /> },
   { segment: 'expense-tracker', title: 'Activity', icon: <TimelineIcon /> },
+  { segment: 'recurring', title: 'Recurring', icon: <AutorenewIcon /> },
   { segment: 'reports', title: 'Insights', icon: <AutoGraphIcon /> },
   { segment: 'splits', title: 'Shared', icon: <CallSplitIcon /> },
   { kind: 'divider' },

@@ -137,23 +137,23 @@ export const AuthProvider = ({ children }) => {
   // Initialize auth state on app start
   useEffect(() => {
     const initializeAuth = async () => {
+      // No token → don't hit the API (which would 401 and bounce public pages).
+      if (!authUtils.isAuthenticated()) {
+        dispatch({ type: AUTH_ACTIONS.INITIALIZE, payload: { isAuthenticated: false, user: null } });
+        return;
+      }
       try {
         const userProfile = await getUserProfile();
         dispatch({
           type: AUTH_ACTIONS.INITIALIZE,
-          payload: {
-            isAuthenticated: true,
-            user: userProfile
-          }
+          payload: { isAuthenticated: true, user: userProfile }
         });
       } catch (error) {
-        console.log('No valid session found, user not authenticated');
+        // Token was rejected — treat as logged out.
+        authUtils.logout();
         dispatch({
           type: AUTH_ACTIONS.INITIALIZE,
-          payload: {
-            isAuthenticated: false,
-            user: null
-          }
+          payload: { isAuthenticated: false, user: null }
         });
       }
     };
@@ -161,65 +161,35 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
-  // Login function
-  const login = async (username, password) => {
+  // Login function — email + password → auth token.
+  const login = async (email, password) => {
     dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
     dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
 
     try {
-      const getApiBaseUrl = () => {
-        const hostname = window.location.hostname;
-        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local');
-
-        const baseUrl = isLocalhost
-            ? 'http://localhost:8000'
-            : 'https://toolbox.pythonanywhere.com';
-
-        console.log(`🔗 API Environment: ${isLocalhost ? 'DEVELOPMENT' : 'PRODUCTION'} | Base URL: ${baseUrl}`);
-
-        return baseUrl;
-      };
-
-      const API_BASE_URL = getApiBaseUrl();
+      const hostname = window.location.hostname;
+      const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local');
+      const API_BASE_URL = isLocalhost ? 'http://localhost:8000' : 'https://toolbox.pythonanywhere.com';
 
       const response = await fetch(API_BASE_URL + '/api/users/login/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          username,
-          password
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        throw new Error(errorData.error || errorData.detail || `HTTP error! status: ${response.status}`);
       }
 
-      // Login successful, fetch user profile using Django session authentication
-      // Add a small delay to ensure Django session cookie is properly set
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      let userProfile;
-      try {
-        userProfile = await getUserProfile();
-        console.log('✅ Profile fetched successfully after login');
-      } catch (profileError) {
-        console.warn('⚠️ Initial profile fetch failed, retrying once:', profileError);
-        // Retry once after a longer delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        userProfile = await getUserProfile();
-        console.log('✅ Profile fetched successfully on retry');
-      }
+      // { detail, token, user } — store the token, then the app is authenticated.
+      const data = await response.json();
+      authUtils.login(data.token, data.user);
+      const userProfile = transformUserForUI(data.user);
 
       dispatch({
         type: AUTH_ACTIONS.LOGIN_SUCCESS,
-        payload: {
-          user: userProfile
-        }
+        payload: { user: userProfile },
       });
 
       return { success: true, user: userProfile };
@@ -241,10 +211,9 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
 
     try {
+      // apiRegisterUser stores the returned auth token itself, so the new
+      // account is logged in as soon as this resolves.
       const registeredUser = await apiRegisterUser(userData);
-
-      // Establish the localStorage session route guards rely on (authUtils.isAuthenticated)
-      authUtils.login(registeredUser.id, registeredUser.username);
 
       dispatch({
         type: AUTH_ACTIONS.REGISTER_SUCCESS,

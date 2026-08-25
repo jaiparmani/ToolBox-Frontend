@@ -1,6 +1,5 @@
 // API Configuration - Dynamic base URL with environment detection
-import { getCsrfHeaders, requiresCsrfProtection } from './csrfUtils.js';
-import { apiInterceptor } from './authUtils.js';
+import { authUtils } from './authUtils.js';
 
 const getApiBaseUrl = () => {
     const hostname = window.location.hostname;
@@ -32,47 +31,24 @@ const authenticatedFetch = async (url, options = {}) => {
     const method = options.method || 'GET';
     const headers = {
         'Content-Type': 'application/json',
+        ...authUtils.authHeader(),   // Authorization: Token <token>
         ...options.headers
     };
 
-    // Add CSRF token for state-changing requests (Django handles this via cookies for session auth)
-    if (requiresCsrfProtection(method)) {
-        try {
-            const csrfHeaders = await getCsrfHeaders(headers);
-            Object.assign(headers, csrfHeaders);
-        } catch (error) {
-            console.warn('Failed to get CSRF token for expenses API:', error);
-            // For session authentication, CSRF should be handled via cookies
-            // This warning is expected and normal for session-based auth
-        }
-    }
-
-    // Add userid to URL using interceptor
-    const finalUrl = apiInterceptor.addUserIdToUrl(url);
-
-    // Add userid to request body if needed
-    let body = options.body;
-    if (body && typeof body === 'string') {
-        try {
-            const parsedBody = JSON.parse(body);
-            body = apiInterceptor.addUserIdToBody(parsedBody, method);
-            body = JSON.stringify(body);
-        } catch (error) {
-            // If body is not JSON, leave it as is
-            console.warn('Could not parse request body as JSON for userid injection:', error);
-        }
-    }
-
+    const finalUrl = url;
     const response = await fetch(finalUrl, {
         ...options,
         headers,
-        body,
-        credentials: 'include' // Include credentials for Django session cookie authentication
+        body: options.body,
     });
 
     if (response.status === 401) {
         console.error(`🚫 Authentication failed for ${method} ${url} - Status: ${response.status}`);
-        clearAuthCredentials();
+        authUtils.logout();
+        // Bounce to login unless we're already there, so a stale token can't strand the app.
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+            window.location.href = '/login';
+        }
         throw new Error('Authentication failed. Please log in again.');
     }
 

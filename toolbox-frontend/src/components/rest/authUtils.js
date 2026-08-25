@@ -1,59 +1,49 @@
-// Simple authentication utilities using localStorage
+// Token-based authentication utilities (localStorage-backed).
+//
+// The API authenticates every request with a DRF auth token sent as
+// `Authorization: Token <token>`. There is no more ?userid= trust — the server
+// derives the user from the token alone.
+
+const TOKEN_KEY = 'authToken';
+const USER_KEY = 'authUser';
+
 export const authUtils = {
-  // Check if user is logged in
-  isAuthenticated: () => {
-    return !!localStorage.getItem('userid') && !!localStorage.getItem('username');
-  },
+  // Logged in iff we hold a token.
+  isAuthenticated: () => !!localStorage.getItem(TOKEN_KEY),
 
-  // Get current user info
+  getToken: () => localStorage.getItem(TOKEN_KEY),
+
+  // The cached user object from login/profile, or null.
   getUser: () => {
-    const userid = localStorage.getItem('userid');
-    const username = localStorage.getItem('username');
-    return userid && username ? { userid, username } : null;
+    try {
+      const raw = localStorage.getItem(USER_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
   },
 
-  // Login user
-  login: (userid, username) => {
-    localStorage.setItem('userid', userid.toString());
-    localStorage.setItem('username', username);
+  // Store the token (and optionally the user) after a successful login/register.
+  login: (token, user) => {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
   },
 
-  // Logout user
+  setUser: (user) => {
+    if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+  },
+
   logout: () => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    // Clear the old pre-token keys too, so a stale session can't linger.
     localStorage.removeItem('userid');
     localStorage.removeItem('username');
   },
 
-  // Get userid for API calls
-  getUserId: () => {
-    return localStorage.getItem('userid');
-  }
-};
-
-// API interceptor to add userid to all requests
-export const apiInterceptor = {
-  // Add userid to URL query parameters
-  addUserIdToUrl: (url) => {
-    const userid = authUtils.getUserId();
-    if (userid && !url.includes('userid=')) {
-      const separator = url.includes('?') ? '&' : '?';
-      return `${url}${separator}userid=${userid}`;
-    }
-    return url;
+  // The Authorization header for authenticated requests (empty when logged out).
+  authHeader: () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    return token ? { Authorization: `Token ${token}` } : {};
   },
-
-  // Add userid to request body for POST/PUT/PATCH requests
-  addUserIdToBody: (body, method) => {
-    const methodRequiresUserId = ['POST', 'PUT', 'PATCH'].includes(method?.toUpperCase());
-    const userid = authUtils.getUserId();
-
-    if (methodRequiresUserId && userid && body && typeof body === 'object') {
-      // Only add userid if it's not already present in the body
-      if (!('userid' in body)) {
-        body.userid = userid;
-      }
-    }
-
-    return body;
-  }
 };

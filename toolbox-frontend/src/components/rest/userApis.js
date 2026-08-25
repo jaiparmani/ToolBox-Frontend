@@ -1,6 +1,5 @@
 // User API Configuration - Dynamic base URL with environment detection
-import { getCsrfHeaders, requiresCsrfProtection, clearAllAuthData } from './csrfUtils.js';
-import { apiInterceptor } from './authUtils.js';
+import { authUtils } from './authUtils.js';
 
 const getApiBaseUrl = () => {
     const hostname = window.location.hostname;
@@ -18,8 +17,9 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
-// Session management utilities - simplified for Django session cookies
+// Clear the stored auth token (and any legacy session keys).
 export const clearSession = () => {
+    authUtils.logout();
     localStorage.removeItem('sessionid');
 };
 
@@ -32,20 +32,24 @@ export const clearSession = () => {
  */
 export const clearAllData = async (onSuccess, onError) => {
     try {
-        console.log('🧹 Clearing all authentication data...');
-
-        // Clear all cookies, storage, and attempt server logout
-        const success = await clearAllAuthData();
-
-        if (success) {
-            console.log('✓ All authentication data cleared successfully');
-            if (onSuccess) onSuccess(true);
-            return true;
-        } else {
-            throw new Error('Failed to clear authentication data');
+        // Best-effort server-side token invalidation, then wipe the local token.
+        try {
+            if (authUtils.isAuthenticated()) {
+                await fetch(`${API_BASE_URL}/logout/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...authUtils.authHeader() },
+                });
+            }
+        } catch (e) {
+            // Network failure shouldn't block a local logout.
+            console.warn('Server logout failed; clearing locally anyway.', e);
         }
+        authUtils.logout();
+        if (onSuccess) onSuccess(true);
+        return true;
     } catch (error) {
         console.error('Error clearing all authentication data:', error);
+        authUtils.logout();
         const handledError = handleApiError(error, 'clear all data');
         if (onError) onError(handledError);
         throw handledError;
@@ -53,43 +57,21 @@ export const clearAllData = async (onSuccess, onError) => {
 };
 
 
-// Utility function for making authenticated requests with session cookies
+// Utility function for making authenticated (token) requests.
 const authenticatedFetch = async (url, options = {}) => {
-    const method = options.method || 'GET';
     const headers = {
         'Content-Type': 'application/json',
+        ...authUtils.authHeader(),
         ...options.headers,
     };
 
-    // Add CSRF token for state-changing requests (authenticated requests only)
-    if (requiresCsrfProtection(method)) {
-        try {
-            const csrfHeaders = await getCsrfHeaders(headers);
-            Object.assign(headers, csrfHeaders);
-        } catch (error) {
-            console.warn('Failed to get CSRF token for authenticated request:', error);
-        }
-    }
-
-    // Add userid to URL using interceptor
-    const finalUrl = apiInterceptor.addUserIdToUrl(url);
-
-    // Add userid to request body if needed
-    let body = options.body;
-    if (body && typeof body === 'object') {
-        body = apiInterceptor.addUserIdToBody(JSON.parse(body), method);
-        body = JSON.stringify(body);
-    }
-
-    const response = await fetch(finalUrl, {
-        ...options,
-        headers,
-        body,
-        credentials: 'include' // Important for session cookie handling
-    });
+    const response = await fetch(url, { ...options, headers, body: options.body });
 
     if (response.status === 401) {
-        clearSession();
+        authUtils.logout();
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+            window.location.href = '/login';
+        }
         throw new Error('Session expired or invalid. Please log in again.');
     }
 
@@ -133,21 +115,10 @@ const throwHttpError = (errorData, status) => {
 
 // Utility function for making public requests (no authentication required)
 const publicFetch = async (url, options = {}) => {
-    const method = options.method || 'GET';
     const headers = {
         'Content-Type': 'application/json',
         ...options.headers
     };
-
-    // Add CSRF token for state-changing public requests (like registration)
-    if (requiresCsrfProtection(method)) {
-        try {
-            const csrfHeaders = await getCsrfHeaders(headers);
-            Object.assign(headers, csrfHeaders);
-        } catch (error) {
-            console.warn('Failed to get CSRF token for public request:', error);
-        }
-    }
 
     const response = await fetch(url, {
         ...options,
@@ -265,8 +236,11 @@ export const registerUser = async (userData, onSuccess, onError) => {
             })
         });
 
+        // Backend returns { token, user } — store the token so the new account
+        // is logged straight in, and return the user for the UI.
         const data = await response.json();
-        const transformedData = transformUserForUI(data);
+        if (data.token) authUtils.login(data.token, data.user);
+        const transformedData = transformUserForUI(data.user || data);
 
         if (onSuccess) onSuccess(transformedData);
         return transformedData;
@@ -386,6 +360,10 @@ export const changePassword = async (passwordData, onSuccess, onError) => {
         });
 
         const data = await response.json();
+
+        // The server rotates the token on a password change; adopt the new one
+        // so the current session keeps working.
+        if (data.token) authUtils.login(data.token);
 
         if (onSuccess) onSuccess(data);
         return data;

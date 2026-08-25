@@ -1,6 +1,5 @@
 // API Configuration - Dynamic base URL with environment detection
-import { getCsrfHeaders, requiresCsrfProtection } from './csrfUtils.js';
-import { apiInterceptor } from './authUtils.js';
+import { authUtils } from './authUtils.js';
 
 const getApiBaseUrl = () => {
     const hostname = window.location.hostname;
@@ -46,41 +45,19 @@ const throwHttpError = (errorData, status) => {
 };
 
 const authenticatedFetch = async (url, options = {}) => {
-    const method = options.method || 'GET';
     const headers = {
         'Content-Type': 'application/json',
+        ...authUtils.authHeader(),
         ...options.headers
     };
 
-    if (requiresCsrfProtection(method)) {
-        try {
-            const csrfHeaders = await getCsrfHeaders(headers);
-            Object.assign(headers, csrfHeaders);
-        } catch (error) {
-            console.warn('Failed to get CSRF token for health API:', error);
-        }
-    }
-
-    const finalUrl = apiInterceptor.addUserIdToUrl(url);
-
-    let body = options.body;
-    if (body && typeof body === 'string') {
-        try {
-            const parsedBody = apiInterceptor.addUserIdToBody(JSON.parse(body), method);
-            body = JSON.stringify(parsedBody);
-        } catch (error) {
-            console.warn('Could not parse request body as JSON for userid injection:', error);
-        }
-    }
-
-    const response = await fetch(finalUrl, {
-        ...options,
-        headers,
-        body,
-        credentials: 'include'
-    });
+    const response = await fetch(url, { ...options, headers, body: options.body });
 
     if (response.status === 401) {
+        authUtils.logout();
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+            window.location.href = '/login';
+        }
         throw Object.assign(new Error('Authentication failed. Please log in again.'), { status: 401 });
     }
 

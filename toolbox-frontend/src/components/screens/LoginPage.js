@@ -6,23 +6,26 @@ import {
   FormControlLabel, Checkbox
 } from '@mui/material';
 import {
-  Person,
+  Email as EmailIcon,
+  Lock as LockIcon,
   Login,
   CheckCircle,
   Error as ErrorIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { authUtils } from '../rest/authUtils';
+import { useAuth } from '../../contexts/AuthContext';
 import { clearAllData } from '../rest/userApis';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
   // Form state
   const [formData, setFormData] = useState({
-    userid: '',
+    email: '',
+    password: '',
     rememberMe: false
   });
 
@@ -62,17 +65,19 @@ export default function LoginPage() {
   // Form validation
   const validateForm = () => {
     const errors = {};
-
-    // Userid validation
-    if (!formData.userid.trim()) {
-      errors.userid = 'User ID is required';
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      errors.email = 'Enter a valid email';
     }
-
+    if (!formData.password) {
+      errors.password = 'Password is required';
+    }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  // Handle form submission
+  // Handle form submission — real email + password auth via the token flow.
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError(null);
@@ -83,62 +88,13 @@ export default function LoginPage() {
 
     setIsLoading(true);
     try {
-      const getApiBaseUrl = () => {
-        const hostname = window.location.hostname;
-        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local');
-
-        const baseUrl = isLocalhost
-            ? 'http://localhost:8000'
-            : 'https://toolbox.pythonanywhere.com';
-
-        console.log(`🔗 API Environment: ${isLocalhost ? 'DEVELOPMENT' : 'PRODUCTION'} | Base URL: ${baseUrl}`);
-
-        return baseUrl;
-      };
-
-      const API_BASE_URL = getApiBaseUrl();
-
-      const response = await fetch(API_BASE_URL + `/api/users/login/?userid=${formData.userid}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({})
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      const result = await login(formData.email.trim(), formData.password);
+      if (!result.success) {
+        throw new Error(result.error || 'Login failed. Please check your credentials.');
       }
-
-      // Login successful
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Login response data:', data);
-
-      // Use the userid from the form since we're sending it explicitly
-      const userid = formData.userid;
-
-      if (!userid) {
-        throw new Error('User ID is required');
-      }
-
-      // Save to localStorage
-      authUtils.login(userid, `user${userid}`);
-
-      console.log('Login successful, userid:', userid);
       setSuccess(true);
-      setTimeout(() => {
-        navigate('/');
-      }, 1500);
-
+      setTimeout(() => navigate('/'), 900);
     } catch (error) {
-      console.error('Login error:', error);
       setError({ message: error.message || 'Login failed. Please check your credentials and try again.' });
     } finally {
       setIsLoading(false);
@@ -242,21 +198,44 @@ export default function LoginPage() {
         {/* Login Form */}
         <Box component="form" onSubmit={handleSubmit}>
           <Grid container spacing={3}>
-            {/* User ID Field */}
+            {/* Email Field */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="User ID"
-                value={formData.userid}
-                onChange={handleInputChange('userid')}
-                error={!!formErrors.userid}
-                helperText={renderFieldError(formErrors.userid)}
+                label="Email"
+                type="email"
+                value={formData.email}
+                onChange={handleInputChange('email')}
+                error={!!formErrors.email}
+                helperText={renderFieldError(formErrors.email)}
                 required
-                autoComplete="userid"
+                autoComplete="email"
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Person />
+                      <EmailIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+
+            {/* Password Field */}
+            <Grid item xs={12} sx={{ pt: '12px !important' }}>
+              <TextField
+                fullWidth
+                label="Password"
+                type="password"
+                value={formData.password}
+                onChange={handleInputChange('password')}
+                error={!!formErrors.password}
+                helperText={renderFieldError(formErrors.password)}
+                required
+                autoComplete="current-password"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LockIcon />
                     </InputAdornment>
                   ),
                 }}

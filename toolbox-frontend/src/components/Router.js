@@ -3,18 +3,15 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import PageTransition from './motion/PageTransition'
 import { authUtils } from './rest/authUtils'
 import DashboardLayoutBasic from './DashboardLayout'
-import HobbyTracker from './screens/HobbyTracker'
 import ExpenseTrackerPage from './screens/ExpenseTrackerPage'
 import ReportsPage from './screens/ReportsPage'
 import HealthTrackerPage from './screens/HealthTrackerPage'
-import ArraySumDemo from './ArraySumDemo'
 import LoginPage from './screens/LoginPage'
 import UserRegistrationPage from './screens/UserRegistrationPage'
 import UserProfilePage from './screens/UserProfilePage'
 import LandingPage from './screens/LandingPage'
 import InboxPage from './screens/InboxPage'
 import RecurringPage from './screens/RecurringPage'
-import QRCodeGenerator from './screens/QRCodeGenerator'
 import ApiKeysPage from './screens/ApiKeysPage'
 import SplitsPage from './screens/SplitsPage'
 import { Box, CircularProgress, Typography } from '@mui/material'
@@ -76,14 +73,16 @@ export default function Router() {
         <Route path="/inbox" element={<InboxPage />} />
         <Route path="/recurring" element={<RecurringPage />} />
         <Route path="/profile" element={<UserProfilePage />} />
-        <Route path="/hobby-tracker" element={<HobbyTracker />} />
         <Route path="/expense-tracker" element={<ExpenseTrackerPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/health-tracker" element={<HealthTrackerPage />} />
-        <Route path="/array-sum" element={<ArraySumDemo />} />
         <Route path="/splits" element={<SplitsPage />} />
+        {/* API Keys is admin-only tooling — reachable by URL, kept out of the nav */}
         <Route path="/api-keys" element={<ApiKeysPage />} />
-        <Route path="/qr-generator" element={<QRCodeGenerator />} />
+        {/* Retired toy tools (hobby, array-sum, qr) redirect home */}
+        <Route path="/hobby-tracker" element={<Navigate to="/" replace />} />
+        <Route path="/array-sum" element={<Navigate to="/" replace />} />
+        <Route path="/qr-generator" element={<Navigate to="/" replace />} />
       </Route>
 
       {/* Legacy routes - redirect to dashboard */}

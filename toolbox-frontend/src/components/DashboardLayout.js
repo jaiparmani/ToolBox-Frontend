@@ -44,6 +44,8 @@ import BrandLogo from './motion/BrandLogo';
 import CommandPalette from './ui/CommandPalette';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 
+// Focused on the finance core plus Health. The old toy tools (Array Sum, QR,
+// Habits) and the admin-only API Keys page are no longer in the primary nav.
 const NAVIGATION = [
   { kind: 'header', title: 'Money' },
   { segment: 'dashboard', title: 'Home', icon: <DashboardIcon /> },
@@ -52,15 +54,9 @@ const NAVIGATION = [
   { segment: 'recurring', title: 'Recurring', icon: <AutorenewIcon /> },
   { segment: 'reports', title: 'Insights', icon: <AutoGraphIcon /> },
   { segment: 'splits', title: 'Shared', icon: <CallSplitIcon /> },
+  { segment: 'health-tracker', title: 'Health', icon: <FavoriteIcon /> },
   { kind: 'divider' },
   { segment: 'profile', title: 'Settings', icon: <SettingsIcon /> },
-  { kind: 'divider' },
-  { kind: 'header', title: 'Tools' },
-  { segment: 'health-tracker', title: 'Health', icon: <FavoriteIcon /> },
-  { segment: 'hobby-tracker', title: 'Habits', icon: <LayersIcon /> },
-  { segment: 'api-keys', title: 'API Keys', icon: <VpnKeyIcon /> },
-  { segment: 'array-sum', title: 'Array Sum', icon: <FunctionsIcon /> },
-  { segment: 'qr-generator', title: 'QR Code', icon: <QrCode2Icon /> },
 ];
 const demoTheme = extendTheme({
   colorSchemes: {

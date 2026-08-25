@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Card, CardActionArea, Stack, Typography } from '@mui/material';
 import BarChartIcon from '@mui/icons-material/BarChart';
-import LayersIcon from '@mui/icons-material/Layers';
+import AutorenewRoundedIcon from '@mui/icons-material/AutorenewRounded';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
@@ -44,10 +44,10 @@ const getGreeting = () => {
 
 const FEATURES = [
   { to: '/expense-tracker', icon: BarChartIcon, title: 'Activity', hint: 'Every transaction', color: accents.blue },
+  { to: '/recurring', icon: AutorenewRoundedIcon, title: 'Recurring', hint: 'Income & bills', color: accents.violet },
   { to: '/splits', icon: CallSplitIcon, title: 'Shared', hint: 'Who owes whom', color: accents.amber },
-  { to: '/health-tracker', icon: FavoriteIcon, title: 'Health', hint: 'Weight, water, sleep', color: accents.red },
   { to: '/reports', icon: AssessmentIcon, title: 'Insights', hint: 'Trends & breakdowns', color: accents.purple },
-  { to: '/hobby-tracker', icon: LayersIcon, title: 'Habits', hint: 'Streaks & routines', color: accents.green },
+  { to: '/health-tracker', icon: FavoriteIcon, title: 'Health', hint: 'Weight, water, sleep', color: accents.red },
 ];
 
 export default function LandingPage() {

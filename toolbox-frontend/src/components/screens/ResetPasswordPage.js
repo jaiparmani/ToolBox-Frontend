@@ -44,7 +44,8 @@ export default function ResetPasswordPage() {
     try {
       const res = await confirmPasswordReset({ uid, token, newPassword: pw, newPasswordConfirm: confirm });
       if (!res.token) throw new Error(res.error || 'This reset link is invalid or has expired.');
-      navigate('/'); // confirmPasswordReset stored the token — we're signed in
+      // Full load so the auth context re-initialises with the signed-in profile.
+      window.location.href = '/';
     } catch (err) {
       setError(err.message || 'This reset link is invalid or has expired.');
     } finally {

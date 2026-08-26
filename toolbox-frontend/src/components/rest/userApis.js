@@ -340,6 +340,31 @@ export const patchUserProfile = async (profileData, onSuccess, onError) => {
 };
 
 /**
+ * Passwordless login — request a one-time code. The identifier is an email or
+ * username; the code is emailed to the account. Always resolves the same way,
+ * so it can't reveal which accounts exist.
+ */
+export const requestOtp = async (identifier) => {
+    const response = await publicFetch(`${API_BASE_URL}/otp-request/`, {
+        method: 'POST', body: JSON.stringify({ identifier }),
+    });
+    return await response.json();
+};
+
+/**
+ * Verify the one-time code and sign in. On success the server returns an auth
+ * token, which we store.
+ */
+export const verifyOtp = async (identifier, code) => {
+    const response = await publicFetch(`${API_BASE_URL}/otp-verify/`, {
+        method: 'POST', body: JSON.stringify({ identifier, code }),
+    });
+    const data = await response.json();
+    if (data.token) authUtils.login(data.token, data.user);
+    return data;
+};
+
+/**
  * Forgot password — request a reset link (sent to the email out-of-band).
  * Always resolves the same way, so it can't reveal which emails have accounts.
  */

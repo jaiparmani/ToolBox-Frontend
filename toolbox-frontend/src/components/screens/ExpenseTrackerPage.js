@@ -73,6 +73,29 @@ const categoryColors = [
  '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'
 ];
 
+/** Opens the one ToolBox Assistant — the scattered AI boxes now live there. */
+function AssistantNudge({ label }) {
+ const open = () => window.dispatchEvent(new Event('toolbox:command-palette'));
+ return (
+   <Box
+     role="button"
+     aria-label="Open the ToolBox assistant"
+     onClick={open}
+     sx={{
+       display: 'flex', alignItems: 'center', gap: 1.25, px: 2, py: 1.5, borderRadius: 3, cursor: 'pointer',
+       border: '1px solid', borderColor: `${accents.violet}55`,
+       backgroundImage: `radial-gradient(120% 160% at 0% 0%, ${accents.violet}14, transparent 60%)`,
+       transition: 'border-color 0.2s ease',
+       '&:hover': { borderColor: accents.violet },
+     }}
+   >
+     <AutoAwesomeIcon sx={{ color: accents.violet, fontSize: 20, flexShrink: 0 }} />
+     <Typography variant="body2" sx={{ flex: 1, color: 'text.secondary' }} noWrap>{label}</Typography>
+     <Box sx={{ display: { xs: 'none', sm: 'block' }, px: 0.75, py: 0.15, borderRadius: 1, border: '1px solid', borderColor: 'divider', fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary' }}>⌘K</Box>
+   </Box>
+ );
+}
+
 export default function ExpenseTrackerPage() {
   // Use global authentication state
   const { isAuthenticated, isLoading, logout, user } = useAuth();
@@ -983,17 +1006,9 @@ export default function ExpenseTrackerPage() {
        </Box>
      </Paper>
 
-     {/* Capture: the primary action, sized for a thumb */}
+     {/* Capture, ask, and insights now all live in the one ToolBox Assistant. */}
      <Box sx={{ mb: { xs: 2, sm: 3 } }}>
-       <QuickCapture
-         value={quickAddText}
-         onChange={(value) => setQuickAddText(value)}
-         onSubmit={handleQuickAdd}
-         loading={quickAddLoading}
-         placeholder="20 aamras, 58 chai vada pav…"
-         hint="Type it how you'd say it — the amount and category are worked out for you"
-       />
-       <ThinkingHint show={quickAddLoading} label="Reading that expense…" />
+       <AssistantNudge label="Add an expense, split a bill, or ask a question" />
      </Box>
 
      {/* Failures stay until dismissed; confirmations fade on their own */}
@@ -1064,14 +1079,7 @@ export default function ExpenseTrackerPage() {
                  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
              }}
            >
-             <QuickCapture
-               value={ask.question}
-               onChange={(value) => setAsk(prev => ({ ...prev, question: value }))}
-               onSubmit={runAsk}
-               loading={ask.loading}
-               placeholder="How much on food last month?"
-             />
-             <ThinkingHint show={ask.loading} label="Working out the filters…" />
+             <AssistantNudge label="Ask about your spending — e.g. “how much on food this month?”" />
              {ask.answer && (
                <Box display="flex" justifyContent="flex-end" sx={{ mt: 1 }}>
                  <Button size="small" onClick={clearAsk} color="inherit">Clear</Button>
@@ -1445,12 +1453,9 @@ export default function ExpenseTrackerPage() {
              <Button
                variant="contained"
                startIcon={<AutoAwesomeIcon />}
-               onClick={() => runInsight(!!insight.data)}
-               disabled={insight.loading}
+               onClick={() => window.dispatchEvent(new Event('toolbox:command-palette'))}
              >
-               {insight.loading
-                 ? 'Analysing...'
-                 : insight.data ? 'Regenerate' : 'Generate review'}
+               Ask ToolBox
              </Button>
            </Box>
 

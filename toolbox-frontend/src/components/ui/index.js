@@ -21,7 +21,7 @@ export { default as SegmentedControl } from './SegmentedControl';
 export { default as ConfirmDialog } from './ConfirmDialog';
 export { ToastProvider, useToast } from './Toast';
 export { default as ErrorBanner } from './ErrorBanner';
-export { default as CommandPalette } from './CommandPalette';
+export { default as Assistant } from './Assistant';
 
 // Money OS — the cinematic finance surfaces
 export { default as SafeToSpendHero } from './SafeToSpendHero';

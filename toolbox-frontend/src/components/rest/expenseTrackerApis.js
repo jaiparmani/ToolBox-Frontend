@@ -614,6 +614,24 @@ export const getRecurring = async () => {
     } catch (error) { throw handleApiError(error, 'load recurring items'); }
 };
 
+// ── The one assistant — every AI capability behind a single endpoint ─────────
+const ASSISTANT_URL = API_BASE_URL.replace(/\/expenses$/, '/assistant');
+
+export const askAssistant = async (message, { conversationId } = {}) => {
+    const r = await authenticatedFetch(`${ASSISTANT_URL}/`, {
+        method: 'POST',
+        body: JSON.stringify(conversationId ? { message, conversation_id: conversationId } : { message }),
+    });
+    return await r.json();
+};
+
+export const commitAssistant = async (payload) => {
+    const r = await authenticatedFetch(`${ASSISTANT_URL}/`, {
+        method: 'POST', body: JSON.stringify(payload),
+    });
+    return await r.json();
+};
+
 // ── "Can I afford it?" — natural-language, computed from the projection ───────
 export const askAffordability = async (question) => {
     try {

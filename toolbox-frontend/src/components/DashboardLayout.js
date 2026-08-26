@@ -41,8 +41,8 @@ import { clearAllData } from './rest/userApis';
 import { useColorMode } from '../contexts/ColorModeContext';
 import { MoneyProvider } from '../contexts/MoneyContext';
 import BrandLogo from './motion/BrandLogo';
-import CommandPalette from './ui/CommandPalette';
-import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import Assistant from './ui/Assistant';
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
 // Focused on the finance core plus Health. The old toy tools (Array Sum, QR,
 // Habits) and the admin-only API Keys page are no longer in the primary nav.
@@ -196,16 +196,16 @@ function SidebarFooterAccount({ mini }) {
   );
 }
 
-// The ⌘K affordance in the top toolbar. Opens the global CommandPalette via a
-// decoupled window event (the palette also owns the keyboard shortcut itself).
+// The ⌘K affordance in the top toolbar. Opens the ToolBox Assistant via a
+// decoupled window event (the assistant also owns the keyboard shortcut itself).
 function CommandTrigger() {
-  const openPalette = () => window.dispatchEvent(new Event('toolbox:command-palette'));
+  const openAssistant = () => window.dispatchEvent(new Event('toolbox:command-palette'));
   return (
-    <Tooltip title="Command palette (⌘K)">
+    <Tooltip title="Ask ToolBox (⌘K)">
       <Box
-        onClick={openPalette}
+        onClick={openAssistant}
         role="button"
-        aria-label="Open command palette"
+        aria-label="Open the ToolBox assistant"
         sx={{
           display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer',
           px: { xs: 1, sm: 1.5 }, py: 0.6, borderRadius: 2,
@@ -214,8 +214,8 @@ function CommandTrigger() {
           '&:hover': { borderColor: 'primary.main', color: 'text.primary' },
         }}
       >
-        <SearchRoundedIcon fontSize="small" />
-        <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>Search</Typography>
+        <AutoAwesomeRoundedIcon fontSize="small" />
+        <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>Ask</Typography>
         <Box sx={{ display: { xs: 'none', sm: 'block' }, px: 0.6, py: 0.1, borderRadius: 1, border: '1px solid', borderColor: 'divider', fontSize: '0.7rem', fontWeight: 600 }}>⌘K</Box>
       </Box>
     </Tooltip>
@@ -252,8 +252,8 @@ export default function DashboardLayoutBasic(props) {
         <DashboardLayout
           slots={{ sidebarFooter: SidebarFooterAccount, toolbarActions: CommandTrigger }}
         >
-          {/* Global command palette — ⌘K anywhere, or the toolbar button */}
-          <CommandPalette />
+          {/* The one ToolBox Assistant — ⌘K anywhere, or the toolbar button */}
+          <Assistant />
           {/* Every nested route renders here, inside the one shell */}
           <Box sx={{ p: { xs: 0, sm: 1 } }}>
             <Outlet />

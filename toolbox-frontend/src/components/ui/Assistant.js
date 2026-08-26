@@ -12,6 +12,8 @@ import { accents, motion as motionTokens } from '../../theme/tokens';
 import { askAssistant, commitAssistant } from '../rest/expenseTrackerApis';
 import { useMoney } from '../../contexts/MoneyContext';
 import ThinkingHint from './ThinkingHint';
+import AssistantOrb from './AssistantOrb';
+import TypedLight from './TypedLight';
 import { money } from './money';
 
 /**
@@ -48,8 +50,14 @@ export default function Assistant() {
   const [input, setInput] = React.useState('');
   const [turns, setTurns] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
+  const [speaking, setSpeaking] = React.useState(0); // # of replies currently streaming in
   const bodyRef = React.useRef(null);
   const convId = React.useRef(null);
+
+  // The orb's mood follows what the assistant is actually doing.
+  const orbState = loading ? 'thinking' : speaking > 0 ? 'speaking' : 'idle';
+  const onSpeakStart = React.useCallback(() => setSpeaking(s => s + 1), []);
+  const onSpeakEnd = React.useCallback(() => setSpeaking(s => Math.max(0, s - 1)), []);
 
   // Global hotkey + a decoupled open event (toolbar button dispatches it).
   React.useEffect(() => {
@@ -119,12 +127,24 @@ export default function Assistant() {
         },
       }}
     >
+      {/* The presence — a persistent orb that reflects what it's doing */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2.5, pt: 2.25, pb: turns.length ? 1.5 : 0.5, flexShrink: 0 }}>
+        <AssistantOrb state={orbState} size={44} reduce={reduce} />
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '0.98rem', lineHeight: 1.2 }}>ToolBox Assistant</Typography>
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {loading ? 'Thinking…' : speaking > 0 ? 'Answering…' : 'Ready when you are'}
+          </Typography>
+        </Box>
+      </Box>
+
       {/* Conversation */}
       {turns.length > 0 && (
-        <Box ref={bodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 2, py: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        <Box ref={bodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 2, pb: 2, pt: 0.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           {turns.map((turn) => (
             <Turn key={turn.id} turn={turn} reduce={reduce} theme={theme} navigate={navigate}
-              onConfirm={confirm} onDiscard={discard} onClose={() => setOpen(false)} />
+              onConfirm={confirm} onDiscard={discard} onClose={() => setOpen(false)}
+              onSpeakStart={onSpeakStart} onSpeakEnd={onSpeakEnd} />
           ))}
           {loading && <ThinkingHint show label="Working that out…" />}
         </Box>
@@ -132,8 +152,7 @@ export default function Assistant() {
 
       {/* Empty state */}
       {turns.length === 0 && (
-        <Box sx={{ px: 3, pt: 3, pb: 1 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: '1.05rem' }}>Ask ToolBox</Typography>
+        <Box sx={{ px: 3, pt: 1, pb: 1 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1.75 }}>
             Add an expense, split a bill, search, or ask how you're doing — all in one place.
           </Typography>
@@ -174,7 +193,14 @@ export default function Assistant() {
 }
 
 /** One conversation turn — a user bubble, or an assistant response card. */
-function Turn({ turn, reduce, theme, navigate, onConfirm, onDiscard, onClose }) {
+function Turn({ turn, reduce, theme, navigate, onConfirm, onDiscard, onClose, onSpeakStart, onSpeakEnd }) {
+  const c = turn.card || {};
+  const hasReply = turn.role === 'assistant' && !!c.reply && !turn.committed;
+  // The card is "emitted" only after the words finish arriving, so the reply
+  // streams first and the result then blooms out of it. (Hook stays above the
+  // user-bubble early return so hook order is stable.)
+  const [streamed, setStreamed] = React.useState(reduce || !hasReply);
+
   const revealSx = reduce ? {} : {
     animation: `asstIn ${motionTokens.slow}ms ${motionTokens.emphasis} both`,
     '@keyframes asstIn': { from: { opacity: 0, transform: 'translateY(10px) scale(0.98)' }, to: { opacity: 1, transform: 'none' } },
@@ -188,22 +214,32 @@ function Turn({ turn, reduce, theme, navigate, onConfirm, onDiscard, onClose }) 
     );
   }
 
-  const c = turn.card || {};
-  const commonReply = c.reply && !turn.committed ? (
-    <Typography variant="body2" color="text.secondary" sx={{ mb: c.type === 'answer' ? 0 : 1 }}>{c.reply}</Typography>
-  ) : null;
+  const emitSx = reduce ? {} : {
+    animation: `asstEmit ${motionTokens.slow}ms ${motionTokens.emphasis} both`,
+    '@keyframes asstEmit': {
+      from: { opacity: 0, transform: 'translateY(8px) scale(0.9)', filter: 'brightness(1.5)' },
+      to: { opacity: 1, transform: 'none', filter: 'none' },
+    },
+  };
 
   return (
-    <Box sx={{ alignSelf: 'flex-start', maxWidth: '92%', ...revealSx }}>
-      {commonReply}
+    <Box sx={{ alignSelf: 'flex-start', maxWidth: '92%' }}>
+      {hasReply && (
+        <Typography variant="body2" color="text.secondary" sx={{ position: 'relative', mb: c.type === 'answer' ? 0 : 1 }}>
+          <TypedLight text={c.reply} reduce={reduce} onStart={onSpeakStart}
+            onDone={() => { setStreamed(true); onSpeakEnd?.(); }} />
+        </Typography>
+      )}
 
       {turn.committed ? (
-        <SuccessCard result={turn.committed} onClose={onClose} navigate={navigate} />
+        <Box sx={emitSx}><SuccessCard result={turn.committed} onClose={onClose} navigate={navigate} /></Box>
       ) : turn.discarded ? (
         <Typography variant="caption" color="text.disabled">Discarded.</Typography>
-      ) : (
-        <CardBody card={c} turn={turn} onConfirm={onConfirm} onDiscard={onDiscard} onClose={onClose} navigate={navigate} theme={theme} />
-      )}
+      ) : streamed ? (
+        <Box sx={emitSx}>
+          <CardBody card={c} turn={turn} onConfirm={onConfirm} onDiscard={onDiscard} onClose={onClose} navigate={navigate} theme={theme} />
+        </Box>
+      ) : null}
     </Box>
   );
 }

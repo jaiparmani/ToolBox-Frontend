@@ -12,6 +12,8 @@ import UserProfilePage from './screens/UserProfilePage'
 import LandingPage from './screens/LandingPage'
 import InboxPage from './screens/InboxPage'
 import RecurringPage from './screens/RecurringPage'
+import ForgotPasswordPage from './screens/ForgotPasswordPage'
+import ResetPasswordPage from './screens/ResetPasswordPage'
 import ApiKeysPage from './screens/ApiKeysPage'
 import SplitsPage from './screens/SplitsPage'
 import { Box, CircularProgress, Typography } from '@mui/material'
@@ -64,6 +66,10 @@ export default function Router() {
           <UserRegistrationPage />
         </PublicRoute>
       } />
+
+      {/* Forgot-password flow (public; reachable while signed out) */}
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
 
       {/* Protected app: one shell (sidebar + header), all pages nested inside */}

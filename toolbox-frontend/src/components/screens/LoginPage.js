@@ -297,8 +297,10 @@ export default function LoginPage() {
 
           {/* Info */}
           <Box textAlign="center">
-            <Typography variant="body2" color="text.secondary">
-              Login to access your toolbox
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              <Link component="button" type="button" variant="body2" onClick={() => navigate('/forgot-password')}>
+                Forgot your password?
+              </Link>
             </Typography>
             <Typography variant="body2" sx={{ mt: 1 }}>
               Don't have an account?{' '}

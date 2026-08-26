@@ -340,6 +340,31 @@ export const patchUserProfile = async (profileData, onSuccess, onError) => {
 };
 
 /**
+ * Forgot password — request a reset link (sent to the email out-of-band).
+ * Always resolves the same way, so it can't reveal which emails have accounts.
+ */
+export const requestPasswordReset = async (email) => {
+    const response = await publicFetch(`${API_BASE_URL}/password-reset/`, {
+        method: 'POST', body: JSON.stringify({ email }),
+    });
+    return await response.json();
+};
+
+/**
+ * Finish a reset: set a new password with the uid + token from the emailed link.
+ * On success the server returns an auth token, so the user is signed in.
+ */
+export const confirmPasswordReset = async ({ uid, token, newPassword, newPasswordConfirm }) => {
+    const response = await publicFetch(`${API_BASE_URL}/password-reset-confirm/`, {
+        method: 'POST',
+        body: JSON.stringify({ uid, token, new_password: newPassword, new_password_confirm: newPasswordConfirm }),
+    });
+    const data = await response.json();
+    if (data.token) authUtils.login(data.token, data.user);
+    return data;
+};
+
+/**
  * Change user password
  * @param {ChangePasswordData} passwordData - Password change data
  * @param {Function} onSuccess - Success callback

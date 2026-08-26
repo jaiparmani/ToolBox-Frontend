@@ -46,7 +46,7 @@ export default function UserProfilePage() {
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading, updateProfile, changePassword, logout } = useAuth();
 
-  const [details, setDetails] = useState({ username: '', email: '', first_name: '', last_name: '' });
+  const [details, setDetails] = useState({ username: '', email: '', first_name: '', last_name: '', phone: '' });
   const [editing, setEditing] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
 
@@ -63,7 +63,8 @@ export default function UserProfilePage() {
   useEffect(() => {
     if (user) setDetails({
       username: user.username || '', email: user.email || '',
-      first_name: user.first_name || '', last_name: user.last_name || '',
+      first_name: user.first_name ?? user.firstName ?? '', last_name: user.last_name ?? user.lastName ?? '',
+      phone: user.phone || '',
     });
   }, [user]);
 
@@ -170,6 +171,9 @@ export default function UserProfilePage() {
                 onChange={(v) => setDetails(d => ({ ...d, username: v }))} />
               <Field label="Email" value={details.email} editing={editing} type="email"
                 onChange={(v) => setDetails(d => ({ ...d, email: v }))} />
+              <Field label="Phone" value={details.phone} editing={editing} type="tel"
+                placeholder="Not set"
+                onChange={(v) => setDetails(d => ({ ...d, phone: v }))} />
             </Stack>
           </SectionCard>
         </Reveal>
@@ -277,9 +281,9 @@ function SectionCard({ icon, color, title, action, children }) {
   );
 }
 
-function Field({ label, value, editing, onChange, type = 'text' }) {
+function Field({ label, value, editing, onChange, type = 'text', placeholder }) {
   if (editing) {
-    return <TextField size="small" fullWidth label={label} type={type} value={value}
+    return <TextField size="small" fullWidth label={label} type={type} value={value} placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)} />;
   }
   return (

@@ -9,6 +9,7 @@ import {
   VisibilityOff,
   Person,
   Email,
+  Phone,
   Lock,
   CheckCircle,
   Error as ErrorIcon,
@@ -28,6 +29,7 @@ export default function UserRegistrationPage() {
     email: '',
     first_name: '',
     last_name: '',
+    phone: '',
     password: '',
     password_confirm: ''
   });
@@ -376,6 +378,26 @@ export default function UserRegistrationPage() {
                   startAdornment: (
                     <InputAdornment position="start">
                       <Email />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+
+            {/* Phone Field (optional) */}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Phone number (optional)"
+                type="tel"
+                value={formData.phone}
+                onChange={handleInputChange('phone')}
+                error={!!formErrors.phone}
+                helperText={renderFieldError(formErrors.phone) || 'Used for account recovery and sign-in codes.'}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Phone />
                     </InputAdornment>
                   ),
                 }}

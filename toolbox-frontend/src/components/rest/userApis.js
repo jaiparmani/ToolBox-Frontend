@@ -164,6 +164,7 @@ export const transformUserForUI = (apiUser) => {
         email: apiUser.email,
         firstName: apiUser.first_name,
         lastName: apiUser.last_name,
+        phone: apiUser.phone || '',
         displayName: `${apiUser.first_name} ${apiUser.last_name}`.trim() || apiUser.username,
         dateJoined: new Date(apiUser.date_joined),
         isActive: apiUser.is_active !== false // Default to true if not specified
@@ -231,6 +232,7 @@ export const registerUser = async (userData, onSuccess, onError) => {
                 email: userData.email,
                 first_name: userData.first_name,
                 last_name: userData.last_name,
+                phone: userData.phone || '',
                 password: userData.password,
                 password_confirm: userData.password_confirm
             })
@@ -290,7 +292,8 @@ export const updateUserProfile = async (profileData, onSuccess, onError) => {
                 username: profileData.username,
                 email: profileData.email,
                 first_name: profileData.first_name,
-                last_name: profileData.last_name
+                last_name: profileData.last_name,
+                phone: profileData.phone || ''
             })
         });
 
@@ -323,7 +326,8 @@ export const patchUserProfile = async (profileData, onSuccess, onError) => {
                 username: profileData.username,
                 email: profileData.email,
                 first_name: profileData.first_name,
-                last_name: profileData.last_name
+                last_name: profileData.last_name,
+                phone: profileData.phone || ''
             })
         });
 

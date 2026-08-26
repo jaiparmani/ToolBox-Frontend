@@ -162,7 +162,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Login function — email + password → auth token.
-  const login = async (email, password) => {
+  const login = async (identifier, password) => {
     dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
     dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
 
@@ -174,7 +174,7 @@ export const AuthProvider = ({ children }) => {
       const response = await fetch(API_BASE_URL + '/api/users/login/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier, password }),
       });
 
       if (!response.ok) {

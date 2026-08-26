@@ -21,7 +21,7 @@ import { SummarySkeleton } from '../ui/Skeletons';
 import {
   Panel, MetricCard, EmptyState, SectionHeader,
   FinancialWeather, SafeToSpendHero, MoneyCommandBar, MoneyPulse, CashFlowRiver, AttentionLayer,
-  TransactionStoryDrawer, buildStoryFromEvent, copilotToItem,
+  MoneyUniverse, TransactionStoryDrawer, buildStoryFromEvent, copilotToItem,
 } from '../ui';
 import { accents } from '../../theme/tokens';
 import { money } from '../ui/money';
@@ -151,6 +151,23 @@ export default function LandingPage() {
           </Box>
         </Box>
       </Reveal>
+
+      {/* The Money Universe — your month as a spatial scene, every body real */}
+      {!loading && expense && (
+        <Reveal index={1}>
+          <Box sx={{ mb: 2.5 }}>
+            <MoneyUniverse
+              income={expense.totalIncome}
+              categories={expense.categoryBreakdown}
+              bills={projection?.upcoming_bills || 0}
+              net={expense.netBalance}
+              projection={projection}
+              pulse={pulse}
+              onSelectCategory={(name) => navigate(`/expense-tracker?category=${encodeURIComponent(name)}`)}
+            />
+          </Box>
+        </Reveal>
+      )}
 
       {/* Ask anything — computed from the real projection */}
       {hasProjection && (

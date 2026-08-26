@@ -16,6 +16,7 @@ import { useMoney } from '../../contexts/MoneyContext';
 import { getExpenseSummary, getSplitBalances, getCopilotCards, dismissCopilotCard } from '../rest/expenseTrackerApis';
 import OwedHero from '../ui/OwedHero';
 import Reveal from '../ui/Reveal';
+import AuroraBackground from '../motion/AuroraBackground';
 import { SummarySkeleton } from '../ui/Skeletons';
 import {
   Panel, MetricCard, EmptyState, SectionHeader,
@@ -127,7 +128,10 @@ export default function LandingPage() {
   const hasProjection = projection && projection.series && projection.series.length > 1;
 
   return (
-    <Box sx={{ pb: { xs: 4, md: 2 } }}>
+    <Box sx={{ pb: { xs: 4, md: 2 }, position: 'relative' }}>
+      {/* Living backdrop that reflects the derived financial weather */}
+      <AuroraBackground />
+      <Box sx={{ position: 'relative', zIndex: 1 }}>
       {/* Greeting + climate */}
       <Reveal>
         <Box sx={{ px: { xs: 0.5, sm: 1 }, pt: { xs: 1, sm: 2 }, mb: 2 }}>
@@ -285,6 +289,7 @@ export default function LandingPage() {
 
       {/* One reusable detail surface for any inspectable stream/event */}
       <TransactionStoryDrawer open={!!story} story={story} onClose={() => setStory(null)} />
+      </Box>
     </Box>
   );
 }

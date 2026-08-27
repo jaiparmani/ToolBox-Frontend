@@ -89,6 +89,9 @@ export const radius = { sm: 8, md: 12, lg: 16, xl: 22, xxl: 28, pill: 999 };
 // ── Type scale (fluid where it matters) ─────────────────────────────────────
 export const type = {
   family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Arial, sans-serif',
+  // Distinctive self-hosted display face for headings + money figures — the
+  // premium signal a system font can't give. Body stays neutral/system.
+  displayFamily: '"Geist Variable", -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
   mono: '"SF Mono", "JetBrains Mono", ui-monospace, monospace',
   // money numbers: large and confident
   hero:    { size: 'clamp(2.2rem, 8vw, 3.4rem)', weight: 700, spacing: '-0.03em' },

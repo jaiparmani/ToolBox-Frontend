@@ -65,7 +65,7 @@ import { money } from '../ui/money';
 import { feedback } from '../ui/feedback';
 import { FinancialWeatherBar, TransactionStoryDrawer, buildStoryFromExpense } from '../ui';
 import AuroraBackground from '../motion/AuroraBackground';
-import { accents } from '../../theme/tokens';
+import { accents, type } from '../../theme/tokens';
 
 // Color palette for categories
 const categoryColors = [
@@ -964,11 +964,12 @@ export default function ExpenseTrackerPage() {
          backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(22,22,28,0.55)' : 'rgba(255,255,255,0.72)',
          backdropFilter: 'blur(20px)',
          boxShadow: (theme) => theme.palette.mode === 'dark'
-           ? '0 1px 0 rgba(255,255,255,0.05) inset, 0 20px 50px -28px rgba(10,132,255,0.7)'
-           : '0 1px 0 rgba(255,255,255,0.9) inset, 0 22px 50px -30px rgba(10,132,255,0.55)',
+           ? '0 1px 0 rgba(255,255,255,0.045) inset, 0 24px 60px -36px rgba(10,132,255,0.4)'
+           : '0 1px 0 rgba(255,255,255,0.9) inset, 0 24px 60px -38px rgba(10,132,255,0.32)',
+         // One committed accent, held back — a whisper of blue at the corner, not a wash.
          '&::before': {
            content: '""', position: 'absolute', inset: 0, pointerEvents: 'none',
-           background: 'radial-gradient(120% 90% at 0% 0%, rgba(10,132,255,0.16), transparent 55%), radial-gradient(80% 70% at 100% 120%, rgba(124,92,255,0.14), transparent 60%)',
+           background: 'radial-gradient(90% 80% at 0% 0%, rgba(10,132,255,0.10), transparent 52%)',
          },
        }}
      >
@@ -991,12 +992,13 @@ export default function ExpenseTrackerPage() {
            </Box>
            <Box sx={{ minWidth: 0 }}>
              <Typography sx={{
+               fontFamily: type.displayFamily,
                fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
                color: 'primary.main', mb: 0.25, display: 'block',
              }}>
                Activity
              </Typography>
-             <Typography sx={{ fontWeight: 750, letterSpacing: '-0.03em', lineHeight: 1, fontSize: { xs: '1.5rem', sm: '2.15rem' } }} noWrap>
+             <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 650, letterSpacing: '-0.035em', lineHeight: 1, fontSize: { xs: '1.55rem', sm: '2.2rem' } }} noWrap>
                Expenses
              </Typography>
              <Typography variant="body2" color="text.secondary" noWrap sx={{ display: { xs: 'none', sm: 'block' }, mt: 0.4 }}>

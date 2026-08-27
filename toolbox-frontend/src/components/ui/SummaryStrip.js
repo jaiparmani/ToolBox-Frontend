@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Stack, Typography, useTheme } from '@mui/material';
 import AnimatedNumber from './AnimatedNumber';
+import { type } from '../../theme/tokens';
 
 /**
  * The four headline figures — as machined hardware, not flat chips.
@@ -57,10 +58,10 @@ export default function SummaryStrip({ stats }) {
                 : 'inset 0 1px 0 rgba(255,255,255,0.9)',
             }}
           >
-            {/* Faint corner glow of the stat's own colour */}
+            {/* A restrained whisper of the stat's colour at the corner — not a glow */}
             <Box aria-hidden sx={{
-              position: 'absolute', top: -22, right: -22, width: 70, height: 70, borderRadius: '50%',
-              background: `radial-gradient(circle, ${stat.color}44, transparent 70%)`, filter: 'blur(8px)', pointerEvents: 'none',
+              position: 'absolute', top: -26, right: -26, width: 64, height: 64, borderRadius: '50%',
+              background: `radial-gradient(circle, ${stat.color}26, transparent 72%)`, filter: 'blur(10px)', pointerEvents: 'none',
             }} />
 
             <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1, position: 'relative' }}>
@@ -83,8 +84,8 @@ export default function SummaryStrip({ stats }) {
             <Typography
               component="div"
               sx={{
-                position: 'relative', fontWeight: 800,
-                fontSize: { xs: '1.3rem', sm: '1.5rem' }, letterSpacing: '-0.03em', lineHeight: 1.05,
+                position: 'relative', fontFamily: type.displayFamily, fontWeight: 650,
+                fontSize: { xs: '1.35rem', sm: '1.55rem' }, letterSpacing: '-0.03em', lineHeight: 1.05,
                 color: stat.tone || 'text.primary', fontVariantNumeric: 'tabular-nums',
               }}
               noWrap

@@ -8,6 +8,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import NorthEastRoundedIcon from '@mui/icons-material/NorthEastRounded';
 import SouthWestRoundedIcon from '@mui/icons-material/SouthWestRounded';
 import { money, relativeDay } from './money';
+import { type } from '../../theme/tokens';
 
 /**
  * One expense, as a row that works at any width.
@@ -93,7 +94,7 @@ export default function ExpenseItem({ expense, onEdit, onDelete, onOpen }) {
           ? <SouthWestRoundedIcon sx={{ fontSize: 15, color: 'success.main' }} />
           : <NorthEastRoundedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />}
         <Typography sx={{
-          fontWeight: 700, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums',
+          fontFamily: type.displayFamily, fontWeight: 600, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums',
           fontSize: { xs: '0.98rem', sm: '1.05rem' },
           color: isIncome ? 'success.main' : 'text.primary',
         }}>

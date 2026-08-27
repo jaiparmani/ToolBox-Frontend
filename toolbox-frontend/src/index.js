@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import '@fontsource-variable/geist'; // self-hosted display font (registers "Geist Variable")
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';

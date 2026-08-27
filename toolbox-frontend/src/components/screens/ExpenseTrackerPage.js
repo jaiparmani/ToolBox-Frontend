@@ -64,6 +64,7 @@ import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { money } from '../ui/money';
 import { feedback } from '../ui/feedback';
 import { FinancialWeatherBar, TransactionStoryDrawer, buildStoryFromExpense } from '../ui';
+import AuroraBackground from '../motion/AuroraBackground';
 import { accents, type } from '../../theme/tokens';
 
 // Color palette for categories
@@ -946,14 +947,70 @@ export default function ExpenseTrackerPage() {
          pb: { xs: 'calc(72px + env(safe-area-inset-bottom))', md: 4 },
        }}
      >
+     {/* Living backdrop, keyed to the same financial weather as the rest of the app */}
+     <AuroraBackground />
      <Box sx={{ position: 'relative', zIndex: 1 }}>
      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
        <FinancialWeatherBar compact />
      </Box>
-     {/* Header — editorial and type-forward. No glass, no glow, no badge. */}
-     <Box sx={{ pb: { xs: 2, sm: 2.25 }, mb: { xs: 2.5, sm: 3 }, borderBottom: '1px solid', borderColor: 'divider' }}>
-       <Box display="flex" justifyContent="space-between" alignItems="flex-end" gap={1.5}>
-         <Box sx={{ minWidth: 0 }}>
+     {/* Header - stays reachable, shrinks to icons on a phone */}
+     <Paper
+       elevation={0}
+       sx={{
+         p: { xs: 2.25, sm: 3 }, mb: { xs: 2, sm: 3 },
+         position: 'relative', overflow: 'hidden', borderRadius: 4,
+         border: '1px solid',
+         borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+         backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(22,22,28,0.55)' : 'rgba(255,255,255,0.72)',
+         backdropFilter: 'blur(20px)',
+         boxShadow: (theme) => theme.palette.mode === 'dark'
+           ? '0 1px 0 rgba(255,255,255,0.045) inset, 0 24px 60px -36px rgba(10,132,255,0.4)'
+           : '0 1px 0 rgba(255,255,255,0.9) inset, 0 24px 60px -38px rgba(10,132,255,0.32)',
+         // One committed accent, held back — a whisper of blue at the corner, not a wash.
+         '&::before': {
+           content: '""', position: 'absolute', inset: 0, pointerEvents: 'none',
+           background: 'radial-gradient(90% 80% at 0% 0%, rgba(10,132,255,0.10), transparent 52%)',
+         },
+       }}
+     >
+       <Box display="flex" justifyContent="space-between" alignItems="center" gap={1.5} sx={{ position: 'relative' }}>
+         <Box display="flex" alignItems="center" gap={{ xs: 1.5, sm: 2 }} sx={{ minWidth: 0 }}>
+           {/* Nested-bezel icon with a spinning gradient halo and a pulsing glow */}
+           <Box sx={{
+             position: 'relative', flexShrink: 0,
+             '@keyframes iconSpin': { to: { transform: 'rotate(360deg)' } },
+             '@keyframes iconPulse': { '0%,100%': { opacity: 0.45, transform: 'scale(1)' }, '50%': { opacity: 0.8, transform: 'scale(1.14)' } },
+           }}>
+             {/* Pulsing glow halo */}
+             <Box aria-hidden sx={{
+               position: 'absolute', inset: -11, borderRadius: '50%',
+               background: 'radial-gradient(circle, rgba(10,132,255,0.55), transparent 68%)', filter: 'blur(10px)',
+               animation: 'iconPulse 3s ease-in-out infinite',
+               '@media (prefers-reduced-motion: reduce)': { animation: 'none', opacity: 0.5 },
+             }} />
+             {/* Spinning gradient-border ring */}
+             <Box aria-hidden sx={{
+               position: 'absolute', inset: -2.5, borderRadius: '18px', padding: '2px',
+               background: 'conic-gradient(from 0deg, transparent 0%, #64D2FF 16%, #0A84FF 38%, transparent 58%)',
+               WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+               WebkitMaskComposite: 'xor', maskComposite: 'exclude',
+               animation: 'iconSpin 3.4s linear infinite',
+               '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+             }} />
+             <Box sx={{
+               position: 'relative', p: '4px', borderRadius: '16px',
+               background: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(10,132,255,0.08)',
+             }}>
+               <Box sx={{
+                 width: { xs: 40, sm: 50 }, height: { xs: 40, sm: 50 }, borderRadius: '13px',
+                 background: 'linear-gradient(135deg, #0A84FF, #64D2FF)',
+                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+                 boxShadow: '0 12px 26px -6px rgba(10,132,255,0.7), inset 0 1px 0 rgba(255,255,255,0.45)',
+               }}>
+                 <DashboardIcon sx={{ fontSize: { xs: 22, sm: 27 }, color: '#fff' }} />
+               </Box>
+             </Box>
+           </Box>
            <Box sx={{ minWidth: 0 }}>
              <Typography sx={{
                fontFamily: type.displayFamily,
@@ -962,7 +1019,14 @@ export default function ExpenseTrackerPage() {
              }}>
                Activity
              </Typography>
-             <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 650, letterSpacing: '-0.035em', lineHeight: 1, fontSize: { xs: '1.55rem', sm: '2.2rem' } }} noWrap>
+             <Typography sx={{
+               fontFamily: type.displayFamily, fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 0.95,
+               fontSize: { xs: '1.5rem', sm: '2.5rem' },
+               backgroundImage: (theme) => theme.palette.mode === 'dark'
+                 ? 'linear-gradient(120deg, #ffffff 30%, #8ec9ff 100%)'
+                 : 'linear-gradient(120deg, #0b1220 40%, #0A84FF 100%)',
+               backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+             }} noWrap>
                Expenses
              </Typography>
              <Typography variant="body2" color="text.secondary" noWrap sx={{ display: { xs: 'none', sm: 'block' }, mt: 0.4 }}>
@@ -997,7 +1061,7 @@ export default function ExpenseTrackerPage() {
            </Tooltip>
          </Stack>
        </Box>
-     </Box>
+     </Paper>
 
      {/* Capture, ask, and insights now all live in the one ToolBox Assistant. */}
      <Box sx={{ mb: { xs: 2, sm: 3 } }}>
@@ -1034,7 +1098,7 @@ export default function ExpenseTrackerPage() {
        ) : null}
      </Box>
 
-     {/* Main Content Tabs — matte, hairline-bordered, no glass */}
+     {/* Main Content Tabs */}
      <Paper
        elevation={0}
        sx={{
@@ -1043,7 +1107,8 @@ export default function ExpenseTrackerPage() {
          borderRadius: 3,
          overflow: 'hidden',
          backgroundColor: (theme) =>
-           theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.012)',
+           theme.palette.mode === 'dark' ? 'rgba(30,30,36,0.55)' : 'rgba(255,255,255,0.78)',
+         backdropFilter: 'blur(20px)',
        }}
      >
        <SectionNav

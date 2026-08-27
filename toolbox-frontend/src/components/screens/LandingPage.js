@@ -17,6 +17,7 @@ import { getExpenseSummary, getSplitBalances, getCopilotCards, dismissCopilotCar
 import OwedHero from '../ui/OwedHero';
 import Reveal from '../ui/Reveal';
 import AuroraBackground from '../motion/AuroraBackground';
+import TiltCard from '../motion/TiltCard';
 import { SummarySkeleton } from '../ui/Skeletons';
 import {
   Panel, MetricCard, EmptyState, SectionHeader,
@@ -276,30 +277,32 @@ export default function LandingPage() {
       >
         {FEATURES.map((f, i) => (
           <Reveal key={f.to} index={8 + i}>
-            <Card
-              elevation={0}
-              sx={{
-                borderRadius: 4, height: '100%', border: '1px solid', borderColor: 'divider',
-                backgroundColor: 'transparent',
-                transition: 'transform 0.2s ease, border-color 0.2s ease',
-                '&:hover': { transform: 'translateY(-4px)', borderColor: f.color },
-              }}
-            >
-              <CardActionArea onClick={() => navigate(f.to)} sx={{ p: 2, height: '100%' }}>
-                <Box
-                  sx={{
-                    width: 42, height: 42, borderRadius: '13px', mb: 1.5,
-                    background: `linear-gradient(135deg, ${f.color}, ${f.color}bb)`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: `0 6px 16px ${f.color}55`,
-                  }}
-                >
-                  <f.icon sx={{ color: '#fff', fontSize: 22 }} />
-                </Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.2 }}>{f.title}</Typography>
-                <Typography variant="caption" color="text.secondary">{f.hint}</Typography>
-              </CardActionArea>
-            </Card>
+            <TiltCard>
+              <Card
+                elevation={0}
+                sx={{
+                  borderRadius: 4, height: '100%', border: '1px solid', borderColor: 'divider',
+                  backgroundColor: 'transparent',
+                  transition: 'border-color 0.2s ease',
+                  '&:hover': { borderColor: f.color },
+                }}
+              >
+                <CardActionArea onClick={() => navigate(f.to)} sx={{ p: 2, height: '100%' }}>
+                  <Box
+                    sx={{
+                      width: 42, height: 42, borderRadius: '13px', mb: 1.5,
+                      background: `linear-gradient(135deg, ${f.color}, ${f.color}bb)`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: `0 6px 16px ${f.color}55`,
+                    }}
+                  >
+                    <f.icon sx={{ color: '#fff', fontSize: 22 }} />
+                  </Box>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.2 }}>{f.title}</Typography>
+                  <Typography variant="caption" color="text.secondary">{f.hint}</Typography>
+                </CardActionArea>
+              </Card>
+            </TiltCard>
           </Reveal>
         ))}
       </Box>

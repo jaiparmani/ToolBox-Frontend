@@ -12,6 +12,8 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import { useAuth } from '../../contexts/AuthContext';
 import { getExpenseSummary, getMonthlyReport } from '../rest/expenseTrackerApis';
 import Reveal from '../ui/Reveal';
+import AuroraBackground from '../motion/AuroraBackground';
+import TiltCard from '../motion/TiltCard';
 import CategoryBreakdown from '../ui/CategoryBreakdown';
 import TrendBars from '../ui/TrendBars';
 import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
@@ -88,7 +90,10 @@ export default function ReportsPage() {
   ];
 
   return (
-    <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 6 }}>
+    <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 6, position: 'relative' }}>
+      {/* Living backdrop, reacting to the same financial weather as the dashboard */}
+      <AuroraBackground />
+      <Box sx={{ position: 'relative', zIndex: 1 }}>
       {/* Month navigator */}
       <Reveal>
         <PageHeader
@@ -123,14 +128,15 @@ export default function ReportsPage() {
             }}
           >
             {stats.map((stat) => (
-              <MetricCard
-                key={stat.label}
-                icon={stat.icon}
-                color={stat.color}
-                label={stat.label}
-                amount={stat.raw}
-                format={stat.plain ? 'plain' : 'smart'}
-              />
+              <TiltCard key={stat.label} max={7}>
+                <MetricCard
+                  icon={stat.icon}
+                  color={stat.color}
+                  label={stat.label}
+                  amount={stat.raw}
+                  format={stat.plain ? 'plain' : 'smart'}
+                />
+              </TiltCard>
             ))}
           </Box>
         )}
@@ -166,6 +172,7 @@ export default function ReportsPage() {
             : <EmptyState icon={AssessmentIcon} title="No daily activity to chart" dense />}
         </ChartContainer>
       </Reveal>
+      </Box>
     </Container>
   );
 }

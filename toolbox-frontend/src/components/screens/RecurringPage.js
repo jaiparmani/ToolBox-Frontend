@@ -18,6 +18,7 @@ import {
   BottomSheet, ConfirmDialog, ErrorBanner, FinancialWeatherBar,
 } from '../ui';
 import { accents } from '../../theme/tokens';
+import { feedback } from '../ui/feedback';
 
 const CADENCE = [
   { id: 'daily', label: 'Daily' },
@@ -93,10 +94,11 @@ export default function RecurringPage() {
         end_date: form.end_date || null,
         category: form.category || null,
       });
+      feedback('success');
       setFormOpen(false);
       await load();
       refreshMoney();           // the forecast changes — reflect it everywhere
-    } catch (e) { setError(e.message || 'Could not save that recurring item.'); }
+    } catch (e) { feedback('error'); setError(e.message || 'Could not save that recurring item.'); }
     finally { setSaving(false); }
   };
 

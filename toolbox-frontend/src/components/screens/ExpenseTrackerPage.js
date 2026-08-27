@@ -62,6 +62,7 @@ import ThinkingHint from '../ui/ThinkingHint';
 import ErrorBanner from '../ui/ErrorBanner';
 import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { money } from '../ui/money';
+import { feedback } from '../ui/feedback';
 import { FinancialWeatherBar, TransactionStoryDrawer, buildStoryFromExpense } from '../ui';
 import { accents } from '../../theme/tokens';
 
@@ -380,10 +381,12 @@ export default function ExpenseTrackerPage() {
        await addExpenseApi(expenseForm.data);
        setSuccess('Expense added successfully!');
      }
+     feedback('success');
      closeExpenseForm();
      loadExpenses();
      loadSummary();
    } catch (error) {
+     feedback('error');
      console.error('Expense save error:', error);
      // Show more specific error messages based on error type
      if (error.message.includes('400')) {

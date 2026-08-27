@@ -64,7 +64,6 @@ import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { money } from '../ui/money';
 import { feedback } from '../ui/feedback';
 import { FinancialWeatherBar, TransactionStoryDrawer, buildStoryFromExpense } from '../ui';
-import AuroraBackground from '../motion/AuroraBackground';
 import { accents, type } from '../../theme/tokens';
 
 // Color palette for categories
@@ -947,49 +946,14 @@ export default function ExpenseTrackerPage() {
          pb: { xs: 'calc(72px + env(safe-area-inset-bottom))', md: 4 },
        }}
      >
-     {/* Living backdrop, keyed to the same financial weather as the rest of the app */}
-     <AuroraBackground />
      <Box sx={{ position: 'relative', zIndex: 1 }}>
      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
        <FinancialWeatherBar compact />
      </Box>
-     {/* Header - stays reachable, shrinks to icons on a phone */}
-     <Paper
-       elevation={0}
-       sx={{
-         p: { xs: 2.25, sm: 3 }, mb: { xs: 2, sm: 3 },
-         position: 'relative', overflow: 'hidden', borderRadius: 4,
-         border: '1px solid',
-         borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-         backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(22,22,28,0.55)' : 'rgba(255,255,255,0.72)',
-         backdropFilter: 'blur(20px)',
-         boxShadow: (theme) => theme.palette.mode === 'dark'
-           ? '0 1px 0 rgba(255,255,255,0.045) inset, 0 24px 60px -36px rgba(10,132,255,0.4)'
-           : '0 1px 0 rgba(255,255,255,0.9) inset, 0 24px 60px -38px rgba(10,132,255,0.32)',
-         // One committed accent, held back — a whisper of blue at the corner, not a wash.
-         '&::before': {
-           content: '""', position: 'absolute', inset: 0, pointerEvents: 'none',
-           background: 'radial-gradient(90% 80% at 0% 0%, rgba(10,132,255,0.10), transparent 52%)',
-         },
-       }}
-     >
-       <Box display="flex" justifyContent="space-between" alignItems="center" gap={1.5} sx={{ position: 'relative' }}>
-         <Box display="flex" alignItems="center" gap={{ xs: 1.5, sm: 2 }} sx={{ minWidth: 0 }}>
-           {/* Nested-bezel icon: gradient core in a subtle tray */}
-           <Box sx={{
-             p: '4px', borderRadius: '18px', flexShrink: 0,
-             background: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(10,132,255,0.08)',
-             boxShadow: 'inset 0 0 0 1px rgba(10,132,255,0.18)',
-           }}>
-             <Box sx={{
-               width: { xs: 38, sm: 46 }, height: { xs: 38, sm: 46 }, borderRadius: '14px',
-               background: 'linear-gradient(135deg, #0A84FF, #64D2FF)',
-               display: 'flex', alignItems: 'center', justifyContent: 'center',
-               boxShadow: '0 10px 22px -6px rgba(10,132,255,0.6), inset 0 1px 0 rgba(255,255,255,0.4)',
-             }}>
-               <DashboardIcon sx={{ fontSize: { xs: 21, sm: 25 }, color: '#fff' }} />
-             </Box>
-           </Box>
+     {/* Header — editorial and type-forward. No glass, no glow, no badge. */}
+     <Box sx={{ pb: { xs: 2, sm: 2.25 }, mb: { xs: 2.5, sm: 3 }, borderBottom: '1px solid', borderColor: 'divider' }}>
+       <Box display="flex" justifyContent="space-between" alignItems="flex-end" gap={1.5}>
+         <Box sx={{ minWidth: 0 }}>
            <Box sx={{ minWidth: 0 }}>
              <Typography sx={{
                fontFamily: type.displayFamily,
@@ -1033,7 +997,7 @@ export default function ExpenseTrackerPage() {
            </Tooltip>
          </Stack>
        </Box>
-     </Paper>
+     </Box>
 
      {/* Capture, ask, and insights now all live in the one ToolBox Assistant. */}
      <Box sx={{ mb: { xs: 2, sm: 3 } }}>
@@ -1070,7 +1034,7 @@ export default function ExpenseTrackerPage() {
        ) : null}
      </Box>
 
-     {/* Main Content Tabs */}
+     {/* Main Content Tabs — matte, hairline-bordered, no glass */}
      <Paper
        elevation={0}
        sx={{
@@ -1079,8 +1043,7 @@ export default function ExpenseTrackerPage() {
          borderRadius: 3,
          overflow: 'hidden',
          backgroundColor: (theme) =>
-           theme.palette.mode === 'dark' ? 'rgba(30,30,36,0.55)' : 'rgba(255,255,255,0.78)',
-         backdropFilter: 'blur(20px)',
+           theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.012)',
        }}
      >
        <SectionNav

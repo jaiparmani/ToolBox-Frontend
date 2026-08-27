@@ -41,6 +41,7 @@ import { clearAllData } from './rest/userApis';
 import { useColorMode } from '../contexts/ColorModeContext';
 import { MoneyProvider } from '../contexts/MoneyContext';
 import BrandLogo from './motion/BrandLogo';
+import ParticleFlow from './motion/ParticleFlow';
 import Assistant from './ui/Assistant';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
@@ -254,6 +255,8 @@ export default function DashboardLayoutBasic(props) {
         >
           {/* The one ToolBox Assistant — ⌘K anywhere, or the toolbar button */}
           <Assistant />
+          {/* App-wide particle layer — money in motion (settle → stream home) */}
+          <ParticleFlow />
           {/* Every nested route renders here, inside the one shell */}
           <Box sx={{ p: { xs: 0, sm: 1 } }}>
             <Outlet />

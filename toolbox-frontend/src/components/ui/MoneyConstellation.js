@@ -172,6 +172,7 @@ export default function MoneyConstellation({ people, selectedId, onSelect, centr
 
         {/* You */}
         <circle
+          data-mc-center
           cx={centre} cy={centre} r={compact ? 30 : 36}
           fill={theme.palette.primary.main}
           filter="url(#flowGlow)"
@@ -191,6 +192,7 @@ export default function MoneyConstellation({ people, selectedId, onSelect, centr
           return (
             <g
               key={node.id}
+              data-mc-node={node.id}
               onClick={() => { if (!moved.current) onSelect(selected ? null : node); }}
               style={{
                 cursor: 'pointer',

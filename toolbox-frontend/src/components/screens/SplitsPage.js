@@ -20,6 +20,7 @@ import { BalanceSkeleton } from '../ui/Skeletons';
 import SwipeAction from '../ui/SwipeAction';
 import { AnimatePresence, motion, LayoutGroup } from 'framer-motion';
 import { money, relativeDay } from '../ui/money';
+import { accents } from '../../theme/tokens';
 import GroupStrip from '../ui/GroupStrip';
 import { FinancialWeatherBar } from '../ui';
 import {
@@ -31,6 +32,25 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, LinearProgress,
   Autocomplete,
 } from '@mui/material';
+
+/**
+ * Send a ribbon of particles between a settled person's node and you, tied to
+ * the real amount. Reads live DOM positions, so it must fire before the list
+ * re-renders the node away. A no-op if the nodes aren't on screen.
+ */
+function fireSettleFlow(person, amount) {
+  if (typeof window === 'undefined') return;
+  const node = document.querySelector(`[data-mc-node="${person.id}"]`);
+  const centre = document.querySelector('[data-mc-center]');
+  if (!node || !centre) return;
+  const owedByMe = person.net < 0;
+  window.dispatchEvent(new CustomEvent('toolbox:flow', { detail: {
+    from: owedByMe ? centre : node,      // you owe → money leaves you; they owe → comes home
+    to: owedByMe ? node : centre,
+    amount: Math.abs(amount || person.net || 0),
+    color: owedByMe ? accents.amber : accents.cyan,
+  }}));
+}
 
 /**
  * Splitting lives on its own page now.
@@ -221,6 +241,8 @@ export default function SplitsPage() {
     try {
       const result = await settleUpWith(
         owedByMe ? { owedToUserId: person.owedToUserId } : { personId: person.personId });
+      // Fire the particle stream while the node is still on screen, then refresh.
+      fireSettleFlow(person, result.total);
       setSuccess(`Settled ${money(result.total)} with ${person.name}`);
       setSelected(null);
       load();

@@ -42,6 +42,7 @@ import { useColorMode } from '../contexts/ColorModeContext';
 import { MoneyProvider } from '../contexts/MoneyContext';
 import BrandLogo from './motion/BrandLogo';
 import ParticleFlow from './motion/ParticleFlow';
+import { NotificationBell } from './ui';
 import Assistant from './ui/Assistant';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
@@ -223,6 +224,16 @@ function CommandTrigger() {
   );
 }
 
+// The toolbar cluster: live notifications + the assistant trigger.
+function ToolbarActions() {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 } }}>
+      <NotificationBell />
+      <CommandTrigger />
+    </Box>
+  );
+}
+
 export default function DashboardLayoutBasic(props) {
   const { window } = props;
   const { mode } = useColorMode();
@@ -251,7 +262,7 @@ export default function DashboardLayoutBasic(props) {
       <ThemeSync mode={mode} />
       <MoneyProvider>
         <DashboardLayout
-          slots={{ sidebarFooter: SidebarFooterAccount, toolbarActions: CommandTrigger }}
+          slots={{ sidebarFooter: SidebarFooterAccount, toolbarActions: ToolbarActions }}
         >
           {/* The one ToolBox Assistant — ⌘K anywhere, or the toolbar button */}
           <Assistant />

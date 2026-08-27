@@ -35,6 +35,8 @@ export { copilotToItem, copilotIcon, copilotTone } from './copilotCards';
 export { default as MoneyPulse } from './MoneyPulse';
 export { default as CashFlowRiver } from './CashFlowRiver';
 export { default as MoneyUniverse } from './MoneyUniverse';
+export { default as NotificationBell } from './NotificationBell';
+export { default as TelegramConnect } from './TelegramConnect';
 export { default as TransactionStoryDrawer, buildStoryFromEvent, buildStoryFromExpense } from './TransactionStoryDrawer';
 
 // Money helpers

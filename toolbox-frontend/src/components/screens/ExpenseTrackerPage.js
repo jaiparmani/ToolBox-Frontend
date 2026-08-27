@@ -547,6 +547,8 @@ export default function ExpenseTrackerPage() {
      });
      setSuccess(`Split ${formatCurrency(result.expense.amount)} with ${result.splits.length} ` +
                 `${result.splits.length === 1 ? 'person' : 'people'}`);
+     feedback('success');
+     window.dispatchEvent(new Event('toolbox:notify-refresh'));
      setSplitForm(prev => ({ ...prev, open: false, saving: false }));
      loadBalances();
      loadExpenses();

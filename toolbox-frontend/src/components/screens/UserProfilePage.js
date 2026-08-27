@@ -20,6 +20,7 @@ import Reveal from '../ui/Reveal';
 import { ConfirmDialog } from '../ui';
 import { accents } from '../../theme/tokens';
 import { getFeedbackPrefs, setFeedbackPrefs, feedback } from '../ui/feedback';
+import { TelegramConnect } from '../ui';
 
 /**
  * Profile, rebuilt as a single scrollable column of glass cards rather than a
@@ -200,8 +201,13 @@ export default function UserProfilePage() {
           </SectionCard>
         </Reveal>
 
-        {/* Password */}
+        {/* Telegram — the on-the-go channel */}
         <Reveal index={3}>
+          <TelegramConnect />
+        </Reveal>
+
+        {/* Password */}
+        <Reveal index={4}>
           <SectionCard icon={<LockIcon />} color={accents.amber} title="Password">
             <Stack spacing={1.75} sx={{ mt: 1 }}>
               <TextField size="small" fullWidth label="Current password" type={showPw ? 'text' : 'password'}

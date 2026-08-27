@@ -651,6 +651,24 @@ export const getCopilotCards = async () => {
     } catch (error) { throw handleApiError(error, 'load copilot cards'); }
 };
 
+/** The notification feed: { unread_count, results: [...] }. */
+export const getNotifications = async () => {
+    try {
+        const r = await authenticatedFetch(`${API_BASE_URL}/expenses/notifications/`);
+        return await r.json();
+    } catch (error) { throw handleApiError(error, 'load notifications'); }
+};
+
+/** Mark notifications read — pass an array of ids, or nothing for all of them. */
+export const markNotificationsRead = async (ids) => {
+    try {
+        await authenticatedFetch(`${API_BASE_URL}/expenses/notifications/read/`, {
+            method: 'POST', body: JSON.stringify(ids && ids.length ? { ids } : {}),
+        });
+        return true;
+    } catch (error) { throw handleApiError(error, 'update notifications'); }
+};
+
 export const dismissCopilotCard = async (id) => {
     try {
         await authenticatedFetch(`${API_BASE_URL}/copilot/${id}/dismiss/`, { method: 'POST' });

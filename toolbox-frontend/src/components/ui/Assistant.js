@@ -104,6 +104,8 @@ export default function Assistant() {
     try {
       const res = await commitAssistant(payload);
       feedback('success');
+      // A split commit creates notifications server-side — nudge the bell now.
+      if (payload?.commit === 'split') window.dispatchEvent(new Event('toolbox:notify-refresh'));
       setTurns(t => t.map(x => x.id === turnId ? { ...x, committing: false, committed: res } : x));
       refreshMoney();
     } catch (e) {

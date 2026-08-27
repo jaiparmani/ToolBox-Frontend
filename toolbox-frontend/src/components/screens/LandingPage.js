@@ -18,6 +18,7 @@ import OwedHero from '../ui/OwedHero';
 import Reveal from '../ui/Reveal';
 import AuroraBackground from '../motion/AuroraBackground';
 import TiltCard from '../motion/TiltCard';
+import SummaryStrip from '../ui/SummaryStrip';
 import { SummarySkeleton } from '../ui/Skeletons';
 import {
   Panel, MetricCard, EmptyState, SectionHeader,
@@ -255,18 +256,9 @@ export default function LandingPage() {
         {loading ? (
           <Box sx={{ mb: 2.5 }}><SummarySkeleton /></Box>
         ) : (
-          <Stack direction="row" spacing={1.5} sx={{ mb: 2.5 }}>
-            {stats.map((stat) => (
-              <MetricCard
-                key={stat.label}
-                icon={stat.icon}
-                color={stat.color}
-                label={stat.label}
-                amount={stat.raw}
-                sx={{ flex: 1 }}
-              />
-            ))}
-          </Stack>
+          <Box sx={{ mb: 2.5 }}>
+            <SummaryStrip stats={stats} />
+          </Box>
         )}
       </Reveal>
 

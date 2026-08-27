@@ -149,20 +149,32 @@ export const AuthProvider = ({ children }) => {
           payload: { isAuthenticated: true, user: userProfile }
         });
       } catch (error) {
-        // Token was rejected — treat as logged out.
-        authUtils.logout();
-        dispatch({
-          type: AUTH_ACTIONS.INITIALIZE,
-          payload: { isAuthenticated: false, user: null }
-        });
+        // Only a *rejected token* means log out. A server or network error
+        // (e.g. the profile endpoint 500s) must NOT nuke a valid session —
+        // otherwise a transient backend hiccup silently signs the device out.
+        // In that case keep the token and fall back to the cached user, so the
+        // rest of the app stays usable.
+        const isAuthError = error?.type === 'auth_error' || error?.status === 401
+          || /session expired|log ?in again/i.test(error?.message || '');
+        if (isAuthError) {
+          authUtils.logout();
+          dispatch({ type: AUTH_ACTIONS.INITIALIZE, payload: { isAuthenticated: false, user: null } });
+        } else {
+          const cached = authUtils.getUser();
+          dispatch({
+            type: AUTH_ACTIONS.INITIALIZE,
+            payload: { isAuthenticated: true, user: cached ? transformUserForUI(cached) : null },
+          });
+        }
       }
     };
 
     initializeAuth();
   }, []);
 
-  // Login function — email + password → auth token.
-  const login = async (identifier, password) => {
+  // Login function — identifier (email/username) + password → auth token.
+  // `remember` decides whether the token persists across restarts.
+  const login = async (identifier, password, remember = true) => {
     dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
     dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
 
@@ -184,7 +196,7 @@ export const AuthProvider = ({ children }) => {
 
       // { detail, token, user } — store the token, then the app is authenticated.
       const data = await response.json();
-      authUtils.login(data.token, data.user);
+      authUtils.login(data.token, data.user, remember);
       const userProfile = transformUserForUI(data.user);
 
       dispatch({

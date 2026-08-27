@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Typography, Box, TextField, Button, Alert, InputAdornment, Link, Divider } from '@mui/material';
+import { Typography, Box, TextField, Button, Alert, InputAdornment, Link, Divider, FormControlLabel, Checkbox } from '@mui/material';
 import { Person as PersonIcon, Lock as LockIcon, Login, PinRounded } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -22,6 +22,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [info, setInfo] = useState(null);
+  const [remember, setRemember] = useState(true); // keep this device signed in
 
   const finish = () => { window.location.href = '/'; };
 
@@ -30,7 +31,7 @@ export default function LoginPage() {
     if (!identifier.trim() || !password) { setError('Enter your email/username and password.'); return; }
     setLoading(true);
     try {
-      const res = await login(identifier.trim(), password);
+      const res = await login(identifier.trim(), password, remember);
       if (!res.success) throw new Error(res.error || 'Invalid credentials.');
       finish();
     } catch (err) { setError(err.message || 'Invalid credentials.'); }
@@ -54,7 +55,7 @@ export default function LoginPage() {
     if (!/^\d{6}$/.test(code.trim())) { setError('Enter the 6-digit code from your email.'); return; }
     setLoading(true);
     try {
-      const res = await verifyOtp(identifier.trim(), code.trim());
+      const res = await verifyOtp(identifier.trim(), code.trim(), remember);
       if (!res.token) throw new Error(res.error || 'That code is invalid or has expired.');
       finish();
     } catch (err) { setError(err.message || 'That code is invalid or has expired.'); }
@@ -66,6 +67,14 @@ export default function LoginPage() {
   const subtitle = method === 'password'
     ? 'Sign in with your password'
     : otpStep === 'identify' ? "We'll email you a one-time code" : `Enter the code we sent for ${identifier}`;
+
+  const rememberRow = (
+    <FormControlLabel
+      sx={{ mt: 1, ml: 0 }}
+      control={<Checkbox size="small" checked={remember} onChange={(e) => setRemember(e.target.checked)} sx={{ py: 0.25 }} />}
+      label={<Typography variant="body2" color="text.secondary">Remember this device</Typography>}
+    />
+  );
 
   return (
     <AuroraShell>
@@ -93,7 +102,8 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start"><LockIcon /></InputAdornment> }}
           />
-          <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} sx={{ mt: 3, py: 1.3 }}>
+          {rememberRow}
+          <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} sx={{ mt: 2, py: 1.3 }}>
             {loading ? 'Signing in…' : 'Sign in'}
           </Button>
           <Box display="flex" justifyContent="space-between" sx={{ mt: 2 }}>
@@ -123,7 +133,8 @@ export default function LoginPage() {
             onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
             InputProps={{ startAdornment: <InputAdornment position="start"><PinRounded /></InputAdornment> }}
           />
-          <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} sx={{ mt: 3, py: 1.3 }}>
+          {rememberRow}
+          <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} sx={{ mt: 2, py: 1.3 }}>
             {loading ? 'Verifying…' : 'Verify & sign in'}
           </Button>
           <Box display="flex" justifyContent="space-between" sx={{ mt: 2 }}>

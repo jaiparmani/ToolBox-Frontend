@@ -359,12 +359,12 @@ export const requestOtp = async (identifier) => {
  * Verify the one-time code and sign in. On success the server returns an auth
  * token, which we store.
  */
-export const verifyOtp = async (identifier, code) => {
+export const verifyOtp = async (identifier, code, remember = true) => {
     const response = await publicFetch(`${API_BASE_URL}/otp-verify/`, {
         method: 'POST', body: JSON.stringify({ identifier, code }),
     });
     const data = await response.json();
-    if (data.token) authUtils.login(data.token, data.user);
+    if (data.token) authUtils.login(data.token, data.user, remember);
     return data;
 };
 

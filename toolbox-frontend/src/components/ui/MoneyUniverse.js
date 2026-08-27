@@ -3,6 +3,7 @@ import { Box, Typography, useTheme, useMediaQuery } from '@mui/material';
 import { accents, chart } from '../../theme/tokens';
 import { moneySmart } from './money';
 import { deriveWeather } from './FinancialWeather';
+import AnimatedNumber from './AnimatedNumber';
 
 /**
  * The Money Universe — your month rendered as a spatial scene.
@@ -26,6 +27,7 @@ const RING = { income: 0.42, category: 0.7, bill: 0.96 }; // fraction of max orb
 export default function MoneyUniverse({
   income = 0, categories = [], bills = 0, net = 0,
   projection, pulse, weatherKey, onSelectCategory, height,
+  netOverride = null, overrideActive = false, overrideLabel = '',
 }) {
   const theme = useTheme();
   const dark = theme.palette.mode === 'dark';
@@ -37,8 +39,17 @@ export default function MoneyUniverse({
 
   const H = height || (compact ? 300 : 380);
   const key = weatherKey || deriveWeather({ projection, pulse }).key || 'clear';
-  const auraColor = { clear: accents.mint, tailwind: accents.cyan, pressure: accents.amber, storm: accents.red }[key] || accents.mint;
+  const baseAura = { clear: accents.mint, tailwind: accents.cyan, pressure: accents.amber, storm: accents.red }[key] || accents.mint;
   const auraSpeed = { clear: 1, tailwind: 1.15, pressure: 1.3, storm: 1.6 }[key] || 1;
+
+  // Scrubbing time: the star reflows to the projection's balance at the scrubbed
+  // day (a real number from the series). A ref carries the live target into the
+  // rAF loop so a scrub never restarts the canvas; the star eases toward it.
+  const targetNet = netOverride != null ? netOverride : net;
+  const targetNetRef = useRef(targetNet); targetNetRef.current = targetNet;
+  const dispNetRef = useRef(targetNet);
+  // A day scrubbed into the red storms the aura, on-track keeps the weather hue.
+  const auraColor = targetNet < 0 ? accents.red : baseAura;
 
   // Reduced-motion is a live signal, not a one-shot read.
   useEffect(() => {
@@ -83,10 +94,6 @@ export default function MoneyUniverse({
   }, [categories, income, bills, compact, dark]);
 
   const hasData = bodies.length > 0 || Math.abs(net) > 0;
-
-  // Star = net position; sign is its colour, magnitude its heft (with a floor so
-  // a near-zero month still reads as a star, not a speck).
-  const starColor = net >= 0 ? accents.mint : accents.red;
 
   // ── Render loop ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -144,18 +151,21 @@ export default function MoneyUniverse({
       });
       ctx.globalAlpha = 1;
 
-      // Star: net position, with a weather-tinted aura
-      const starR = (compact ? 24 : 30) + Math.sqrt(Math.min(Math.abs(net), 1e12)) * 0; // heft handled by glow below
-      const heft = Math.min(1, Math.abs(net) / (Math.max(income, bills, 1) * 1.2 || 1));
+      // Star: net position (eased toward the scrubbed target), weather-tinted aura
+      dispNetRef.current += (targetNetRef.current - dispNetRef.current) * (reduce ? 1 : 0.14);
+      const dNet = dispNetRef.current;
+      const sColor = dNet >= 0 ? accents.mint : accents.red;
+      const auraCol = dNet < 0 ? accents.red : baseAura;
+      const heft = Math.min(1, Math.abs(dNet) / (Math.max(income, bills, 1) * 1.2 || 1));
       const coreR = (compact ? 20 : 26) + heft * (compact ? 8 : 12);
       const aura = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 3.4);
-      aura.addColorStop(0, hexA(auraColor, 0.42));
-      aura.addColorStop(0.5, hexA(auraColor, 0.14));
-      aura.addColorStop(1, hexA(auraColor, 0));
+      aura.addColorStop(0, hexA(auraCol, 0.42));
+      aura.addColorStop(0.5, hexA(auraCol, 0.14));
+      aura.addColorStop(1, hexA(auraCol, 0));
       const pulse2 = reduce ? 1 : 1 + Math.sin(t * 1.6 * auraSpeed) * 0.06;
       ctx.fillStyle = aura; ctx.beginPath(); ctx.arc(cx, cy, coreR * 3.4 * pulse2, 0, 7); ctx.fill();
       const core = ctx.createRadialGradient(cx - coreR * 0.3, cy - coreR * 0.3, 0, cx, cy, coreR);
-      core.addColorStop(0, '#ffffff'); core.addColorStop(0.35, starColor); core.addColorStop(1, hexA(starColor, 0.65));
+      core.addColorStop(0, '#ffffff'); core.addColorStop(0.35, sColor); core.addColorStop(1, hexA(sColor, 0.65));
       ctx.fillStyle = core; ctx.beginPath(); ctx.arc(cx, cy, coreR, 0, 7); ctx.fill();
 
       // Bodies
@@ -187,7 +197,7 @@ export default function MoneyUniverse({
     io.observe(wrap);
 
     return () => { running = false; cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); document.removeEventListener('visibilitychange', onVis); };
-  }, [bodies, reduce, dark, compact, H, net, income, bills, auraColor, auraSpeed, starColor, hover, hasData]);
+  }, [bodies, reduce, dark, compact, H, income, bills, baseAura, auraSpeed, hover, hasData]);
 
   // ── Pointer / keyboard hit-testing ─────────────────────────────────────────
   const pick = (clientX, clientY) => {
@@ -234,11 +244,14 @@ export default function MoneyUniverse({
         style={{ display: 'block', touchAction: 'pan-y', cursor: active?.kind === 'category' ? 'pointer' : 'default', outline: 'none' }}
       />
 
-      {/* Center readout: the star's real figure, always legible */}
+      {/* Center readout: the star's real figure, always legible. While scrubbing
+          it names the day and counts to that day's projected balance. */}
       <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
-        <Typography sx={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'text.secondary', textTransform: 'uppercase' }}>Net</Typography>
-        <Typography sx={{ fontSize: { xs: '1rem', sm: '1.2rem' }, fontWeight: 800, color: net >= 0 ? accents.mint : accents.red, fontVariantNumeric: 'tabular-nums', textShadow: dark ? '0 1px 8px rgba(0,0,0,0.6)' : 'none' }}>
-          {moneySmart(net)}
+        <Typography sx={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: overrideActive ? accents.cyan : 'text.secondary', textTransform: 'uppercase' }}>
+          {overrideActive ? (overrideLabel || 'Projected') : 'Net'}
+        </Typography>
+        <Typography component="div" sx={{ fontSize: { xs: '1rem', sm: '1.2rem' }, fontWeight: 800, color: targetNet >= 0 ? accents.mint : accents.red, fontVariantNumeric: 'tabular-nums', textShadow: dark ? '0 1px 8px rgba(0,0,0,0.6)' : 'none' }}>
+          <AnimatedNumber value={targetNet} format="smart" />
         </Typography>
       </Box>
 

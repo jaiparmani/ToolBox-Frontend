@@ -61,6 +61,7 @@ export default function LandingPage() {
   const [copilot, setCopilot] = useState([]);
   const [loading, setLoading] = useState(true);
   const [story, setStory] = useState(null);
+  const [scrub, setScrub] = useState(null); // scrubbed day from the Cash Flow River
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -164,6 +165,9 @@ export default function LandingPage() {
               net={expense.netBalance}
               projection={projection}
               pulse={pulse}
+              netOverride={scrub ? scrub.balance : null}
+              overrideActive={!!scrub && !scrub.isToday}
+              overrideLabel={scrub ? new Date(scrub.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) : ''}
               onSelectCategory={(name) => navigate(`/expense-tracker?category=${encodeURIComponent(name)}`)}
             />
           </Box>
@@ -203,6 +207,7 @@ export default function LandingPage() {
           <Panel sx={{ mb: 2.5, p: { xs: 2, sm: 2.5 } }}>
             <CashFlowRiver
               projection={projection}
+              onScrub={setScrub}
               onSelectEvent={(ev) => setStory(buildStoryFromEvent(ev, ev.date))}
               onSelectCategory={(id) => navigate(`/expense-tracker?category=${id}`)}
             />

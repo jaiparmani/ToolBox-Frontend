@@ -18,7 +18,7 @@ import { money, moneySmart } from './money';
  * the selected day in React state, so it stays exact under the frequent
  * re-renders this screen does - the same approach the constellation uses.
  */
-export default function CashFlowRiver({ projection, onSelectEvent, onSelectCategory }) {
+export default function CashFlowRiver({ projection, onSelectEvent, onSelectCategory, onScrub }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const compact = useMediaQuery(theme.breakpoints.down('sm'));
@@ -28,6 +28,15 @@ export default function CashFlowRiver({ projection, onSelectEvent, onSelectCateg
   const svgRef = React.useRef(null);
   const headRef = React.useRef(null);
   const [selIdx, setSelIdx] = React.useState(null);
+
+  // Broadcast the scrubbed day so the wider scene (the Money Universe star) can
+  // reflow to that day's real projected balance. Null when the scrub is idle.
+  React.useEffect(() => {
+    if (!onScrub) return;
+    const d = selIdx != null ? series[selIdx] : null;
+    onScrub(d ? { index: selIdx, date: d.date, balance: d.balance, isToday: !!d.is_today } : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selIdx]);
 
   const W = 1000, H = compact ? 260 : 300, padY = 34;
   const inColor = isDark ? chart.flow.dark.owedToYou : chart.flow.light.owedToYou;

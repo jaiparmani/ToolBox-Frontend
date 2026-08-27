@@ -64,6 +64,7 @@ import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { money } from '../ui/money';
 import { feedback } from '../ui/feedback';
 import { FinancialWeatherBar, TransactionStoryDrawer, buildStoryFromExpense } from '../ui';
+import AuroraBackground from '../motion/AuroraBackground';
 import { accents } from '../../theme/tokens';
 
 // Color palette for categories
@@ -941,10 +942,14 @@ export default function ExpenseTrackerPage() {
        sx={{
          mt: { xs: 1.5, sm: 2 },
          px: { xs: 2, sm: 3 },
+         position: 'relative',
          // Room for the fixed bottom nav (and the home indicator under it).
          pb: { xs: 'calc(72px + env(safe-area-inset-bottom))', md: 4 },
        }}
      >
+     {/* Living backdrop, keyed to the same financial weather as the rest of the app */}
+     <AuroraBackground />
+     <Box sx={{ position: 'relative', zIndex: 1 }}>
      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
        <FinancialWeatherBar compact />
      </Box>
@@ -952,33 +957,50 @@ export default function ExpenseTrackerPage() {
      <Paper
        elevation={0}
        sx={{
-         p: { xs: 2, sm: 3 }, mb: { xs: 2, sm: 3 },
-         position: 'relative', overflow: 'hidden',
-         border: '1px solid', borderColor: 'divider',
+         p: { xs: 2.25, sm: 3 }, mb: { xs: 2, sm: 3 },
+         position: 'relative', overflow: 'hidden', borderRadius: 4,
+         border: '1px solid',
+         borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+         backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(22,22,28,0.55)' : 'rgba(255,255,255,0.72)',
+         backdropFilter: 'blur(20px)',
+         boxShadow: (theme) => theme.palette.mode === 'dark'
+           ? '0 1px 0 rgba(255,255,255,0.05) inset, 0 20px 50px -28px rgba(10,132,255,0.7)'
+           : '0 1px 0 rgba(255,255,255,0.9) inset, 0 22px 50px -30px rgba(10,132,255,0.55)',
          '&::before': {
-           content: '""', position: 'absolute', inset: 0,
-           background: 'radial-gradient(circle at 0% 0%, rgba(10,132,255,0.18), transparent 55%)',
+           content: '""', position: 'absolute', inset: 0, pointerEvents: 'none',
+           background: 'radial-gradient(120% 90% at 0% 0%, rgba(10,132,255,0.16), transparent 55%), radial-gradient(80% 70% at 100% 120%, rgba(124,92,255,0.14), transparent 60%)',
          },
        }}
      >
        <Box display="flex" justifyContent="space-between" alignItems="center" gap={1.5} sx={{ position: 'relative' }}>
-         <Box display="flex" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
-           <Box
-             sx={{
-               width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 }, borderRadius: '14px',
+         <Box display="flex" alignItems="center" gap={{ xs: 1.5, sm: 2 }} sx={{ minWidth: 0 }}>
+           {/* Nested-bezel icon: gradient core in a subtle tray */}
+           <Box sx={{
+             p: '4px', borderRadius: '18px', flexShrink: 0,
+             background: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(10,132,255,0.08)',
+             boxShadow: 'inset 0 0 0 1px rgba(10,132,255,0.18)',
+           }}>
+             <Box sx={{
+               width: { xs: 38, sm: 46 }, height: { xs: 38, sm: 46 }, borderRadius: '14px',
                background: 'linear-gradient(135deg, #0A84FF, #64D2FF)',
-               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-               boxShadow: '0 8px 20px rgba(10,132,255,0.4)',
-             }}
-           >
-             <DashboardIcon sx={{ fontSize: { xs: 22, sm: 26 }, color: '#fff' }} />
+               display: 'flex', alignItems: 'center', justifyContent: 'center',
+               boxShadow: '0 10px 22px -6px rgba(10,132,255,0.6), inset 0 1px 0 rgba(255,255,255,0.4)',
+             }}>
+               <DashboardIcon sx={{ fontSize: { xs: 21, sm: 25 }, color: '#fff' }} />
+             </Box>
            </Box>
            <Box sx={{ minWidth: 0 }}>
-             <Typography sx={{ fontWeight: 650, letterSpacing: '-0.02em', fontSize: { xs: '1.35rem', sm: '2rem' } }} noWrap>
+             <Typography sx={{
+               fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
+               color: 'primary.main', mb: 0.25, display: 'block',
+             }}>
+               Activity
+             </Typography>
+             <Typography sx={{ fontWeight: 750, letterSpacing: '-0.03em', lineHeight: 1, fontSize: { xs: '1.5rem', sm: '2.15rem' } }} noWrap>
                Expenses
              </Typography>
-             <Typography variant="body2" color="text.secondary" noWrap sx={{ display: { xs: 'none', sm: 'block' } }}>
-               Manage your expenses efficiently
+             <Typography variant="body2" color="text.secondary" noWrap sx={{ display: { xs: 'none', sm: 'block' }, mt: 0.4 }}>
+               Every transaction, in one clear stream.
              </Typography>
            </Box>
          </Box>
@@ -2320,6 +2342,7 @@ export default function ExpenseTrackerPage() {
      >
        <AddIcon />
      </Fab>
+     </Box>
    </Container>
    </>
  );

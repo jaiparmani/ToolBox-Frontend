@@ -14,6 +14,7 @@ import { useMoney } from '../../contexts/MoneyContext';
 import ThinkingHint from './ThinkingHint';
 import AssistantOrb from './AssistantOrb';
 import TypedLight from './TypedLight';
+import { feedback } from './feedback';
 import { money } from './money';
 
 /**
@@ -82,6 +83,7 @@ export default function Assistant() {
     if (m && NAV[m[1]]) { navigate(NAV[m[1]]); setOpen(false); return; }
 
     setInput('');
+    feedback('send');
     const uid = Date.now();
     setTurns(t => [...t, { id: uid, role: 'user', text: q }]);
     setLoading(true);
@@ -90,6 +92,7 @@ export default function Assistant() {
       if (r.conversation_id) convId.current = r.conversation_id;
       setTurns(t => [...t, { id: uid + 1, role: 'assistant', card: r }]);
     } catch (e) {
+      feedback('error');
       setTurns(t => [...t, { id: uid + 1, role: 'assistant', card: { type: 'error', error: e.message } }]);
     } finally {
       setLoading(false);
@@ -100,6 +103,7 @@ export default function Assistant() {
     setTurns(t => t.map(x => x.id === turnId ? { ...x, committing: true } : x));
     try {
       const res = await commitAssistant(payload);
+      feedback('success');
       setTurns(t => t.map(x => x.id === turnId ? { ...x, committing: false, committed: res } : x));
       refreshMoney();
     } catch (e) {

@@ -21,6 +21,7 @@ import SwipeAction from '../ui/SwipeAction';
 import { AnimatePresence, motion, LayoutGroup } from 'framer-motion';
 import { money, relativeDay } from '../ui/money';
 import { accents } from '../../theme/tokens';
+import { feedback } from '../ui/feedback';
 import GroupStrip from '../ui/GroupStrip';
 import { FinancialWeatherBar } from '../ui';
 import {
@@ -243,6 +244,7 @@ export default function SplitsPage() {
         owedByMe ? { owedToUserId: person.owedToUserId } : { personId: person.personId });
       // Fire the particle stream while the node is still on screen, then refresh.
       fireSettleFlow(person, result.total);
+      feedback('success');
       setSuccess(`Settled ${money(result.total)} with ${person.name}`);
       setSelected(null);
       load();

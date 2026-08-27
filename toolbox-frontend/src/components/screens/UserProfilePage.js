@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert, Box, Button, Card, CardContent, Container, IconButton, InputAdornment,
-  LinearProgress, Paper, Snackbar, Stack, TextField, Typography,
+  LinearProgress, Paper, Snackbar, Stack, Switch, TextField, Typography,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import LockIcon from '@mui/icons-material/Lock';
 import PersonIcon from '@mui/icons-material/Person';
+import TouchAppIcon from '@mui/icons-material/TouchApp';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
@@ -18,6 +19,7 @@ import { clearAllData } from '../rest/userApis.js';
 import Reveal from '../ui/Reveal';
 import { ConfirmDialog } from '../ui';
 import { accents } from '../../theme/tokens';
+import { getFeedbackPrefs, setFeedbackPrefs, feedback } from '../ui/feedback';
 
 /**
  * Profile, rebuilt as a single scrollable column of glass cards rather than a
@@ -53,6 +55,14 @@ export default function UserProfilePage() {
   const [pw, setPw] = useState({ old_password: '', new_password: '', new_password_confirm: '' });
   const [showPw, setShowPw] = useState(false);
   const [savingPw, setSavingPw] = useState(false);
+
+  const [feel, setFeel] = useState(getFeedbackPrefs());
+  const toggleFeel = (key) => {
+    const next = { ...feel, [key]: !feel[key] };
+    setFeedbackPrefs(next);
+    setFeel(next);
+    if (next[key]) feedback(key === 'sound' ? 'success' : 'tap'); // let them hear/feel it turn on
+  };
 
   const [clearing, setClearing] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -178,8 +188,20 @@ export default function UserProfilePage() {
           </SectionCard>
         </Reveal>
 
-        {/* Password */}
+        {/* Feel — tactile finish, mutable and remembered */}
         <Reveal index={2}>
+          <SectionCard icon={<TouchAppIcon />} color={accents.violet} title="Feel">
+            <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+              <FeelRow label="Haptics" hint="A gentle buzz on key actions (supported phones)"
+                checked={!!feel.haptics} onChange={() => toggleFeel('haptics')} />
+              <FeelRow label="Sound" hint="Soft, synthesized cues — off by default"
+                checked={!!feel.sound} onChange={() => toggleFeel('sound')} />
+            </Stack>
+          </SectionCard>
+        </Reveal>
+
+        {/* Password */}
+        <Reveal index={3}>
           <SectionCard icon={<LockIcon />} color={accents.amber} title="Password">
             <Stack spacing={1.75} sx={{ mt: 1 }}>
               <TextField size="small" fullWidth label="Current password" type={showPw ? 'text' : 'password'}
@@ -278,6 +300,18 @@ function SectionCard({ icon, color, title, action, children }) {
         {children}
       </CardContent>
     </Card>
+  );
+}
+
+function FeelRow({ label, hint, checked, onChange }) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 0.5 }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography variant="body1" sx={{ fontWeight: 500 }}>{label}</Typography>
+        <Typography variant="caption" color="text.secondary">{hint}</Typography>
+      </Box>
+      <Switch checked={checked} onChange={onChange} inputProps={{ 'aria-label': label }} />
+    </Box>
   );
 }
 

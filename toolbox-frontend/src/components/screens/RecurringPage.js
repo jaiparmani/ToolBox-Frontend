@@ -13,6 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useMoney } from '../../contexts/MoneyContext';
 import { getRecurring, createRecurring, deleteRecurring, getCategories } from '../rest/expenseTrackerApis';
 import Reveal from '../ui/Reveal';
+import AuroraBackground from '../motion/AuroraBackground';
 import {
   PageHeader, SectionHeader, Panel, EmptyState, AmountDisplay, SegmentedControl,
   BottomSheet, ConfirmDialog, ErrorBanner, FinancialWeatherBar,
@@ -119,7 +120,10 @@ export default function RecurringPage() {
   const tone = isIncome ? accents.mint : accents.blue;
 
   return (
-    <Container maxWidth="sm" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 10 }}>
+    <Container maxWidth="sm" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 10, position: 'relative' }}>
+      {/* Living backdrop — same premium climate as the money screens */}
+      <AuroraBackground />
+      <Box sx={{ position: 'relative', zIndex: 1 }}>
       <ErrorBanner error={error} onClose={() => setError(null)} />
       <Reveal>
         <PageHeader
@@ -246,6 +250,7 @@ export default function RecurringPage() {
         onConfirm={doDelete}
         onCancel={() => setConfirmDel(null)}
       />
+      </Box>
     </Container>
   );
 }

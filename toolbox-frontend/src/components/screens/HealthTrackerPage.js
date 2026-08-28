@@ -19,7 +19,8 @@ import TrendBars from '../ui/TrendBars';
 import SwipeAction from '../ui/SwipeAction';
 import { ExpenseListSkeleton } from '../ui/Skeletons';
 import { relativeDay } from '../ui/money';
-import { accents } from '../../theme/tokens';
+import AuroraBackground from '../motion/AuroraBackground';
+import { accents, type as tokenType } from '../../theme/tokens';
 
 const METRICS = {
   weight: { label: 'Weight', unit: 'kg', icon: MonitorWeightIcon, color: accents.blue },
@@ -97,13 +98,19 @@ export default function HealthTrackerPage() {
 
   return (
     <>
-      <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 12 }}>
+      <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 12, position: 'relative' }}>
+        {/* Living backdrop — same premium climate as the money screens */}
+        <AuroraBackground />
+        <Box sx={{ position: 'relative', zIndex: 1 }}>
         <Reveal>
           <Box display="flex" alignItems="center" gap={1.5} sx={{ mb: 2 }}>
             <Box sx={{ width: 44, height: 44, borderRadius: '13px', background: `linear-gradient(135deg, ${accents.red}, ${accents.amber})`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 20px ${accents.red}55` }}>
               <FavoriteIcon sx={{ color: '#fff', fontSize: 22 }} />
             </Box>
-            <Typography variant="h6" sx={{ fontWeight: 650 }}>Health</Typography>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontFamily: tokenType.displayFamily, fontWeight: 700, fontSize: '1.15rem', lineHeight: 1.15 }}>Health</Typography>
+              <Typography variant="caption" color="text.secondary" noWrap>Your body, tracked</Typography>
+            </Box>
           </Box>
         </Reveal>
 
@@ -223,6 +230,7 @@ export default function HealthTrackerPage() {
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} sx={{ bottom: { xs: 90, md: 24 } }}>
           <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 3 }}>{error}</Alert>
         </Snackbar>
+        </Box>
       </Container>
     </>
   );

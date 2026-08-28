@@ -21,6 +21,28 @@ export default function AssistantOrb({ state = 'idle', size = 72, reduce = false
   const anim = (on) => (reduce ? 'none' : on);
   const rush = thinking ? 2.1 : speaking ? 1.4 : 1; // sparks quicken with activity
 
+  // Sound-reactive pulse: TypedLight pings 'toolbox:orb-tick' as each word lands,
+  // and the orb answers with a quick ripple of light — driven straight to the
+  // DOM (no React re-render per character) so it stays cheap even mid-stream.
+  const pulseRef = React.useRef(null);
+  React.useEffect(() => {
+    if (reduce) return undefined;
+    const onTick = () => {
+      const el = pulseRef.current;
+      if (!el) return;
+      el.style.transition = 'none';
+      el.style.opacity = '0.85';
+      el.style.transform = 'scale(0.9)';
+      requestAnimationFrame(() => {
+        el.style.transition = 'opacity 420ms ease-out, transform 420ms ease-out';
+        el.style.opacity = '0';
+        el.style.transform = 'scale(1.5)';
+      });
+    };
+    window.addEventListener('toolbox:orb-tick', onTick);
+    return () => window.removeEventListener('toolbox:orb-tick', onTick);
+  }, [reduce]);
+
   // Sparks on their own orbits — diameter, duration, direction, colour, size.
   const orbits = [
     { d: size * 1.08, dur: 5.5, dir: 1, c: accents.cyan, dot: size * 0.055 },
@@ -42,6 +64,12 @@ export default function AssistantOrb({ state = 'idle', size = 72, reduce = false
         background: `radial-gradient(circle, ${accents.violet}${thinking ? '5e' : speaking ? '4a' : '30'}, transparent 68%)`,
         transition: 'background 400ms ease', filter: 'blur(7px)',
         animation: anim(thinking ? 'orbPulse 1.1s ease-in-out infinite' : 'orbBreathe 3.4s ease-in-out infinite') }} />
+
+      {/* Reactive pulse ring — flashes outward on each typed-light tick */}
+      <Box ref={pulseRef} aria-hidden sx={{ position: 'absolute', inset: -size * 0.12, borderRadius: '50%',
+        opacity: 0, pointerEvents: 'none', willChange: 'transform, opacity',
+        border: `1.5px solid ${accents.cyan}`,
+        boxShadow: `0 0 ${size * 0.18}px ${accents.cyan}88` }} />
 
       {/* Orbiting sparks */}
       {orbits.map((o, i) => (

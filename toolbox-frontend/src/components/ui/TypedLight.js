@@ -23,6 +23,9 @@ export default function TypedLight({ text = '', reduce = false, speed = 16, onSt
     const id = setInterval(() => {
       // Reveal a couple of chars per tick on long replies so it never drags.
       i += text.length > 160 ? 2 : 1;
+      // Ping the orb so it visibly reacts to the words landing — a light-driven
+      // pulse, throttled to every few chars so it reads as a beat, not a buzz.
+      if (i % 3 === 0) window.dispatchEvent(new Event('toolbox:orb-tick'));
       if (i >= text.length) { i = text.length; setN(i); clearInterval(id); onDone?.(); }
       else setN(i);
     }, speed);

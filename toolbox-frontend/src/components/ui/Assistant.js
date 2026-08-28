@@ -15,7 +15,7 @@ import ThinkingHint from './ThinkingHint';
 import AssistantOrb from './AssistantOrb';
 import TypedLight from './TypedLight';
 import { feedback } from './feedback';
-import { money } from './money';
+import { money, moneySmart } from './money';
 
 /**
  * ToolBox Assistant — the single conversational surface for all of the app's
@@ -44,7 +44,7 @@ const NAV = {
 export default function Assistant() {
   const navigate = useNavigate();
   const theme = useTheme();
-  const { refresh: refreshMoney } = useMoney();
+  const { projection, refresh: refreshMoney } = useMoney();
   const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   const [open, setOpen] = React.useState(false);
@@ -59,6 +59,27 @@ export default function Assistant() {
   const orbState = loading ? 'thinking' : speaking > 0 ? 'speaking' : 'idle';
   const onSpeakStart = React.useCallback(() => setSpeaking(s => s + 1), []);
   const onSpeakEnd = React.useCallback(() => setSpeaking(s => Math.max(0, s - 1)), []);
+
+  // While it thinks, show something true instead of a dead spinner — only
+  // facts we actually know from the live projection, never a made-up number.
+  const facts = React.useMemo(() => {
+    const p = projection || {};
+    const out = [];
+    if (p.safe_to_spend_today != null) out.push(`${moneySmart(p.safe_to_spend_today)} safe to spend today`);
+    if (p.runway_days != null) out.push(`about ${p.runway_days} day${p.runway_days === 1 ? '' : 's'} of runway left`);
+    if (Number(p.upcoming_bills) > 0) out.push(`${moneySmart(p.upcoming_bills)} in bills coming up`);
+    if (Number(p.upcoming_income) > 0) out.push(`${moneySmart(p.upcoming_income)} of income on the way`);
+    if (p.projected_low != null) out.push(`projected low of ${moneySmart(p.projected_low)}`);
+    return out;
+  }, [projection]);
+  const [factIdx, setFactIdx] = React.useState(0);
+  React.useEffect(() => {
+    if (!loading || facts.length === 0) return undefined;
+    setFactIdx(0);
+    const id = setInterval(() => setFactIdx(i => (i + 1) % facts.length), 2400);
+    return () => clearInterval(id);
+  }, [loading, facts.length]);
+  const thinkingText = loading && facts.length ? facts[factIdx % facts.length] : null;
 
   // Global hotkey + a decoupled open event (toolbar button dispatches it).
   React.useEffect(() => {
@@ -149,7 +170,7 @@ export default function Assistant() {
           <Box sx={{ minWidth: 0 }}>
             <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: '0.98rem', lineHeight: 1.2 }}>ToolBox Assistant</Typography>
             <Typography variant="caption" color="text.secondary" noWrap>
-              {loading ? 'Thinking…' : speaking > 0 ? 'Answering…' : 'Ready when you are'}
+              {loading ? (thinkingText || 'Thinking…') : speaking > 0 ? 'Answering…' : 'Ready when you are'}
             </Typography>
           </Box>
         </Box>
@@ -163,7 +184,7 @@ export default function Assistant() {
               onConfirm={confirm} onDiscard={discard} onClose={() => setOpen(false)}
               onSpeakStart={onSpeakStart} onSpeakEnd={onSpeakEnd} />
           ))}
-          {loading && <ThinkingHint show label="Working that out…" />}
+          {loading && <ThinkingHint show label={thinkingText || 'Working that out…'} />}
         </Box>
       )}
 

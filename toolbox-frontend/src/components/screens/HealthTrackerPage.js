@@ -136,12 +136,26 @@ export default function HealthTrackerPage() {
         <Reveal index={2}>
           <Paper elevation={0} sx={{ p: 3, mb: 2.5, borderRadius: 4, border: '1px solid', borderColor: 'divider',
             position: 'relative', overflow: 'hidden',
+            '@keyframes healthAura': { to: { transform: 'rotate(360deg)' } },
+            '@keyframes healthSheen': { '0%': { transform: 'translateX(-140%) skewX(-12deg)' }, '60%,100%': { transform: 'translateX(320%) skewX(-12deg)' } },
             '&::before': { content: '""', position: 'absolute', inset: 0, pointerEvents: 'none',
               background: `radial-gradient(circle at 50% -20%, ${cfg.color}33, transparent 60%)` } }}>
+            {/* Slow-turning reactor aura, keyed to the metric's colour */}
+            <Box aria-hidden sx={{ position: 'absolute', top: '50%', left: '50%', width: 360, height: 360,
+              mt: '-180px', ml: '-180px', pointerEvents: 'none', opacity: 0.55, borderRadius: '50%',
+              background: `conic-gradient(from 0deg, transparent, ${cfg.color}66, transparent 42%)`,
+              filter: 'blur(26px)', animation: 'healthAura 16s linear infinite',
+              '@media (prefers-reduced-motion: reduce)': { animation: 'none' } }} />
+            {/* Light sheen sweeping across the reading */}
+            <Box aria-hidden sx={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '32%', pointerEvents: 'none',
+              background: 'linear-gradient(105deg, transparent, rgba(255,255,255,0.16), transparent)',
+              animation: 'healthSheen 6.5s ease-in-out infinite',
+              '@media (prefers-reduced-motion: reduce)': { animation: 'none' } }} />
             <Box sx={{ position: 'relative' }}>
               <Typography variant="overline" color="text.secondary">Latest {cfg.label.toLowerCase()}</Typography>
               <Box display="flex" alignItems="baseline" gap={1}>
-                <Typography sx={{ fontWeight: 700, fontSize: '2.6rem', letterSpacing: '-0.03em', color: cfg.color }}>
+                <Typography sx={{ fontFamily: tokenType.displayFamily, fontWeight: 700, fontSize: '2.8rem', letterSpacing: '-0.03em', color: cfg.color,
+                  textShadow: `0 0 26px ${cfg.color}44` }}>
                   {stat?.latest_value != null ? <AnimatedNumber value={Number(stat.latest_value)} format="plain" /> : '—'}
                 </Typography>
                 <Typography variant="h6" color="text.secondary">{cfg.unit}</Typography>

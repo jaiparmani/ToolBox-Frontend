@@ -8,7 +8,7 @@ import CallSplitRoundedIcon from '@mui/icons-material/CallSplitRounded';
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import SellRoundedIcon from '@mui/icons-material/SellRounded';
-import { accents, motion as motionTokens } from '../../theme/tokens';
+import { accents, motion as motionTokens, type } from '../../theme/tokens';
 import { askAssistant, commitAssistant } from '../rest/expenseTrackerApis';
 import { useMoney } from '../../contexts/MoneyContext';
 import ThinkingHint from './ThinkingHint';
@@ -126,23 +126,34 @@ export default function Assistant() {
           position: 'absolute', top: { xs: 16, sm: 72 }, m: 0, width: '100%',
           height: turns.length ? { xs: '82vh', sm: 560 } : 'auto',
           borderRadius: 4, overflow: 'hidden', display: 'flex', flexDirection: 'column',
-          border: '1px solid', borderColor: 'divider',
-          backgroundImage: `radial-gradient(120% 130% at 0% 0%, ${accents.violet}18, transparent 55%)`,
-          backdropFilter: 'blur(30px) saturate(1.4)',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
+          backgroundImage: `radial-gradient(120% 120% at 0% 0%, ${accents.violet}22, transparent 52%), radial-gradient(90% 90% at 100% 100%, ${accents.cyan}14, transparent 55%)`,
+          backdropFilter: 'blur(34px) saturate(1.6)',
+          boxShadow: `0 30px 90px rgba(0,0,0,0.6), 0 0 60px -20px ${accents.violet}66`,
+          // A slowly colour-cycling gradient hairline — the AI console glow.
+          '&::before': {
+            content: '""', position: 'absolute', inset: 0, borderRadius: 'inherit', padding: '1px', pointerEvents: 'none',
+            background: `conic-gradient(from 0deg, ${accents.violet}, ${accents.cyan}, ${accents.blue}, ${accents.violet})`,
+            WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+            WebkitMaskComposite: 'xor', maskComposite: 'exclude',
+            opacity: 0.55,
+            animation: reduce ? 'none' : 'dialogHue 7s linear infinite',
+          },
+          '@keyframes dialogHue': { to: { filter: 'hue-rotate(360deg)' } },
         },
       }}
     >
-      {/* The presence — a persistent orb that reflects what it's doing */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2.5, pt: 2.25, pb: turns.length ? 1.5 : 0.5, flexShrink: 0 }}>
-        <AssistantOrb state={orbState} size={44} reduce={reduce} />
-        <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: '0.98rem', lineHeight: 1.2 }}>ToolBox Assistant</Typography>
-          <Typography variant="caption" color="text.secondary" noWrap>
-            {loading ? 'Thinking…' : speaking > 0 ? 'Answering…' : 'Ready when you are'}
-          </Typography>
+      {/* The presence — a compact orb header during a conversation */}
+      {turns.length > 0 && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2.5, pt: 2.25, pb: 1.5, flexShrink: 0 }}>
+          <AssistantOrb state={orbState} size={44} reduce={reduce} />
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: '0.98rem', lineHeight: 1.2 }}>ToolBox Assistant</Typography>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {loading ? 'Thinking…' : speaking > 0 ? 'Answering…' : 'Ready when you are'}
+            </Typography>
+          </Box>
         </Box>
-      </Box>
+      )}
 
       {/* Conversation */}
       {turns.length > 0 && (
@@ -156,42 +167,61 @@ export default function Assistant() {
         </Box>
       )}
 
-      {/* Empty state */}
+      {/* Empty state — the orb as the star, big and breathing */}
       {turns.length === 0 && (
-        <Box sx={{ px: 3, pt: 1, pb: 1 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1.75 }}>
-            Add an expense, split a bill, search, or ask how you're doing — all in one place.
+        <Box sx={{ textAlign: 'center', px: 3, pt: { xs: 3.5, sm: 4.5 }, pb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2.25 }}>
+            <AssistantOrb state={orbState} size={82} reduce={reduce} />
+          </Box>
+          <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: '1.4rem', letterSpacing: '-0.025em' }}>
+            {loading ? 'Thinking…' : 'How can I help?'}
           </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, mb: 2.25, maxWidth: 360, mx: 'auto' }}>
+            Add an expense, split a bill, search, or ask how you're doing — one box, one brain.
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.85, justifyContent: 'center' }}>
             {EXAMPLES.map(ex => (
-              <Chip key={ex} label={ex} size="small" onClick={() => send(ex)}
-                sx={{ cursor: 'pointer', borderColor: 'divider' }} variant="outlined" />
+              <Chip key={ex} label={ex} onClick={() => send(ex)}
+                sx={{
+                  cursor: 'pointer', borderRadius: 999, fontWeight: 500, height: 32,
+                  border: '1px solid', borderColor: `${accents.violet}3d`,
+                  backgroundColor: `${accents.violet}0f`, color: 'text.primary',
+                  transition: `all ${motionTokens.fast}ms ${motionTokens.ease}`,
+                  '&:hover': { borderColor: accents.violet, backgroundColor: `${accents.violet}24`, transform: 'translateY(-1px)', boxShadow: `0 6px 16px -6px ${accents.violet}88` },
+                }} />
             ))}
           </Box>
         </Box>
       )}
 
-      {/* Input */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 2, py: 1.5, borderTop: turns.length ? '1px solid' : 'none', borderColor: 'divider', flexShrink: 0 }}>
-        <AutoAwesomeRoundedIcon sx={{ color: accents.violet, fontSize: 20 }} />
-        <InputBase
-          autoFocus
-          fullWidth
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') send(); if (e.key === 'Escape') setOpen(false); }}
-          placeholder="Add, split, search, or ask…"
-          sx={{ fontSize: '1.02rem', fontWeight: 500 }}
-        />
-        <Box role="button" aria-label="Send" onClick={() => send()}
-          sx={{
-            flexShrink: 0, width: 34, height: 34, borderRadius: '50%', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            backgroundColor: input.trim() ? accents.violet : 'action.disabledBackground',
-            color: input.trim() ? '#fff' : 'text.disabled',
-            transition: `background-color ${motionTokens.fast}ms ${motionTokens.ease}`,
-          }}>
-          <ArrowUpwardRoundedIcon sx={{ fontSize: 18 }} />
+      {/* Input — a glass pill that glows when you focus it */}
+      <Box sx={{ px: 2, pt: 1.25, pb: 2, flexShrink: 0 }}>
+        <Box sx={{
+          display: 'flex', alignItems: 'center', gap: 1.25, px: 1.75, py: 0.75, borderRadius: 999,
+          border: '1.5px solid', borderColor: `${accents.violet}40`,
+          backgroundColor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+          transition: `border-color ${motionTokens.fast}ms ${motionTokens.ease}, box-shadow ${motionTokens.fast}ms ${motionTokens.ease}`,
+          '&:focus-within': { borderColor: accents.violet, boxShadow: `0 0 0 3px ${accents.violet}22, 0 8px 26px -8px ${accents.violet}77` },
+        }}>
+          <AutoAwesomeRoundedIcon sx={{ color: accents.violet, fontSize: 20, flexShrink: 0 }} />
+          <InputBase
+            autoFocus fullWidth value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') send(); if (e.key === 'Escape') setOpen(false); }}
+            placeholder="Add, split, search, or ask…"
+            sx={{ fontSize: '1.02rem', fontWeight: 500 }}
+          />
+          <Box role="button" aria-label="Send" onClick={() => send()}
+            sx={{
+              flexShrink: 0, width: 34, height: 34, borderRadius: '50%', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: input.trim() ? `linear-gradient(135deg, ${accents.violet}, ${accents.blue})` : 'action.disabledBackground',
+              color: input.trim() ? '#fff' : 'text.disabled',
+              boxShadow: input.trim() ? `0 6px 16px -4px ${accents.violet}aa` : 'none',
+              transition: `all ${motionTokens.fast}ms ${motionTokens.ease}`,
+            }}>
+            <ArrowUpwardRoundedIcon sx={{ fontSize: 18 }} />
+          </Box>
         </Box>
       </Box>
     </Dialog>

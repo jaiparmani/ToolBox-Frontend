@@ -35,6 +35,7 @@ export default function MoneyUniverse({
   const canvasRef = useRef(null);
   const wrapRef = useRef(null);
   const [hover, setHover] = useState(null); // index into bodies, or null
+  const hoverRef = useRef(hover); hoverRef.current = hover; // read live in the loop (no restart)
   const [reduce, setReduce] = useState(false);
 
   const H = height || (compact ? 300 : 380);
@@ -134,6 +135,29 @@ export default function MoneyUniverse({
       vg.addColorStop(1, dark ? 'rgba(8,9,14,0.55)' : 'rgba(210,216,230,0.55)');
       ctx.fillStyle = vg; ctx.fillRect(0, 0, W, Hh);
 
+      // Nebula wash — a few slow-drifting colour clouds for atmosphere.
+      const dt = reduce ? 0 : t;
+      const clouds = [
+        { hue: baseAura, ox: 0.32, oy: 0.36, r: 0.52, sp: 0.05, ph: 0 },
+        { hue: accents.violet, ox: 0.7, oy: 0.62, r: 0.6, sp: 0.04, ph: 2.1 },
+        { hue: accents.blue, ox: 0.52, oy: 0.44, r: 0.5, sp: 0.03, ph: 4.3 },
+      ];
+      ctx.globalCompositeOperation = 'lighter';
+      for (const n of clouds) {
+        const nx = W * n.ox + Math.sin(dt * n.sp + n.ph) * W * 0.13;
+        const ny = Hh * n.oy + Math.cos(dt * n.sp * 0.8 + n.ph) * Hh * 0.13;
+        const rad = Math.min(W, Hh) * n.r;
+        const g = ctx.createRadialGradient(nx, ny, 0, nx, ny, rad);
+        g.addColorStop(0, hexA(n.hue, dark ? 0.10 : 0.06));
+        g.addColorStop(1, hexA(n.hue, 0));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(nx, ny, rad, 0, 7); ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+
+      // On new data the scene (re)mounts and t resets — flash briefly to signal
+      // the change, then settle.
+      const flash = reduce ? 0 : Math.max(0, 1 - t / 1.4);
+
       // Starfield
       for (const s of stars) { ctx.globalAlpha = s.a * (dark ? 1 : 0.6); ctx.fillStyle = dark ? '#fff' : '#5b6480'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 7); ctx.fill(); }
       ctx.globalAlpha = 1;
@@ -168,7 +192,7 @@ export default function MoneyUniverse({
 
       // Gravity lines (star → body), faint; brighter for the hovered one
       bodies.forEach((b, i) => {
-        const p = pts[i]; const on = hover === i;
+        const p = pts[i]; const on = hoverRef.current === i;
         ctx.strokeStyle = b.color; ctx.globalAlpha = on ? 0.5 : 0.16; ctx.lineWidth = on ? 2 : 1;
         ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.x, p.y); ctx.stroke();
       });
@@ -181,7 +205,7 @@ export default function MoneyUniverse({
         ctx.globalCompositeOperation = 'lighter';
         ctx.lineCap = 'round';
         bodies.forEach((b, i) => {
-          const tr = trails[i]; const on = hover === i;
+          const tr = trails[i]; const on = hoverRef.current === i;
           for (let k = 1; k < tr.length; k++) {
             const a = k / tr.length; // head brightest
             ctx.globalAlpha = a * a * (on ? 0.55 : 0.32);
@@ -210,20 +234,29 @@ export default function MoneyUniverse({
       const core = ctx.createRadialGradient(cx - coreR * 0.3, cy - coreR * 0.3, 0, cx, cy, coreR);
       core.addColorStop(0, '#ffffff'); core.addColorStop(0.35, sColor); core.addColorStop(1, hexA(sColor, 0.65));
       ctx.fillStyle = core; ctx.beginPath(); ctx.arc(cx, cy, coreR, 0, 7); ctx.fill();
+      // Arrival ripple — a ring expands out of the star when data changes.
+      if (flash > 0.01) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = hexA(sColor, flash * 0.6); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, cy, coreR + (1 - flash) * coreR * 2.6, 0, 7); ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
+      }
 
-      // Bodies
+      // Bodies (each pops briefly on new data via `flash`)
+      const pop = 1 + flash * 0.28;
       bodies.forEach((b, i) => {
-        const p = pts[i]; const on = hover === i;
+        const p = pts[i]; const on = hoverRef.current === i;
+        const br = b.r * pop;
         // Bloom halo — additive so overlapping bodies glow into each other.
         ctx.globalCompositeOperation = 'lighter';
-        const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, b.r * 3);
-        glow.addColorStop(0, hexA(b.color, on ? 0.6 : 0.4));
+        const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, br * 3);
+        glow.addColorStop(0, hexA(b.color, Math.min(0.95, (on ? 0.6 : 0.4) + flash * 0.4)));
         glow.addColorStop(1, hexA(b.color, 0));
-        ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p.x, p.y, b.r * 3, 0, 7); ctx.fill();
+        ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p.x, p.y, br * 3, 0, 7); ctx.fill();
         ctx.globalCompositeOperation = 'source-over';
-        const g = ctx.createRadialGradient(p.x - b.r * 0.3, p.y - b.r * 0.3, 0, p.x, p.y, b.r);
+        const g = ctx.createRadialGradient(p.x - br * 0.3, p.y - br * 0.3, 0, p.x, p.y, br);
         g.addColorStop(0, hexA('#ffffff', dark ? 0.9 : 0.95)); g.addColorStop(0.4, b.color); g.addColorStop(1, hexA(b.color, 0.7));
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, b.r, 0, 7); ctx.fill();
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, br, 0, 7); ctx.fill();
         if (on) { ctx.strokeStyle = dark ? '#fff' : '#111'; ctx.globalAlpha = 0.8; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, b.r + 4, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
       });
 
@@ -243,7 +276,7 @@ export default function MoneyUniverse({
     io.observe(wrap);
 
     return () => { running = false; cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); document.removeEventListener('visibilitychange', onVis); };
-  }, [bodies, reduce, dark, compact, H, income, bills, baseAura, auraSpeed, hover, hasData]);
+  }, [bodies, reduce, dark, compact, H, income, bills, baseAura, auraSpeed, hasData]);
 
   // ── Pointer / keyboard hit-testing ─────────────────────────────────────────
   const pick = (clientX, clientY) => {

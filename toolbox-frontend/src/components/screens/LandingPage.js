@@ -63,6 +63,7 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(true);
   const [story, setStory] = useState(null);
   const [scrub, setScrub] = useState(null); // scrubbed day from the Cash Flow River
+  const heroRef = React.useRef(null); // greeting block, parallaxed to the pointer
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -131,13 +132,23 @@ export default function LandingPage() {
   const hasProjection = projection && projection.series && projection.series.length > 1;
 
   return (
-    <Box sx={{ pb: { xs: 4, md: 2 }, position: 'relative' }}>
-      {/* Living backdrop that reflects the derived financial weather */}
-      <AuroraBackground />
+    <Box
+      sx={{ pb: { xs: 4, md: 2 }, position: 'relative' }}
+      onPointerMove={(e) => {
+        if (!heroRef.current || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        const dx = (e.clientX - r.left) / r.width - 0.5;
+        const dy = (e.clientY - r.top) / r.height - 0.5;
+        heroRef.current.style.transform = `translate3d(${dx * 14}px, ${dy * 10}px, 0)`;
+      }}
+      onPointerLeave={() => { if (heroRef.current) { heroRef.current.style.transition = 'transform 500ms cubic-bezier(0.34,1.56,0.64,1)'; heroRef.current.style.transform = 'none'; setTimeout(() => { if (heroRef.current) heroRef.current.style.transition = 'transform 80ms linear'; }, 40); } }}
+    >
+      {/* Living backdrop — reflects the derived weather, or the scrubbed day's outlook */}
+      <AuroraBackground weatherKey={scrub && !scrub.isToday ? (scrub.balance < 0 ? 'storm' : scrub.balance < 3000 ? 'pressure' : 'clear') : undefined} />
       <Box sx={{ position: 'relative', zIndex: 1 }}>
       {/* Greeting + climate */}
       <Reveal>
-        <Box sx={{ px: { xs: 0.5, sm: 1 }, pt: { xs: 1, sm: 2 }, mb: 2 }}>
+        <Box ref={heroRef} sx={{ px: { xs: 0.5, sm: 1 }, pt: { xs: 1, sm: 2 }, mb: 2, willChange: 'transform' }}>
           <Typography
             sx={{
               fontFamily: type.displayFamily,

@@ -107,6 +107,7 @@ export default function MoneyUniverse({
     const stars = []; // static backdrop specks
     const trails = bodies.map(() => []); // recent positions per body → comet tails
     const TRAIL = compact ? 12 : 18;
+    const meteors = []; // occasional shooting stars
 
     const resize = () => {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -136,6 +137,26 @@ export default function MoneyUniverse({
       // Starfield
       for (const s of stars) { ctx.globalAlpha = s.a * (dark ? 1 : 0.6); ctx.fillStyle = dark ? '#fff' : '#5b6480'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 7); ctx.fill(); }
       ctx.globalAlpha = 1;
+
+      // Shooting stars — a rare streak across the field, purely ambient.
+      if (!reduce) {
+        if (Math.random() < 0.007 && meteors.length < 2) {
+          const dir = Math.random() < 0.5 ? 1 : -1;
+          meteors.push({ x: dir > 0 ? -20 : W + 20, y: Math.random() * Hh * 0.55, vx: dir * (5 + Math.random() * 3), vy: 1.3 + Math.random() * 1.6, life: 1 });
+        }
+        ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+        for (let i = meteors.length - 1; i >= 0; i--) {
+          const m = meteors[i];
+          m.x += m.vx; m.y += m.vy; m.life -= 0.016;
+          if (m.life <= 0 || m.x < -40 || m.x > W + 40 || m.y > Hh + 40) { meteors.splice(i, 1); continue; }
+          const grad = ctx.createLinearGradient(m.x, m.y, m.x - m.vx * 4.5, m.y - m.vy * 4.5);
+          grad.addColorStop(0, `rgba(255,255,255,${0.85 * m.life})`);
+          grad.addColorStop(1, 'rgba(120,180,255,0)');
+          ctx.strokeStyle = grad; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(m.x, m.y); ctx.lineTo(m.x - m.vx * 4.5, m.y - m.vy * 4.5); ctx.stroke();
+        }
+        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      }
 
       // Positions
       const pts = bodies.map((b, i) => {

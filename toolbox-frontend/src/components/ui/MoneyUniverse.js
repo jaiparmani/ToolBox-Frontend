@@ -105,6 +105,8 @@ export default function MoneyUniverse({
 
     let raf = 0, running = true, t = 0, dpr = 1, W = 0, Hh = 0;
     const stars = []; // static backdrop specks
+    const trails = bodies.map(() => []); // recent positions per body → comet tails
+    const TRAIL = compact ? 12 : 18;
 
     const resize = () => {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -151,6 +153,26 @@ export default function MoneyUniverse({
       });
       ctx.globalAlpha = 1;
 
+      // Comet trails — each body leaves a fading, tapering tail. Additive so
+      // overlaps bloom. (Held still under reduced motion: no history, no tails.)
+      if (!reduce) {
+        bodies.forEach((b, i) => { const tr = trails[i]; tr.push(pts[i]); if (tr.length > TRAIL) tr.shift(); });
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
+        bodies.forEach((b, i) => {
+          const tr = trails[i]; const on = hover === i;
+          for (let k = 1; k < tr.length; k++) {
+            const a = k / tr.length; // head brightest
+            ctx.globalAlpha = a * a * (on ? 0.55 : 0.32);
+            ctx.strokeStyle = b.color;
+            ctx.lineWidth = Math.max(0.5, a * b.r * 0.9);
+            ctx.beginPath(); ctx.moveTo(tr[k - 1].x, tr[k - 1].y); ctx.lineTo(tr[k].x, tr[k].y); ctx.stroke();
+          }
+        });
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+      }
+
       // Star: net position (eased toward the scrubbed target), weather-tinted aura
       dispNetRef.current += (targetNetRef.current - dispNetRef.current) * (reduce ? 1 : 0.14);
       const dNet = dispNetRef.current;
@@ -171,10 +193,13 @@ export default function MoneyUniverse({
       // Bodies
       bodies.forEach((b, i) => {
         const p = pts[i]; const on = hover === i;
-        const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, b.r * 2.6);
-        glow.addColorStop(0, hexA(b.color, on ? 0.5 : 0.32));
+        // Bloom halo — additive so overlapping bodies glow into each other.
+        ctx.globalCompositeOperation = 'lighter';
+        const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, b.r * 3);
+        glow.addColorStop(0, hexA(b.color, on ? 0.6 : 0.4));
         glow.addColorStop(1, hexA(b.color, 0));
-        ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p.x, p.y, b.r * 2.6, 0, 7); ctx.fill();
+        ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p.x, p.y, b.r * 3, 0, 7); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
         const g = ctx.createRadialGradient(p.x - b.r * 0.3, p.y - b.r * 0.3, 0, p.x, p.y, b.r);
         g.addColorStop(0, hexA('#ffffff', dark ? 0.9 : 0.95)); g.addColorStop(0.4, b.color); g.addColorStop(1, hexA(b.color, 0.7));
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, b.r, 0, 7); ctx.fill();

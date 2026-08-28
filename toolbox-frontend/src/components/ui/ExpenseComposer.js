@@ -9,6 +9,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CheckIcon from '@mui/icons-material/Check';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import { accents, motion as motionTokens } from '../../theme/tokens';
 import { money } from './money';
 
@@ -37,7 +38,7 @@ const SlideUp = React.forwardRef((props, ref) => <Slide direction="up" ref={ref}
 
 export default function ExpenseComposer({
   open, editing, data, onChange, onClose, onSave, saving, categories = [], tags = [],
-  onSmartParse, onAddBatch,
+  onSmartParse, onAddBatch, onAddOne,
 }) {
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
@@ -50,6 +51,7 @@ export default function ExpenseComposer({
   const [batch, setBatch] = React.useState([]);
   const [nlError, setNlError] = React.useState(null);
   const [committing, setCommitting] = React.useState(false);
+  const [addingIdx, setAddingIdx] = React.useState(null);
 
   const activeType = TYPES.find(t => t.id === (data.transactionType || 'expense')) || TYPES[0];
   const heroColor = activeType.color;
@@ -109,7 +111,23 @@ export default function ExpenseComposer({
     catch (e) { setNlError(e.message || 'Could not save those.'); setCommitting(false); }
   };
 
-  const batchMode = batch.length > 1;
+  // Add just one row from the batch, in place — the composer stays open on the
+  // rest so you can pick and choose. Closes once the list is emptied.
+  const addOne = async (it, i) => {
+    if (!onAddOne || addingIdx !== null || committing) return;
+    setAddingIdx(i); setNlError(null);
+    try {
+      await onAddOne(it);
+      setBatch(prev => {
+        const next = prev.filter((_, j) => j !== i);
+        if (next.length === 0) onClose?.();
+        return next;
+      });
+    } catch (e) { setNlError(e.message || 'Could not add that.'); }
+    finally { setAddingIdx(null); }
+  };
+
+  const batchMode = batch.length > 0;
   const batchTotal = batch.reduce((s, i) => s + (Number(i.amount) || 0), 0);
 
   return (
@@ -221,7 +239,7 @@ export default function ExpenseComposer({
         {batchMode ? (
           <>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Review before adding</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Add all, or one at a time with +</Typography>
               <Typography variant="caption" sx={{ color: accents.violet, fontWeight: 650, cursor: 'pointer' }}
                 onClick={() => { setBatch([]); setNlError(null); }}>Start over</Typography>
             </Box>
@@ -240,6 +258,13 @@ export default function ExpenseComposer({
                     <Typography sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: income ? accents.green : 'text.primary', flexShrink: 0 }}>
                       {income ? '+' : ''}{money(it.amount)}
                     </Typography>
+                    {onAddOne && (
+                      <IconButton size="small" onClick={() => addOne(it, i)} disabled={addingIdx !== null || committing}
+                        aria-label={`Add ${it.description || 'this'}`}
+                        sx={{ flexShrink: 0, width: 30, height: 30, color: accents.violet, border: '1px solid', borderColor: `${accents.violet}44` }}>
+                        {addingIdx === i ? <CircularProgress size={14} sx={{ color: accents.violet }} /> : <AddRoundedIcon sx={{ fontSize: 18 }} />}
+                      </IconButton>
+                    )}
                   </Box>
                 );
               })}
@@ -331,7 +356,7 @@ export default function ExpenseComposer({
         {batchMode ? (
           <Button fullWidth size="large" variant="contained" onClick={runBatch} disabled={committing}
             sx={{ py: 1.4, fontSize: '1rem', fontWeight: 650, background: `linear-gradient(135deg, ${accents.blue}, ${accents.blue}cc)`, boxShadow: `0 10px 24px ${accents.blue}55` }}>
-            {committing ? 'Adding…' : `Add all ${batch.length}`}
+            {committing ? 'Adding…' : batch.length === 1 ? 'Add it' : `Add all ${batch.length}`}
           </Button>
         ) : (
           <Button fullWidth size="large" variant="contained" onClick={onSave} disabled={saving || !canSave}

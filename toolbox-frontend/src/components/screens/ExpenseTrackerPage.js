@@ -440,6 +440,17 @@ export default function ExpenseTrackerPage() {
    loadSummary();
  };
 
+ // Commit a single reviewed row without closing the composer, so the user can
+ // add a batch one at a time. Throws so the composer can surface a failure.
+ const addExpenseOne = async (item) => {
+   const result = await bulkAddExpenses([item], true);
+   feedback('success');
+   window.dispatchEvent(new Event('toolbox:notify-refresh'));
+   setSuccess(`Added ${result.count === 1 ? (result.items?.[0]?.description || 'expense') : `${result.count} transactions`}`);
+   loadExpenses();
+   loadSummary();
+ };
+
  const openSplitForm = () => {
    setSplitForm({
      open: true, saving: false, amount: '', description: '', categoryId: '',
@@ -1836,6 +1847,7 @@ export default function ExpenseTrackerPage() {
        onSave={saveExpense}
        onSmartParse={(text) => bulkAddExpenses(text, false)}
        onAddBatch={addExpenseBatch}
+       onAddOne={addExpenseOne}
      />
 
      {/* Category Form Dialog */}

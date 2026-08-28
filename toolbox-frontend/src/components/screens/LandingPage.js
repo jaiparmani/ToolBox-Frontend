@@ -25,7 +25,7 @@ import {
   FinancialWeather, SafeToSpendHero, MoneyCommandBar, MoneyPulse, CashFlowRiver, AttentionLayer,
   MoneyUniverse, TransactionStoryDrawer, buildStoryFromEvent, copilotToItem,
 } from '../ui';
-import { accents } from '../../theme/tokens';
+import { accents, type } from '../../theme/tokens';
 import { money } from '../ui/money';
 
 /**
@@ -140,11 +140,16 @@ export default function LandingPage() {
         <Box sx={{ px: { xs: 0.5, sm: 1 }, pt: { xs: 1, sm: 2 }, mb: 2 }}>
           <Typography
             sx={{
-              fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.02,
-              fontSize: { xs: '1.9rem', sm: '2.5rem' },
-              backgroundImage: `linear-gradient(120deg, ${accents.blue} 10%, ${accents.violet} 55%, ${accents.red} 100%)`,
+              fontFamily: type.displayFamily,
+              fontWeight: 800, letterSpacing: '-0.035em', lineHeight: 1.0,
+              fontSize: { xs: '2rem', sm: '2.7rem' },
+              backgroundImage: `linear-gradient(110deg, ${accents.blue} 0%, ${accents.cyan} 22%, ${accents.violet} 52%, ${accents.red} 82%, ${accents.blue} 100%)`,
+              backgroundSize: '220% auto',
               backgroundClip: 'text', WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent', color: 'transparent',
+              animation: 'greetShimmer 7s linear infinite',
+              '@keyframes greetShimmer': { to: { backgroundPositionX: '220%' } },
+              '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
             }}
           >
             {getGreeting()}, {displayName}.

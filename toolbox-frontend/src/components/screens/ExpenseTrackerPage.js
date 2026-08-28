@@ -28,7 +28,6 @@ import {
   Close as CloseIcon,
   Logout as LogoutIcon,
   AutoAwesome as AutoAwesomeIcon,
-  UploadFile as UploadFileIcon,
   Insights as InsightsIcon,
   Lightbulb as LightbulbIcon,
   WarningAmber as WarningAmberIcon,
@@ -200,10 +199,6 @@ export default function ExpenseTrackerPage() {
  const [quickAddLoading, setQuickAddLoading] = useState(false);
 
  // Bulk import: paste a chat log, review what was found, then save
- const [bulkImport, setBulkImport] = useState({
-   open: false, text: '', loading: false, saving: false, preview: null
- });
-
  // Spending review written by the model
  const [insight, setInsight] = useState({ data: null, loading: false, loaded: false });
 
@@ -432,46 +427,17 @@ export default function ExpenseTrackerPage() {
    }
  };
 
- const openBulkImport = () => setBulkImport({
-   open: true, text: '', loading: false, saving: false, preview: null
- });
-
- const closeBulkImport = () => setBulkImport(prev => ({ ...prev, open: false }));
-
- // Dry run first - the model decides what counts as a transaction, so the
- // user sees the rows before anything is written.
- const previewBulkImport = async () => {
-   if (!bulkImport.text.trim()) {
-     setError('Paste some text to import first');
-     return;
-   }
-   setBulkImport(prev => ({ ...prev, loading: true, preview: null }));
-   try {
-     const result = await bulkAddExpenses(bulkImport.text.trim(), false);
-     setBulkImport(prev => ({ ...prev, loading: false, preview: result }));
-     if (result.count === 0) {
-       setError(result.detail || 'No transactions were found in that text.');
-     }
-   } catch (error) {
-     setBulkImport(prev => ({ ...prev, loading: false }));
-     setError(error.message || 'Failed to read that text');
-   }
- };
-
- const commitBulkImport = async () => {
-   setBulkImport(prev => ({ ...prev, saving: true }));
-   try {
-     // Send back the rows on screen rather than the text: no second model
-     // call, and no chance of saving something other than what was reviewed.
-     const result = await bulkAddExpenses(bulkImport.preview.items, true);
-     setSuccess(`Imported ${result.count} ${result.count === 1 ? 'transaction' : 'transactions'}`);
-     setBulkImport({ open: false, text: '', loading: false, saving: false, preview: null });
-     loadExpenses();
-     loadSummary();
-   } catch (error) {
-     setBulkImport(prev => ({ ...prev, saving: false }));
-     setError(error.message || 'Failed to save the imported expenses');
-   }
+ // Commit a reviewed batch straight from the composer's Smart-add flow. Sends
+ // the reviewed rows (not the text) so nothing but what was seen is written.
+ // Throws on failure so the composer can surface it inline.
+ const addExpenseBatch = async (items) => {
+   const result = await bulkAddExpenses(items, true);
+   feedback('success');
+   window.dispatchEvent(new Event('toolbox:notify-refresh'));
+   setSuccess(`Added ${result.count} ${result.count === 1 ? 'transaction' : 'transactions'}`);
+   closeExpenseForm();
+   loadExpenses();
+   loadSummary();
  };
 
  const openSplitForm = () => {
@@ -1038,11 +1004,6 @@ export default function ExpenseTrackerPage() {
            <Tooltip title="Refresh">
              <IconButton onClick={loadAllData} disabled={loading} size="small" sx={{ width: 40, height: 40 }}>
                <RefreshIcon fontSize="small" />
-             </IconButton>
-           </Tooltip>
-           <Tooltip title="Import from a pasted chat log">
-             <IconButton onClick={openBulkImport} size="small" sx={{ width: 40, height: 40 }}>
-               <UploadFileIcon fontSize="small" />
              </IconButton>
            </Tooltip>
            {/* Full-form actions only where there is room for them */}
@@ -1873,6 +1834,8 @@ export default function ExpenseTrackerPage() {
        onClose={closeExpenseForm}
        onChange={(patch) => setExpenseForm(prev => ({ ...prev, data: { ...prev.data, ...patch } }))}
        onSave={saveExpense}
+       onSmartParse={(text) => bulkAddExpenses(text, false)}
+       onAddBatch={addExpenseBatch}
      />
 
      {/* Category Form Dialog */}
@@ -2056,127 +2019,6 @@ export default function ExpenseTrackerPage() {
      </Dialog>
 
 
-     {/* Bulk Import Dialog */}
-     <Dialog open={bulkImport.open} onClose={closeBulkImport} maxWidth="md" fullWidth>
-       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-         <Box
-           sx={{
-             width: 40, height: 40, borderRadius: '12px',
-             background: 'linear-gradient(135deg, #BF5AF2, #0A84FF)',
-             display: 'flex', alignItems: 'center', justifyContent: 'center',
-             boxShadow: '0 6px 16px rgba(191,90,242,0.4)',
-             flexShrink: 0,
-           }}
-         >
-           <UploadFileIcon sx={{ color: '#fff', fontSize: 20 }} />
-         </Box>
-         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-           <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
-             Bulk Import
-           </Typography>
-           <Typography variant="body2" color="text.secondary">
-             Paste a chat log or a list of notes - nothing is saved until you confirm
-           </Typography>
-         </Box>
-         <IconButton onClick={closeBulkImport} size="small">
-           <CloseIcon fontSize="small" />
-         </IconButton>
-       </DialogTitle>
-       <DialogContent>
-         <TextField
-           fullWidth
-           multiline
-           minRows={6}
-           sx={{ mt: 1 }}
-           placeholder={'[28/05/25, 3:21:37 PM] Jai: 20 aamras\n[28/05/25, 6:48:57 PM] Jai: 58 chai vada pav\n250 lunch with team'}
-           value={bulkImport.text}
-           onChange={(e) => setBulkImport(prev => ({ ...prev, text: e.target.value, preview: null }))}
-           disabled={bulkImport.loading || bulkImport.saving}
-         />
-
-         {bulkImport.loading && (
-           <Box sx={{ mt: 2 }}>
-             <LinearProgress />
-             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-               Reading your text - this can take up to a minute on the free AI tier.
-               Saving afterwards is instant.
-             </Typography>
-           </Box>
-         )}
-
-         {bulkImport.preview && bulkImport.preview.count > 0 && (
-           <Box sx={{ mt: 3 }}>
-             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-               Found {bulkImport.preview.count}{' '}
-               {bulkImport.preview.count === 1 ? 'transaction' : 'transactions'} - review before saving
-             </Typography>
-             <TableContainer sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-               <Table size="small">
-                 <TableHead>
-                   <TableRow>
-                     <TableCell>Date</TableCell>
-                     <TableCell>Description</TableCell>
-                     <TableCell>Category</TableCell>
-                     <TableCell>Type</TableCell>
-                     <TableCell align="right">Amount</TableCell>
-                   </TableRow>
-                 </TableHead>
-                 <TableBody>
-                   {bulkImport.preview.items.map((item, i) => (
-                     <TableRow key={i} hover>
-                       <TableCell>
-                         <Typography variant="body2" color="text.secondary">
-                           {item.date || 'today'}
-                         </Typography>
-                       </TableCell>
-                       <TableCell>{item.description}</TableCell>
-                       <TableCell>
-                         <Chip label={item.category_name} size="small" variant="outlined" />
-                       </TableCell>
-                       <TableCell>
-                         <Typography
-                           variant="caption"
-                           sx={{ textTransform: 'capitalize' }}
-                           color={item.transaction_type === 'income' ? 'success.main' : 'text.secondary'}
-                         >
-                           {item.transaction_type}
-                         </Typography>
-                       </TableCell>
-                       <TableCell align="right">
-                         <Typography variant="body2" fontWeight={600}>
-                           {formatCurrency(item.amount)}
-                         </Typography>
-                       </TableCell>
-                     </TableRow>
-                   ))}
-                 </TableBody>
-               </Table>
-             </TableContainer>
-           </Box>
-         )}
-       </DialogContent>
-       <DialogActions>
-         <Button onClick={closeBulkImport} color="inherit">Cancel</Button>
-         {!bulkImport.preview?.count ? (
-           <Button
-             onClick={previewBulkImport}
-             variant="contained"
-             disabled={bulkImport.loading || !bulkImport.text.trim()}
-             startIcon={<AutoAwesomeIcon />}
-           >
-             {bulkImport.loading ? 'Reading...' : 'Preview'}
-           </Button>
-         ) : (
-           <Button
-             onClick={commitBulkImport}
-             variant="contained"
-             disabled={bulkImport.saving}
-           >
-             {bulkImport.saving ? 'Saving...' : `Save ${bulkImport.preview.count}`}
-           </Button>
-         )}
-       </DialogActions>
-     </Dialog>
 
 
      {/* Manual split - exact numbers, no model call */}

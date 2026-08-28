@@ -17,6 +17,7 @@ import { getExpenseSummary, getSplitBalances, getCopilotCards, dismissCopilotCar
 import OwedHero from '../ui/OwedHero';
 import Reveal from '../ui/Reveal';
 import AuroraBackground from '../motion/AuroraBackground';
+import CursorComet from '../motion/CursorComet';
 import TiltCard from '../motion/TiltCard';
 import SummaryStrip from '../ui/SummaryStrip';
 import { SummarySkeleton } from '../ui/Skeletons';
@@ -145,6 +146,8 @@ export default function LandingPage() {
     >
       {/* Living backdrop — reflects the derived weather, or the scrubbed day's outlook */}
       <AuroraBackground weatherKey={scrub && !scrub.isToday ? (scrub.balance < 0 ? 'storm' : scrub.balance < 3000 ? 'pressure' : 'clear') : undefined} />
+      {/* A comet of sparks trailing the cursor (desktop, motion-on only) */}
+      <CursorComet />
       <Box sx={{ position: 'relative', zIndex: 1 }}>
       {/* Greeting + climate */}
       <Reveal>

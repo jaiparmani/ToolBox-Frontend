@@ -198,6 +198,23 @@ export default function MoneyUniverse({
       });
       ctx.globalAlpha = 1;
 
+      // Constellation web — faint threads between the spending worlds, so they
+      // read as one cluster rather than scattered dots.
+      const cats = [];
+      bodies.forEach((b, i) => { if (b.kind === 'category') cats.push(pts[i]); });
+      if (cats.length > 1) {
+        ctx.strokeStyle = dark ? '#9ec5ff' : '#6b7fb0'; ctx.lineWidth = 0.75;
+        for (let a = 0; a < cats.length; a++) {
+          for (let c = a + 1; c < cats.length; c++) {
+            const d = Math.hypot(cats[a].x - cats[c].x, cats[a].y - cats[c].y);
+            ctx.globalAlpha = Math.max(0, 0.14 - d / (oMax * 22)); // nearer worlds link brighter
+            if (ctx.globalAlpha <= 0.01) continue;
+            ctx.beginPath(); ctx.moveTo(cats[a].x, cats[a].y); ctx.lineTo(cats[c].x, cats[c].y); ctx.stroke();
+          }
+        }
+        ctx.globalAlpha = 1;
+      }
+
       // Comet trails — each body leaves a fading, tapering tail. Additive so
       // overlaps bloom. (Held still under reduced motion: no history, no tails.)
       if (!reduce) {
@@ -247,6 +264,10 @@ export default function MoneyUniverse({
       bodies.forEach((b, i) => {
         const p = pts[i]; const on = hoverRef.current === i;
         const br = b.r * pop;
+        // Depth of field — worlds on the outer rings sit softly out of focus; the
+        // one you hover snaps sharp, so attention pulls it forward.
+        const blur = (reduce || on) ? 0 : Math.max(0, (b.ring - 0.55) * 6);
+        if (blur > 0.2) ctx.filter = `blur(${blur.toFixed(1)}px)`;
         // Bloom halo — additive so overlapping bodies glow into each other.
         ctx.globalCompositeOperation = 'lighter';
         const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, br * 3);
@@ -257,6 +278,7 @@ export default function MoneyUniverse({
         const g = ctx.createRadialGradient(p.x - br * 0.3, p.y - br * 0.3, 0, p.x, p.y, br);
         g.addColorStop(0, hexA('#ffffff', dark ? 0.9 : 0.95)); g.addColorStop(0.4, b.color); g.addColorStop(1, hexA(b.color, 0.7));
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, br, 0, 7); ctx.fill();
+        ctx.filter = 'none';
         if (on) { ctx.strokeStyle = dark ? '#fff' : '#111'; ctx.globalAlpha = 0.8; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, b.r + 4, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
       });
 

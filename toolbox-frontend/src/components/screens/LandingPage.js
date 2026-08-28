@@ -65,6 +65,7 @@ export default function LandingPage() {
   const [story, setStory] = useState(null);
   const [scrub, setScrub] = useState(null); // scrubbed day from the Cash Flow River
   const heroRef = React.useRef(null); // greeting block, parallaxed to the pointer
+  const gridRef = React.useRef(null); // feature grid, magnetically leans to the pointer
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -286,8 +287,18 @@ export default function LandingPage() {
         <SectionHeader title="Jump to" sx={{ px: 0.5 }} />
       </Reveal>
       <Box
+        ref={gridRef}
+        onPointerMove={(e) => {
+          if (window.matchMedia?.('(pointer: coarse)').matches || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+          const r = e.currentTarget.getBoundingClientRect();
+          const dx = (e.clientX - r.left) / r.width - 0.5;
+          const dy = (e.clientY - r.top) / r.height - 0.5;
+          e.currentTarget.style.transition = 'transform 120ms ease-out';
+          e.currentTarget.style.transform = `translate3d(${dx * 10}px, ${dy * 8}px, 0)`;
+        }}
+        onPointerLeave={(e) => { e.currentTarget.style.transition = 'transform 500ms cubic-bezier(0.34,1.56,0.64,1)'; e.currentTarget.style.transform = 'none'; }}
         sx={{
-          display: 'grid', gap: 1.25,
+          display: 'grid', gap: 1.25, willChange: 'transform',
           gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(5, 1fr)' },
         }}
       >

@@ -190,25 +190,35 @@ export default function Assistant() {
 
       {/* Empty state — the orb as the star, big and breathing */}
       {turns.length === 0 && (
-        <Box sx={{ textAlign: 'center', px: 3, pt: { xs: 3.5, sm: 4.5 }, pb: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2.25 }}>
+        <Box sx={{ textAlign: 'center', px: 3, pt: { xs: 3.5, sm: 4.5 }, pb: 2, position: 'relative',
+          '@keyframes assistRise': { from: { opacity: 0, transform: 'translateY(8px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+          '@keyframes assistAura': { '0%,100%': { opacity: 0.55, transform: 'translate(-50%,-50%) scale(1)' }, '50%': { opacity: 0.9, transform: 'translate(-50%,-50%) scale(1.12)' } } }}>
+          {/* Ambient aura pooling behind the orb */}
+          <Box aria-hidden sx={{ position: 'absolute', top: 78, left: '50%', width: 260, height: 260,
+            transform: 'translate(-50%,-50%)', pointerEvents: 'none', borderRadius: '50%',
+            background: `radial-gradient(circle, ${accents.violet}3a, ${accents.blue}1c 45%, transparent 70%)`,
+            filter: 'blur(20px)', animation: reduce ? 'none' : 'assistAura 5s ease-in-out infinite' }} />
+          <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center', mb: 2.25 }}>
             <AssistantOrb state={orbState} size={82} reduce={reduce} />
           </Box>
-          <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: '1.4rem', letterSpacing: '-0.025em' }}>
-            {loading ? 'Thinking…' : 'How can I help?'}
+          <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: '1.4rem', letterSpacing: '-0.025em', position: 'relative' }}>
+            {loading ? (thinkingText || 'Thinking…') : 'How can I help?'}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, mb: 2.25, maxWidth: 360, mx: 'auto' }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, mb: 2.25, maxWidth: 360, mx: 'auto', position: 'relative' }}>
             Add an expense, split a bill, search, or ask how you're doing — one box, one brain.
           </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.85, justifyContent: 'center' }}>
-            {EXAMPLES.map(ex => (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.85, justifyContent: 'center', position: 'relative' }}>
+            {EXAMPLES.map((ex, i) => (
               <Chip key={ex} label={ex} onClick={() => send(ex)}
                 sx={{
                   cursor: 'pointer', borderRadius: 999, fontWeight: 500, height: 32,
                   border: '1px solid', borderColor: `${accents.violet}3d`,
                   backgroundColor: `${accents.violet}0f`, color: 'text.primary',
-                  transition: `all ${motionTokens.fast}ms ${motionTokens.ease}`,
-                  '&:hover': { borderColor: accents.violet, backgroundColor: `${accents.violet}24`, transform: 'translateY(-1px)', boxShadow: `0 6px 16px -6px ${accents.violet}88` },
+                  opacity: reduce ? 1 : 0,
+                  animation: reduce ? 'none' : `assistRise 380ms ${motionTokens.ease} forwards`,
+                  animationDelay: reduce ? undefined : `${140 + i * 55}ms`,
+                  transition: `border-color ${motionTokens.fast}ms ${motionTokens.ease}, background-color ${motionTokens.fast}ms ${motionTokens.ease}, box-shadow ${motionTokens.fast}ms ${motionTokens.ease}`,
+                  '&:hover': { borderColor: accents.violet, backgroundColor: `${accents.violet}24`, boxShadow: `0 6px 16px -6px ${accents.violet}88` },
                 }} />
             ))}
           </Box>

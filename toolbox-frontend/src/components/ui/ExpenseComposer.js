@@ -55,6 +55,10 @@ export default function ExpenseComposer({
 
   const activeType = TYPES.find(t => t.id === (data.transactionType || 'expense')) || TYPES[0];
   const heroColor = activeType.color;
+  // Categories are typed on the backend, and it rejects a save whose type and
+  // category type disagree. So only offer categories that match the chosen type
+  // — otherwise you could pick an expense category for an income and get a 400.
+  const visibleCats = categories.filter(c => (c.transaction_type || 'expense') === activeType.id);
 
   React.useEffect(() => {
     if (open) {
@@ -199,7 +203,13 @@ export default function ExpenseComposer({
               {TYPES.map((t) => {
                 const active = t.id === activeType.id;
                 return (
-                  <Chip key={t.id} label={t.label} onClick={() => set({ transactionType: t.id })}
+                  <Chip key={t.id} label={t.label} onClick={() => {
+                      // Drop a category that no longer matches the new type, so
+                      // the payload never carries a mismatched pair.
+                      const cur = categories.find(c => c.id === data.categoryId);
+                      const keep = cur && (cur.transaction_type || 'expense') === t.id;
+                      set(keep ? { transactionType: t.id } : { transactionType: t.id, categoryId: '' });
+                    }}
                     sx={{
                       flexShrink: 0, fontWeight: 600, borderRadius: 999, border: '1.5px solid',
                       borderColor: active ? t.color : 'divider',
@@ -280,7 +290,7 @@ export default function ExpenseComposer({
 
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 1 }}>Category</Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
-              {categories.map((cat) => {
+              {visibleCats.map((cat) => {
                 const active = data.categoryId === cat.id;
                 return (
                   <Chip key={cat.id} label={cat.name}
@@ -296,8 +306,10 @@ export default function ExpenseComposer({
                     }} />
                 );
               })}
-              {categories.length === 0 && (
-                <Typography variant="body2" color="text.secondary">No categories yet — add one first.</Typography>
+              {visibleCats.length === 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  No {activeType.label.toLowerCase()} categories yet — add one first.
+                </Typography>
               )}
             </Box>
 

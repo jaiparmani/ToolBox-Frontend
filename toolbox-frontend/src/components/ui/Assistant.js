@@ -149,15 +149,22 @@ export default function Assistant() {
           borderRadius: 4, overflow: 'hidden', display: 'flex', flexDirection: 'column',
           backgroundImage: `radial-gradient(120% 120% at 0% 0%, ${accents.violet}22, transparent 52%), radial-gradient(90% 90% at 100% 100%, ${accents.cyan}14, transparent 55%)`,
           backdropFilter: 'blur(34px) saturate(1.6)',
-          boxShadow: `0 30px 90px rgba(0,0,0,0.6), 0 0 60px -20px ${accents.violet}66`,
-          // A slowly colour-cycling gradient hairline — the AI console glow.
+          // The console's outer glow swells while it's working — the whole panel
+          // breathes with the orb rather than sitting inert around it.
+          boxShadow: orbState === 'idle'
+            ? `0 30px 90px rgba(0,0,0,0.6), 0 0 60px -20px ${accents.violet}66`
+            : `0 30px 90px rgba(0,0,0,0.6), 0 0 100px -14px ${orbState === 'thinking' ? accents.violet : accents.cyan}b0`,
+          transition: 'box-shadow 600ms ease',
+          // A colour-cycling gradient hairline — the AI console glow. It brightens
+          // and spins up when thinking/speaking.
           '&::before': {
             content: '""', position: 'absolute', inset: 0, borderRadius: 'inherit', padding: '1px', pointerEvents: 'none',
             background: `conic-gradient(from 0deg, ${accents.violet}, ${accents.cyan}, ${accents.blue}, ${accents.violet})`,
             WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
             WebkitMaskComposite: 'xor', maskComposite: 'exclude',
-            opacity: 0.55,
-            animation: reduce ? 'none' : 'dialogHue 7s linear infinite',
+            opacity: orbState === 'idle' ? 0.55 : 0.95,
+            transition: 'opacity 400ms ease',
+            animation: reduce ? 'none' : `dialogHue ${orbState === 'thinking' ? 2.4 : orbState === 'speaking' ? 4 : 7}s linear infinite`,
           },
           '@keyframes dialogHue': { to: { filter: 'hue-rotate(360deg)' } },
         },

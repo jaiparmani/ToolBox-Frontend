@@ -369,6 +369,46 @@ export const verifyOtp = async (identifier, code, remember = true) => {
 };
 
 /**
+ * MPIN sign-in — identifier + 6-digit PIN -> auth token (stored on success).
+ * The server rate-limits wrong PINs; a 429 comes back as a thrown error whose
+ * message explains the lockout, same as every other failure here.
+ */
+export const mpinLogin = async (identifier, mpin, remember = true) => {
+    const response = await publicFetch(`${API_BASE_URL}/mpin/login/`, {
+        method: 'POST', body: JSON.stringify({ identifier, mpin }),
+    });
+    const data = await response.json();
+    if (data.token) authUtils.login(data.token, data.user, remember);
+    return data;
+};
+
+/** Forgot MPIN — email a one-time reset code. Always resolves generically. */
+export const requestMpinReset = async (identifier) => {
+    const response = await publicFetch(`${API_BASE_URL}/mpin/reset/`, {
+        method: 'POST', body: JSON.stringify({ identifier }),
+    });
+    return await response.json();
+};
+
+/** Finish an MPIN reset — verify the emailed code, set a new PIN, and sign in. */
+export const confirmMpinReset = async (identifier, code, mpin, remember = true) => {
+    const response = await publicFetch(`${API_BASE_URL}/mpin/reset-confirm/`, {
+        method: 'POST', body: JSON.stringify({ identifier, code, mpin }),
+    });
+    const data = await response.json();
+    if (data.token) authUtils.login(data.token, data.user, remember);
+    return data;
+};
+
+/** Set or change the signed-in user's MPIN (password-gated on the server). */
+export const setMpin = async (password, mpin) => {
+    const response = await authenticatedFetch(`${API_BASE_URL}/mpin/set/`, {
+        method: 'POST', body: JSON.stringify({ password, mpin }),
+    });
+    return await response.json();
+};
+
+/**
  * Forgot password — request a reset link (sent to the email out-of-band).
  * Always resolves the same way, so it can't reveal which emails have accounts.
  */

@@ -64,6 +64,7 @@ import { money } from '../ui/money';
 import { feedback } from '../ui/feedback';
 import { FinancialWeatherBar, TransactionStoryDrawer, buildStoryFromExpense } from '../ui';
 import AuroraBackground from '../motion/AuroraBackground';
+import AssistantOrb from '../ui/AssistantOrb';
 import { accents, type } from '../../theme/tokens';
 
 // Color palette for categories
@@ -83,16 +84,41 @@ function AssistantNudge({ label }) {
      aria-label="Open the ToolBox assistant"
      onClick={open}
      sx={{
-       display: 'flex', alignItems: 'center', gap: 1.25, px: 2, py: 1.5, borderRadius: 3, cursor: 'pointer',
+       position: 'relative', overflow: 'hidden',
+       display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1.15, borderRadius: 3, cursor: 'pointer',
        border: '1px solid', borderColor: `${accents.violet}55`,
-       backgroundImage: `radial-gradient(120% 160% at 0% 0%, ${accents.violet}14, transparent 60%)`,
-       transition: 'border-color 0.2s ease',
-       '&:hover': { borderColor: accents.violet },
+       backgroundImage: `radial-gradient(120% 160% at 0% 0%, ${accents.violet}16, transparent 60%)`,
+       transition: 'border-color 0.2s ease, box-shadow 0.3s ease',
+       '@keyframes nudgeSheen': { '0%': { transform: 'translateX(-160%) skewX(-16deg)' }, '55%,100%': { transform: 'translateX(520%) skewX(-16deg)' } },
+       '@keyframes nudgeGlow': { '0%,100%': { boxShadow: `0 0 0 0 ${accents.violet}00` }, '50%': { boxShadow: `0 8px 30px -12px ${accents.violet}88` } },
+       '@keyframes caretBlink': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.2 } },
+       animation: 'nudgeGlow 4.5s ease-in-out infinite',
+       '&:hover': { borderColor: accents.violet, boxShadow: `0 10px 34px -12px ${accents.violet}aa` },
+       '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
      }}
    >
-     <AutoAwesomeIcon sx={{ color: accents.violet, fontSize: 20, flexShrink: 0 }} />
-     <Typography variant="body2" sx={{ flex: 1, color: 'text.secondary' }} noWrap>{label}</Typography>
-     <Box sx={{ display: { xs: 'none', sm: 'block' }, px: 0.75, py: 0.15, borderRadius: 1, border: '1px solid', borderColor: 'divider', fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary' }}>⌘K</Box>
+     {/* A band of light sweeping the bar — this is a live console, not a static field */}
+     <Box aria-hidden sx={{
+       position: 'absolute', top: 0, bottom: 0, left: 0, width: '30%', pointerEvents: 'none',
+       background: `linear-gradient(100deg, transparent, ${accents.violet}22, transparent)`,
+       animation: 'nudgeSheen 7s ease-in-out infinite',
+       '@media (prefers-reduced-motion: reduce)': { display: 'none' },
+     }} />
+     <Box sx={{ flexShrink: 0, position: 'relative' }}>
+       <AssistantOrb state="idle" size={30} />
+     </Box>
+     <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', position: 'relative' }}>
+       <Typography variant="body2" sx={{ color: 'text.secondary' }} noWrap>{label}</Typography>
+       {/* A soft caret, so the bar reads as something you type into */}
+       <Box aria-hidden sx={{
+         ml: '3px', width: '2px', height: '1.05em', borderRadius: '1px', flexShrink: 0,
+         background: `linear-gradient(180deg, ${accents.cyan}, ${accents.violet})`,
+         boxShadow: `0 0 7px ${accents.violet}aa`,
+         animation: 'caretBlink 1.1s steps(1) infinite',
+         '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+       }} />
+     </Box>
+     <Box sx={{ display: { xs: 'none', sm: 'block' }, px: 0.75, py: 0.15, borderRadius: 1, border: '1px solid', borderColor: `${accents.violet}44`, fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', position: 'relative', flexShrink: 0 }}>⌘K</Box>
    </Box>
  );
 }

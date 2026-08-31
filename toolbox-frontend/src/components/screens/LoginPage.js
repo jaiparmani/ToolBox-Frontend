@@ -1,22 +1,35 @@
 import React, { useState } from 'react';
-import { Typography, Box, TextField, Button, Alert, InputAdornment, Link, Divider, FormControlLabel, Checkbox } from '@mui/material';
-import { Person as PersonIcon, Lock as LockIcon, PinRounded, LockRounded, ShieldRounded } from '@mui/icons-material';
+import { Typography, Box, TextField, Button, Alert, InputAdornment, Link, Container, Paper } from '@mui/material';
+import {
+  Person as PersonIcon, Lock as LockIcon, PinRounded, LockRounded, ShieldRounded,
+  MailOutlineRounded, ArrowBackRounded, BoltRounded,
+} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { requestOtp, verifyOtp, mpinLogin, requestMpinReset, confirmMpinReset } from '../rest/userApis';
-import { AuroraShell } from './ForgotPasswordPage';
 import MpinField from '../ui/MpinField';
+import UnlockOverlay from '../motion/UnlockOverlay';
+import BrandLogo from '../motion/BrandLogo';
 import { accents, type } from '../../theme/tokens';
 
 /**
- * Unlock the account. The MPIN pad is the hero and the default path; email-OTP
- * and password are quiet, deliberate alternatives you opt into, not equal
- * mandatory steps. All the existing auth logic (token storage, remember-device,
- * generic errors) is preserved — this reorganises the surface around MPIN.
+ * Unlock your account.
+ *
+ * The MPIN pad is the hero and the default path. Email-OTP and password are
+ * quiet, deliberate alternatives you *opt into* — never a mandatory follow-up.
+ * On success the whole screen hands off to the UnlockOverlay: the vault clicks
+ * open, then we fall through to the app, so signing in feels like unlocking
+ * something rather than submitting a form.
+ *
+ * Every auth handler, API call, validation, error path and remember-device
+ * behaviour is preserved exactly; this file only reorganises the surface around
+ * MPIN and adds the cinematic layer on top.
  */
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const reduce = useReducedMotion();
   const [method, setMethod] = useState('mpin');       // 'mpin' | 'otp' | 'password' | 'mpin-reset'
   const [otpStep, setOtpStep] = useState('identify');  // 'identify' | 'code'
   const [resetStep, setResetStep] = useState('request'); // 'request' | 'confirm'
@@ -29,8 +42,10 @@ export default function LoginPage() {
   const [error, setError] = useState(null);
   const [info, setInfo] = useState(null);
   const [remember, setRemember] = useState(true);
+  const [unlocked, setUnlocked] = useState(null);      // null | { label } → plays the success overlay
 
   const finish = () => { window.location.href = '/'; };
+  const succeed = (label) => setUnlocked({ label });   // hand off to the unlock cinematic
 
   // ---- MPIN (primary) ----
   const doMpin = async (pin) => {
@@ -43,7 +58,7 @@ export default function LoginPage() {
       const res = await mpinLogin(identifier.trim(), p, remember);
       if (!res.token) throw new Error(res.error || 'Invalid credentials.');
       setPinStatus('success');
-      setTimeout(finish, 560);
+      succeed('Welcome back');
     } catch (err) {
       setPinStatus('error');
       setError(err.message || 'That MPIN is not right.');
@@ -74,7 +89,7 @@ export default function LoginPage() {
       const res = await confirmMpinReset(identifier.trim(), code.trim(), p, remember);
       if (!res.token) throw new Error(res.error || 'That code is invalid or has expired.');
       setPinStatus('success');
-      setTimeout(finish, 560);
+      succeed('MPIN updated');
     } catch (err) {
       setPinStatus('error');
       setError(err.message || 'Could not reset your MPIN. Check the code and try again.');
@@ -102,7 +117,7 @@ export default function LoginPage() {
     try {
       const res = await verifyOtp(identifier.trim(), code.trim(), remember);
       if (!res.token) throw new Error(res.error || 'That code is invalid or has expired.');
-      finish();
+      succeed('Welcome back');
     } catch (err) { setError(err.message || 'That code is invalid or has expired.'); }
     finally { setLoading(false); }
   };
@@ -115,7 +130,7 @@ export default function LoginPage() {
     try {
       const res = await login(identifier.trim(), password, remember);
       if (!res.success) throw new Error(res.error || 'Invalid credentials.');
-      finish();
+      succeed('Welcome back');
     } catch (err) { setError(err.message || 'Invalid credentials.'); }
     finally { setLoading(false); }
   };
@@ -136,15 +151,253 @@ export default function LoginPage() {
     : 'Use your account password';
 
   const rememberRow = (
-    <FormControlLabel
-      sx={{ mt: 1, ml: 0 }}
-      control={<Checkbox size="small" checked={remember} onChange={(e) => setRemember(e.target.checked)} sx={{ py: 0.25 }} />}
-      label={<Typography variant="body2" color="text.secondary">Remember this device</Typography>}
+    <Box
+      component="label"
+      sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, mt: 1.25, cursor: 'pointer', userSelect: 'none' }}
+    >
+      <Box
+        component="input" type="checkbox" checked={remember}
+        onChange={(e) => setRemember(e.target.checked)}
+        sx={{ width: 17, height: 17, accentColor: accents.blue, cursor: 'pointer' }}
+      />
+      <Typography variant="body2" color="text.secondary">Remember this device</Typography>
+    </Box>
+  );
+
+  const idField = (autoFocus) => (
+    <TextField
+      fullWidth label="Email or username" value={identifier} required autoFocus={autoFocus} autoComplete="username"
+      onChange={(e) => setIdentifier(e.target.value)}
+      InputProps={{ startAdornment: <InputAdornment position="start"><PersonIcon /></InputAdornment> }}
     />
   );
 
-  // The unlock crest — a lock in a breathing, spinning aura. The security hero.
-  const crest = (
+  // Motion for the mode-switch: content slides + fades, the card height morphs
+  // (framer `layout`) so it feels like re-configuring one panel, not navigating.
+  const panelKey = `${method}:${method === 'otp' ? otpStep : method === 'mpin-reset' ? resetStep : ''}`;
+  const panelVariants = reduce
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 } }
+    : {
+        initial: { opacity: 0, x: 22, filter: 'blur(6px)' },
+        animate: { opacity: 1, x: 0, filter: 'blur(0px)' },
+      };
+  const panelTransition = { duration: reduce ? 0.18 : 0.34, ease: [0.32, 0.72, 0, 1] };
+
+  return (
+    <VaultShell>
+      {/* Header — brand + secure status (spans both columns) */}
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={{ xs: 2, md: 3 }}>
+        <Box display="flex" alignItems="center" gap={1.25}>
+          <BrandLogo size={30} />
+          <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: '1.05rem', letterSpacing: '-0.01em' }}>
+            ToolBox
+          </Typography>
+        </Box>
+        <SecureBadge />
+      </Box>
+
+      {/* Two-column "console" on desktop; a single stacked column on mobile. */}
+      <Box sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', md: 'minmax(0,0.92fr) minmax(0,1.08fr)' },
+        columnGap: { md: 4 }, alignItems: 'center',
+      }}>
+        {/* ── Identity · greeting · reassurance (the calm left panel) ── */}
+        <Box sx={{
+          display: 'flex', flexDirection: { xs: 'row', md: 'column' },
+          alignItems: { xs: 'center', md: 'flex-start' }, gap: 2, mb: { xs: 2, md: 0 },
+          pr: { md: 4 }, borderRight: { md: '1px solid' }, borderColor: { md: 'divider' },
+          alignSelf: { md: 'stretch' }, justifyContent: { md: 'center' },
+        }}>
+          <UnlockCrest />
+          <Box sx={{ minWidth: 0, position: 'relative', flex: { xs: 1, md: 'unset' } }}>
+            <motion.div
+              key={heroTitle}
+              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
+            >
+              <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: { xs: 'clamp(1.4rem,6vw,1.6rem)', md: '1.9rem' }, letterSpacing: '-0.02em', lineHeight: 1.1, mt: { md: 2 } }}>
+                {heroTitle}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{heroSub}</Typography>
+            </motion.div>
+            <ReassurancePoints />
+          </Box>
+        </Box>
+
+        {/* ── Interactive auth column ── */}
+        <Box sx={{ minWidth: 0 }}>
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
+      {info && (method === 'otp' ? otpStep === 'code' : method === 'mpin-reset' ? resetStep === 'confirm' : false) &&
+        <Alert severity="info" sx={{ mb: 2 }}>{info}</Alert>}
+
+      {/* Height-morphing container: swaps between auth modes without a hard cut.
+          The panel is an enter-only keyed remount (no exit-wait) so the mode
+          always advances instantly — even if an animation is throttled. */}
+      <motion.div layout={!reduce} transition={{ layout: { duration: 0.34, ease: [0.32, 0.72, 0, 1] } }} style={{ position: 'relative' }}>
+          <motion.div
+            key={panelKey}
+            initial={panelVariants.initial}
+            animate={panelVariants.animate}
+            transition={panelTransition}
+          >
+            {/* ---------- MPIN: the hero, shown by default ---------- */}
+            {method === 'mpin' && (
+              <Box>
+                <Box sx={{ mb: 2 }}>{idField(true)}</Box>
+                <MpinField value={mpin} onChange={(v) => { setMpin(v); if (pinStatus === 'error') setPinStatus('idle'); }}
+                  onComplete={(p) => doMpin(p)} status={pinStatus} disabled={loading || pinStatus === 'success'} autoFocus={false} />
+                <Button fullWidth variant="contained" size="large" disabled={loading || mpin.length !== 6 || pinStatus === 'success'}
+                  onClick={() => doMpin()} sx={{ mt: 2.25, py: 1.15 }}>
+                  {pinStatus === 'success' ? 'Unlocked ✓' : loading ? 'Unlocking…' : 'Unlock'}
+                </Button>
+                {rememberRow}
+                <SecurityNote />
+
+                {/* Clear hierarchy: OTP is a distinct, secondary path — not an equal link */}
+                <AltDivider />
+                <Button
+                  fullWidth variant="outlined" size="large"
+                  startIcon={<MailOutlineRounded />}
+                  onClick={() => switchTo('otp')}
+                  sx={{
+                    py: 1, color: 'text.secondary', borderColor: 'divider',
+                    '&:hover': { borderColor: `${accents.blue}88`, backgroundColor: `${accents.blue}0d`, color: 'text.primary' },
+                  }}
+                >
+                  Use Email OTP instead
+                </Button>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 0.75, mt: 1.75 }}>
+                  <Link component="button" type="button" variant="body2" underline="hover" sx={{ color: 'text.disabled' }} onClick={() => switchTo('mpin-reset')}>Forgot MPIN?</Link>
+                  <Typography variant="body2" color="text.disabled">·</Typography>
+                  <Link component="button" type="button" variant="body2" underline="hover" sx={{ color: 'text.disabled' }} onClick={() => switchTo('password')}>Use password</Link>
+                </Box>
+              </Box>
+            )}
+
+            {/* ---------- MPIN reset (forgot) ---------- */}
+            {method === 'mpin-reset' && (resetStep === 'request' ? (
+              <Box component="form" onSubmit={sendResetCode}>
+                {idField(true)}
+                <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} sx={{ mt: 2.25, py: 1.15 }}>
+                  {loading ? 'Sending…' : 'Email me a reset code'}
+                </Button>
+                <BackRow onClick={() => switchTo('mpin')} label="Back to MPIN" />
+              </Box>
+            ) : (
+              <Box>
+                <TextField
+                  fullWidth label="6-digit reset code" value={code} required autoFocus autoComplete="one-time-code" sx={{ mb: 2.5 }}
+                  inputProps={{ inputMode: 'numeric', maxLength: 6, style: { letterSpacing: '0.5em', fontSize: '1.25rem', textAlign: 'center' } }}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  InputProps={{ startAdornment: <InputAdornment position="start"><PinRounded /></InputAdornment> }}
+                />
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mb: 1.5 }}>Choose a new MPIN</Typography>
+                <MpinField value={mpin} onChange={(v) => { setMpin(v); if (pinStatus === 'error') setPinStatus('idle'); }}
+                  onComplete={(p) => doResetConfirm(p)} status={pinStatus} disabled={loading || pinStatus === 'success'} autoFocus={false} />
+                <Button fullWidth variant="contained" size="large" disabled={loading || mpin.length !== 6 || pinStatus === 'success'}
+                  onClick={() => doResetConfirm()} sx={{ mt: 2.25, py: 1.15 }}>
+                  {pinStatus === 'success' ? 'Done ✓' : loading ? 'Setting…' : 'Set new MPIN & sign in'}
+                </Button>
+                {rememberRow}
+                <Box display="flex" justifyContent="space-between" sx={{ mt: 2 }}>
+                  <Link component="button" type="button" variant="body2" onClick={() => { setResetStep('request'); setCode(''); setInfo(null); setError(null); }}>← Change details</Link>
+                  <Link component="button" type="button" variant="body2" onClick={sendResetCode}>Resend code</Link>
+                </Box>
+              </Box>
+            ))}
+
+            {/* ---------- Email OTP (alternative) ---------- */}
+            {method === 'otp' && (otpStep === 'identify' ? (
+              <Box component="form" onSubmit={sendCode}>
+                {idField(true)}
+                <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} sx={{ mt: 2.25, py: 1.15 }}>
+                  {loading ? 'Sending…' : 'Email me a code'}
+                </Button>
+                <BackRow onClick={() => switchTo('mpin')} label="Back to MPIN" />
+              </Box>
+            ) : (
+              <Box component="form" onSubmit={verify}>
+                <TextField
+                  fullWidth label="6-digit code" value={code} required autoFocus autoComplete="one-time-code"
+                  inputProps={{ inputMode: 'numeric', maxLength: 6, style: { letterSpacing: '0.5em', fontSize: '1.35rem', textAlign: 'center' } }}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  InputProps={{ startAdornment: <InputAdornment position="start"><PinRounded /></InputAdornment> }}
+                />
+                {rememberRow}
+                <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} sx={{ mt: 2, py: 1.15 }}>
+                  {loading ? 'Verifying…' : 'Verify & sign in'}
+                </Button>
+                <Box display="flex" justifyContent="space-between" sx={{ mt: 2 }}>
+                  <Link component="button" type="button" variant="body2"
+                    onClick={() => { setOtpStep('identify'); setCode(''); setInfo(null); setError(null); }}>← Change details</Link>
+                  <Link component="button" type="button" variant="body2" onClick={sendCode}>Resend code</Link>
+                </Box>
+                <BackRow onClick={() => switchTo('mpin')} label="Back to MPIN" subtle />
+              </Box>
+            ))}
+
+            {/* ---------- Password (alternative) ---------- */}
+            {method === 'password' && (
+              <Box component="form" onSubmit={doPassword}>
+                {idField(true)}
+                <TextField
+                  fullWidth label="Password" type="password" value={password} required autoComplete="current-password" sx={{ mt: 2 }}
+                  onChange={(e) => setPassword(e.target.value)}
+                  InputProps={{ startAdornment: <InputAdornment position="start"><LockIcon /></InputAdornment> }}
+                />
+                {rememberRow}
+                <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} sx={{ mt: 2, py: 1.15 }}>
+                  {loading ? 'Signing in…' : 'Sign in'}
+                </Button>
+                <Box display="flex" justifyContent="space-between" sx={{ mt: 2 }}>
+                  <Link component="button" type="button" variant="body2" onClick={() => navigate('/forgot-password')}>Forgot password?</Link>
+                  <Link component="button" type="button" variant="body2" onClick={() => switchTo('mpin')}>← Use MPIN instead</Link>
+                </Box>
+              </Box>
+            )}
+          </motion.div>
+      </motion.div>
+
+          <Box sx={{ borderTop: '1px solid', borderColor: 'divider', mt: 2.25, pt: 2, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              Don't have an account?{' '}
+              <Link component="button" type="button" variant="body2" sx={{ fontWeight: 600 }} onClick={() => navigate('/register')}>Create one</Link>
+            </Typography>
+          </Box>
+        </Box>{/* /interactive auth column */}
+      </Box>{/* /two-column grid */}
+
+      {/* The signature success cinematic */}
+      {unlocked && <UnlockOverlay label={unlocked.label} onDone={__demoUnlock ? () => {} : finish} />}
+    </VaultShell>
+  );
+}
+
+/** A tiny "encrypted / secure" status pill — reassurance through restraint. */
+function SecureBadge() {
+  return (
+    <Box sx={{
+      display: 'inline-flex', alignItems: 'center', gap: 0.6, px: 1, py: 0.4, borderRadius: 999,
+      border: '1px solid', borderColor: 'divider',
+      background: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+    }}>
+      <Box sx={{
+        width: 6, height: 6, borderRadius: '50%', background: accents.mint,
+        boxShadow: `0 0 8px ${accents.mint}`,
+        '@keyframes securePulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.4 } },
+        animation: 'securePulse 2.4s ease-in-out infinite',
+        '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+      }} />
+      <Typography variant="caption" sx={{ fontWeight: 600, letterSpacing: '0.02em', color: 'text.secondary' }}>Secure</Typography>
+    </Box>
+  );
+}
+
+/** The unlock crest — a lock in a breathing, spinning aura. The security hero. */
+function UnlockCrest() {
+  return (
     <Box aria-hidden sx={{ position: 'relative', width: 64, height: 64, flexShrink: 0,
       '@keyframes crestSpin': { to: { transform: 'rotate(360deg)' } },
       '@keyframes crestPulse': { '0%,100%': { opacity: 0.5, transform: 'scale(1)' }, '50%': { opacity: 0.85, transform: 'scale(1.12)' } },
@@ -164,149 +417,151 @@ export default function LoginPage() {
       </Box>
     </Box>
   );
+}
 
-  const idField = (autoFocus) => (
-    <TextField
-      fullWidth label="Email or username" value={identifier} required autoFocus={autoFocus} autoComplete="username"
-      onChange={(e) => setIdentifier(e.target.value)}
-      InputProps={{ startAdornment: <InputAdornment position="start"><PersonIcon /></InputAdornment> }}
-    />
-  );
-
+/**
+ * The left-panel trust markers — desktop only, where there's room. Quiet,
+ * icon-led, never shouty: security felt through restraint.
+ */
+function ReassurancePoints() {
+  const items = [
+    { icon: <ShieldRounded sx={{ fontSize: 16 }} />, label: 'Bank-grade encryption' },
+    { icon: <BoltRounded sx={{ fontSize: 16 }} />, label: 'One tap, six digits, in' },
+    { icon: <LockRounded sx={{ fontSize: 16 }} />, label: 'Private — we never see your PIN' },
+  ];
   return (
-    <AuroraShell>
-      <Box display="flex" alignItems="center" gap={2} mb={2.5}>
-        {crest}
-        <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: '1.7rem', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-            {heroTitle}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">{heroSub}</Typography>
-        </Box>
-      </Box>
-      <Divider sx={{ mb: 2.5 }} />
-
-      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
-      {info && (method === 'otp' ? otpStep === 'code' : method === 'mpin-reset' ? resetStep === 'confirm' : false) &&
-        <Alert severity="info" sx={{ mb: 2 }}>{info}</Alert>}
-
-      {/* ---------- MPIN: the hero, shown by default ---------- */}
-      {method === 'mpin' && (
-        <Box>
-          <Box sx={{ mb: 2 }}>{idField(true)}</Box>
-          <MpinField value={mpin} onChange={(v) => { setMpin(v); if (pinStatus === 'error') setPinStatus('idle'); }}
-            onComplete={(p) => doMpin(p)} status={pinStatus} disabled={loading || pinStatus === 'success'} autoFocus={false} />
-          <Button fullWidth variant="contained" size="large" disabled={loading || mpin.length !== 6 || pinStatus === 'success'}
-            onClick={() => doMpin()} sx={{ mt: 3, py: 1.3 }}>
-            {pinStatus === 'success' ? 'Unlocked ✓' : loading ? 'Unlocking…' : 'Unlock'}
-          </Button>
-          {rememberRow}
-          <Box display="flex" alignItems="center" justifyContent="center" gap={0.75} sx={{ mt: 1.5, color: 'text.disabled' }}>
-            <ShieldRounded sx={{ fontSize: 15 }} />
-            <Typography variant="caption">Encrypted &amp; rate-limited — 5 tries, then a short cooldown.</Typography>
-          </Box>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 0.5, mt: 2 }}>
-            <Link component="button" type="button" variant="body2" onClick={() => switchTo('mpin-reset')}>Forgot MPIN?</Link>
-            <Typography variant="body2" color="text.disabled">·</Typography>
-            <Link component="button" type="button" variant="body2" onClick={() => switchTo('otp')}>Use Email OTP instead</Link>
-            <Typography variant="body2" color="text.disabled">·</Typography>
-            <Link component="button" type="button" variant="body2" onClick={() => switchTo('password')}>Password</Link>
-          </Box>
-        </Box>
-      )}
-
-      {/* ---------- MPIN reset (forgot) ---------- */}
-      {method === 'mpin-reset' && (resetStep === 'request' ? (
-        <Box component="form" onSubmit={sendResetCode}>
-          {idField(true)}
-          <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} sx={{ mt: 3, py: 1.3 }}>
-            {loading ? 'Sending…' : 'Email me a reset code'}
-          </Button>
-          <Box textAlign="center" sx={{ mt: 2 }}>
-            <Link component="button" type="button" variant="body2" onClick={() => switchTo('mpin')}>← Back to MPIN</Link>
-          </Box>
-        </Box>
-      ) : (
-        <Box>
-          <TextField
-            fullWidth label="6-digit reset code" value={code} required autoFocus autoComplete="one-time-code" sx={{ mb: 2.5 }}
-            inputProps={{ inputMode: 'numeric', maxLength: 6, style: { letterSpacing: '0.5em', fontSize: '1.25rem', textAlign: 'center' } }}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            InputProps={{ startAdornment: <InputAdornment position="start"><PinRounded /></InputAdornment> }}
-          />
-          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mb: 1.5 }}>Choose a new MPIN</Typography>
-          <MpinField value={mpin} onChange={(v) => { setMpin(v); if (pinStatus === 'error') setPinStatus('idle'); }}
-            onComplete={(p) => doResetConfirm(p)} status={pinStatus} disabled={loading || pinStatus === 'success'} autoFocus={false} />
-          <Button fullWidth variant="contained" size="large" disabled={loading || mpin.length !== 6 || pinStatus === 'success'}
-            onClick={() => doResetConfirm()} sx={{ mt: 3, py: 1.3 }}>
-            {pinStatus === 'success' ? 'Done ✓' : loading ? 'Setting…' : 'Set new MPIN & sign in'}
-          </Button>
-          {rememberRow}
-          <Box display="flex" justifyContent="space-between" sx={{ mt: 2 }}>
-            <Link component="button" type="button" variant="body2" onClick={() => { setResetStep('request'); setCode(''); setInfo(null); setError(null); }}>← Change details</Link>
-            <Link component="button" type="button" variant="body2" onClick={sendResetCode}>Resend code</Link>
-          </Box>
+    <Box sx={{ display: { xs: 'none', md: 'flex' }, flexDirection: 'column', gap: 1.25, mt: 3.5 }}>
+      {items.map((it, i) => (
+        <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.25, color: 'text.secondary' }}>
+          <Box sx={{
+            width: 30, height: 30, borderRadius: '9px', flexShrink: 0,
+            display: 'grid', placeItems: 'center', color: accents.cyan,
+            background: `${accents.cyan}14`, border: '1px solid', borderColor: `${accents.cyan}2e`,
+          }}>{it.icon}</Box>
+          <Typography variant="body2">{it.label}</Typography>
         </Box>
       ))}
+    </Box>
+  );
+}
 
-      {/* ---------- Email OTP (alternative) ---------- */}
-      {method === 'otp' && (otpStep === 'identify' ? (
-        <Box component="form" onSubmit={sendCode}>
-          {idField(true)}
-          <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} sx={{ mt: 3, py: 1.3 }}>
-            {loading ? 'Sending…' : 'Email me a code'}
-          </Button>
-          <Box textAlign="center" sx={{ mt: 2 }}>
-            <Link component="button" type="button" variant="body2" onClick={() => switchTo('mpin')}>← Use MPIN instead</Link>
-          </Box>
-        </Box>
-      ) : (
-        <Box component="form" onSubmit={verify}>
-          <TextField
-            fullWidth label="6-digit code" value={code} required autoFocus autoComplete="one-time-code"
-            inputProps={{ inputMode: 'numeric', maxLength: 6, style: { letterSpacing: '0.5em', fontSize: '1.35rem', textAlign: 'center' } }}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            InputProps={{ startAdornment: <InputAdornment position="start"><PinRounded /></InputAdornment> }}
-          />
-          {rememberRow}
-          <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} sx={{ mt: 2, py: 1.3 }}>
-            {loading ? 'Verifying…' : 'Verify & sign in'}
-          </Button>
-          <Box display="flex" justifyContent="space-between" sx={{ mt: 2 }}>
-            <Link component="button" type="button" variant="body2"
-              onClick={() => { setOtpStep('identify'); setCode(''); setInfo(null); setError(null); }}>← Change details</Link>
-            <Link component="button" type="button" variant="body2" onClick={sendCode}>Resend code</Link>
-          </Box>
-        </Box>
-      ))}
+/** Rate-limit reassurance under the primary action. */
+function SecurityNote() {
+  return (
+    <Box display="flex" alignItems="center" justifyContent="center" gap={0.75} sx={{ mt: 1, color: 'text.disabled' }}>
+      <ShieldRounded sx={{ fontSize: 15 }} />
+      <Typography variant="caption">Encrypted &amp; rate-limited — 5 tries, then a short cooldown.</Typography>
+    </Box>
+  );
+}
 
-      {/* ---------- Password (alternative) ---------- */}
-      {method === 'password' && (
-        <Box component="form" onSubmit={doPassword}>
-          {idField(true)}
-          <TextField
-            fullWidth label="Password" type="password" value={password} required autoComplete="current-password" sx={{ mt: 2 }}
-            onChange={(e) => setPassword(e.target.value)}
-            InputProps={{ startAdornment: <InputAdornment position="start"><LockIcon /></InputAdornment> }}
-          />
-          {rememberRow}
-          <Button type="submit" fullWidth variant="contained" size="large" disabled={loading} sx={{ mt: 2, py: 1.3 }}>
-            {loading ? 'Signing in…' : 'Sign in'}
-          </Button>
-          <Box display="flex" justifyContent="space-between" sx={{ mt: 2 }}>
-            <Link component="button" type="button" variant="body2" onClick={() => navigate('/forgot-password')}>Forgot password?</Link>
-            <Link component="button" type="button" variant="body2" onClick={() => switchTo('mpin')}>← Use MPIN instead</Link>
-          </Box>
-        </Box>
-      )}
+/** "or" divider that separates the hero from the secondary path. */
+function AltDivider() {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, my: 2 }}>
+      <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
+      <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600, letterSpacing: '0.08em' }}>OR</Typography>
+      <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
+    </Box>
+  );
+}
 
-      <Divider sx={{ my: 3 }} />
-      <Box textAlign="center">
-        <Typography variant="body2">
-          Don't have an account?{' '}
-          <Link component="button" type="button" variant="body2" onClick={() => navigate('/register')}>Create one</Link>
-        </Typography>
-      </Box>
-    </AuroraShell>
+/** Consistent "← Back to MPIN" affordance. */
+function BackRow({ onClick, label, subtle }) {
+  return (
+    <Box textAlign="center" sx={{ mt: subtle ? 2.5 : 2 }}>
+      <Link component="button" type="button" variant="body2" underline="hover"
+        onClick={onClick}
+        sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, color: subtle ? 'text.disabled' : 'primary.main' }}>
+        <ArrowBackRounded sx={{ fontSize: 16 }} /> {label}
+      </Link>
+    </Box>
+  );
+}
+
+/**
+ * The login-specific "vault" shell. A more cinematic take on the shared auth
+ * shell: a scan-line sweeps the top edge, corner brackets frame the panel like
+ * a security console, and the card floats over the app's living aurora. Left
+ * deliberately separate from AuroraShell so register/forgot stay untouched.
+ */
+function VaultShell({ children }) {
+  return (
+    <Box
+      sx={{
+        minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'relative', overflow: 'hidden',
+        // Respect notches / home indicators on mobile.
+        px: { xs: 2, sm: 3 },
+        pt: 'max(env(safe-area-inset-top), 24px)',
+        pb: 'max(env(safe-area-inset-bottom), 24px)',
+        '&::before': {
+          content: '""', position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: `
+            radial-gradient(circle at 18% 12%, ${accents.blue}30, transparent 40%),
+            radial-gradient(circle at 84% 8%, ${accents.violet}26, transparent 44%),
+            radial-gradient(circle at 50% 108%, ${accents.cyan}1f, transparent 55%)
+          `,
+          opacity: (t) => (t.palette.mode === 'dark' ? 1 : 0.55),
+        },
+        // A faint security grid, masked to fade toward the edges.
+        '&::after': {
+          content: '""', position: 'absolute', inset: 0, pointerEvents: 'none',
+          backgroundImage: (t) => `linear-gradient(${t.palette.mode === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.03)'} 1px, transparent 1px), linear-gradient(90deg, ${t.palette.mode === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.03)'} 1px, transparent 1px)`,
+          backgroundSize: '46px 46px',
+          maskImage: 'radial-gradient(ellipse 70% 60% at 50% 45%, #000 30%, transparent 78%)',
+          WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 45%, #000 30%, transparent 78%)',
+        },
+      }}
+    >
+      <Container maxWidth={false} disableGutters sx={{ position: 'relative', zIndex: 1 }}>
+        <Box
+          component={motion.div}
+          initial={{ opacity: 0, y: 22, scale: 0.985 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
+          sx={{ position: 'relative', width: '100%', maxWidth: { xs: 430, md: 780 }, mx: 'auto' }}
+        >
+          {/* Corner brackets — the "console" framing */}
+          {[
+            { top: -1, left: -1, borderWidth: '2px 0 0 2px', borderRadius: '18px 0 0 0' },
+            { top: -1, right: -1, borderWidth: '2px 2px 0 0', borderRadius: '0 18px 0 0' },
+            { bottom: -1, left: -1, borderWidth: '0 0 2px 2px', borderRadius: '0 0 0 18px' },
+            { bottom: -1, right: -1, borderWidth: '0 2px 2px 0', borderRadius: '0 0 18px 0' },
+          ].map((pos, i) => (
+            <Box key={i} aria-hidden sx={{
+              position: 'absolute', width: 22, height: 22, borderStyle: 'solid',
+              borderColor: `${accents.cyan}88`, ...pos, zIndex: 2, pointerEvents: 'none',
+            }} />
+          ))}
+
+          <Paper
+            elevation={0}
+            sx={{
+              position: 'relative', overflow: 'hidden', p: { xs: 2.5, sm: 3.5 }, borderRadius: '18px',
+              border: '1px solid', borderColor: 'divider',
+              backgroundColor: (t) => t.palette.mode === 'dark' ? 'rgba(22,22,28,0.72)' : 'rgba(255,255,255,0.82)',
+              backdropFilter: 'blur(30px) saturate(1.6)', WebkitBackdropFilter: 'blur(30px) saturate(1.6)',
+              boxShadow: (t) => t.palette.mode === 'dark'
+                ? '0 30px 80px -24px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.05)'
+                : '0 30px 80px -30px rgba(20,30,60,0.28), inset 0 1px 0 rgba(255,255,255,0.6)',
+            }}
+          >
+            {/* Scan-line that sweeps the top edge — subtle "system active" signal */}
+            <Box aria-hidden sx={{
+              position: 'absolute', top: 0, left: 0, right: 0, height: '2px', overflow: 'hidden',
+              '&::before': {
+                content: '""', position: 'absolute', top: 0, left: '-40%', width: '40%', height: '100%',
+                background: `linear-gradient(90deg, transparent, ${accents.cyan}, ${accents.violet}, transparent)`,
+                animation: 'scanSweep 4.2s ease-in-out infinite',
+              },
+              '@keyframes scanSweep': { '0%': { left: '-40%' }, '55%,100%': { left: '110%' } },
+              '@media (prefers-reduced-motion: reduce)': { '&::before': { animation: 'none', opacity: 0.5, left: '30%' } },
+            }} />
+            {children}
+          </Paper>
+        </Box>
+      </Container>
+    </Box>
   );
 }

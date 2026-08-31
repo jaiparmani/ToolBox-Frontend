@@ -56,7 +56,7 @@ export default function MpinField({
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2.75 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
       {/* Slot row (the real input is transparent, on top, so typing + mobile keypad work) */}
       <Box
         ref={rowRef}
@@ -71,7 +71,7 @@ export default function MpinField({
           const active = focused && i === value.length && status !== 'success';
           return (
             <Box key={i} sx={{
-              width: { xs: 42, sm: 50 }, height: { xs: 52, sm: 62 }, borderRadius: '14px',
+              width: { xs: 42, sm: 48 }, height: { xs: 50, sm: 56 }, borderRadius: '14px',
               display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
               background: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.025)',
               border: '1.5px solid',
@@ -110,7 +110,7 @@ export default function MpinField({
       </Box>
 
       {/* On-screen keypad — for thumbs; keyboard still works in parallel */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: { xs: 1, sm: 1.25 }, width: { xs: 216, sm: 246 } }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: { xs: 1, sm: 1.1 }, width: { xs: 214, sm: 240 } }}>
         {keys.map((k, i) => k === '' ? <Box key={i} /> : (
           <Box
             key={i}
@@ -118,7 +118,7 @@ export default function MpinField({
             aria-label={k === '⌫' ? 'Delete' : k}
             onClick={() => press(k)}
             sx={{
-              height: { xs: 58, sm: 62 }, borderRadius: '16px', userSelect: 'none', cursor: disabled ? 'default' : 'pointer',
+              height: { xs: 52, sm: 48 }, borderRadius: '15px', userSelect: 'none', cursor: disabled ? 'default' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontFamily: type.displayFamily, fontWeight: 600, fontSize: '1.35rem',
               color: k === '⌫' ? 'text.secondary' : 'text.primary',

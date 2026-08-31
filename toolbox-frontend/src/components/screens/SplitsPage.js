@@ -15,12 +15,13 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import MoneyConstellation from '../ui/MoneyConstellation';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import Reveal from '../ui/Reveal';
+import AuroraBackground from '../motion/AuroraBackground';
 import ErrorBanner from '../ui/ErrorBanner';
 import { BalanceSkeleton } from '../ui/Skeletons';
 import SwipeAction from '../ui/SwipeAction';
 import { AnimatePresence, motion, LayoutGroup } from 'framer-motion';
 import { money, relativeDay } from '../ui/money';
-import { accents } from '../../theme/tokens';
+import { accents, type } from '../../theme/tokens';
 import { feedback } from '../ui/feedback';
 import GroupStrip from '../ui/GroupStrip';
 import { FinancialWeatherBar } from '../ui';
@@ -271,7 +272,10 @@ export default function SplitsPage() {
 
   return (
     <>
-      <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 12 }}>
+      <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 12, position: 'relative' }}>
+        {/* Living backdrop — same premium climate as the money screens */}
+        <AuroraBackground />
+        <Box sx={{ position: 'relative', zIndex: 1 }}>
         <ErrorBanner error={error} onClose={() => setError(null)} />
 
         {!openGroup && (
@@ -294,8 +298,17 @@ export default function SplitsPage() {
                   ? 'radial-gradient(circle at 50% 0%, rgba(57,135,229,0.18), transparent 60%)'
                   : 'radial-gradient(circle at 50% 0%, rgba(217,79,61,0.18), transparent 60%)',
               },
+              '@keyframes splitAura': { to: { transform: 'translate(-50%,-50%) rotate(360deg)' } },
             }}
           >
+            {/* Slow reactor aura, blue when you're owed, red when you owe */}
+            <Box aria-hidden sx={{
+              position: 'absolute', top: '50%', left: '50%', width: 380, height: 380,
+              transform: 'translate(-50%,-50%)', pointerEvents: 'none', opacity: 0.5, borderRadius: '50%',
+              background: `conic-gradient(from 0deg, transparent, ${netPositive ? '#3987e5' : '#d94f3d'}66, transparent 42%)`,
+              filter: 'blur(30px)', animation: 'splitAura 18s linear infinite',
+              '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+            }} />
             <Box sx={{ position: 'relative' }}>
               <Box display="flex" alignItems="center" justifyContent="center" gap={1} sx={{ mb: 0.5 }}>
                 <CallSplitIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
@@ -308,9 +321,10 @@ export default function SplitsPage() {
               </Box>
               <Typography
                 sx={{
-                  fontWeight: 700, letterSpacing: '-0.03em',
-                  fontSize: { xs: '2.4rem', sm: '3rem' },
+                  fontFamily: type.displayFamily, fontWeight: 700, letterSpacing: '-0.035em',
+                  fontSize: { xs: '2.5rem', sm: '3.1rem' }, fontVariantNumeric: 'tabular-nums',
                   color: netPositive ? '#3987e5' : '#d94f3d',
+                  textShadow: `0 0 30px ${netPositive ? '#3987e5' : '#d94f3d'}44`,
                 }}
               >
                 <AnimatedNumber value={Math.abs(state.net)} />
@@ -744,6 +758,7 @@ export default function SplitsPage() {
         >
           <AddIcon />
         </Fab>
+        </Box>
       </Container>
     </>
   );

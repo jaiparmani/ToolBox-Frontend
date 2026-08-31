@@ -60,6 +60,14 @@ export default function Assistant() {
   const onSpeakStart = React.useCallback(() => setSpeaking(s => s + 1), []);
   const onSpeakEnd = React.useCallback(() => setSpeaking(s => Math.max(0, s - 1)), []);
 
+  // The panel is a modal, but the work isn't. You can dismiss it, browse the
+  // app, and come back — the conversation and any in-flight reply live on here
+  // in the shell, not in the dialog. A minimized orb keeps it one tap away and
+  // lights up when a reply lands while you were away.
+  const [unseen, setUnseen] = React.useState(false);
+  const openRef = React.useRef(false);
+  React.useEffect(() => { openRef.current = open; if (open) setUnseen(false); }, [open]);
+
   // While it thinks, show something true instead of a dead spinner — only
   // facts we actually know from the live projection, never a made-up number.
   const facts = React.useMemo(() => {
@@ -112,9 +120,11 @@ export default function Assistant() {
       const r = await askAssistant(q, { conversationId: convId.current });
       if (r.conversation_id) convId.current = r.conversation_id;
       setTurns(t => [...t, { id: uid + 1, role: 'assistant', card: r }]);
+      if (!openRef.current) { setUnseen(true); feedback('success'); }
     } catch (e) {
       feedback('error');
       setTurns(t => [...t, { id: uid + 1, role: 'assistant', card: { type: 'error', error: e.message } }]);
+      if (!openRef.current) setUnseen(true);
     } finally {
       setLoading(false);
     }
@@ -136,7 +146,37 @@ export default function Assistant() {
 
   const discard = (turnId) => setTurns(t => t.map(x => x.id === turnId ? { ...x, discarded: true } : x));
 
+  // Shown only when the panel is dismissed but there's live context to return to.
+  const showDock = !open && (loading || turns.length > 0);
+
   return (
+    <>
+    {/* Minimized dock — dismiss the panel, keep browsing, come back to the reply */}
+    {showDock && (
+      <Box
+        role="button"
+        aria-label={unseen ? 'Assistant has a reply' : 'Reopen the assistant'}
+        onClick={() => setOpen(true)}
+        sx={{
+          position: 'fixed', zIndex: (t) => t.zIndex.speedDial,
+          left: 16, bottom: { xs: 'calc(80px + env(safe-area-inset-bottom))', md: 24 },
+          cursor: 'pointer', borderRadius: 999, p: '5px',
+          '@keyframes dockIn': { from: { opacity: 0, transform: 'translateY(10px) scale(0.9)' }, to: { opacity: 1, transform: 'none' } },
+          animation: reduce ? 'none' : 'dockIn 260ms cubic-bezier(0.2,0.7,0.2,1)',
+        }}
+      >
+        <AssistantOrb state={loading ? 'thinking' : 'idle'} size={46} reduce={reduce} />
+        {unseen && !loading && (
+          <Box aria-hidden sx={{
+            position: 'absolute', top: 2, right: 2, width: 13, height: 13, borderRadius: '50%',
+            background: accents.mint, border: '2px solid', borderColor: 'background.default',
+            boxShadow: `0 0 10px ${accents.mint}`,
+            '@keyframes dotPop': { '0%': { transform: 'scale(0)' }, '70%': { transform: 'scale(1.25)' }, '100%': { transform: 'scale(1)' } },
+            animation: reduce ? 'none' : 'dotPop 320ms ease-out',
+          }} />
+        )}
+      </Box>
+    )}
     <Dialog
       open={open}
       onClose={() => setOpen(false)}
@@ -263,6 +303,7 @@ export default function Assistant() {
         </Box>
       </Box>
     </Dialog>
+    </>
   );
 }
 

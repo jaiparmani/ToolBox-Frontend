@@ -26,7 +26,6 @@ import {
   AccountBalance as BalanceIcon,
   Refresh as RefreshIcon,
   Close as CloseIcon,
-  Logout as LogoutIcon,
   AutoAwesome as AutoAwesomeIcon,
   Insights as InsightsIcon,
   Lightbulb as LightbulbIcon,
@@ -125,7 +124,7 @@ function AssistantNudge({ label }) {
 
 export default function ExpenseTrackerPage() {
   // Use global authentication state
-  const { isAuthenticated, isLoading, logout, user } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
  // Main data state
  const [expenses, setExpenses] = useState([]);
@@ -250,17 +249,6 @@ export default function ExpenseTrackerPage() {
    }
  }, [isAuthenticated, filters, pagination.page, pagination.pageSize, sortBy]);
 
- const handleLogout = async () => {
-   try {
-     await logout();
-     setExpenses([]);
-     setCategories([]);
-     setTags([]);
-     setSummary(null);
-   } catch (error) {
-     setError('Logout failed');
-   }
- };
 
  const loadAllData = async () => {
    setLoading(true);
@@ -1052,11 +1040,7 @@ export default function ExpenseTrackerPage() {
            >
              Add Expense
            </Button>
-           <Tooltip title="Logout">
-             <IconButton onClick={handleLogout} color="error" size="small" sx={{ width: 40, height: 40 }}>
-               <LogoutIcon fontSize="small" />
-             </IconButton>
-           </Tooltip>
+           {/* Logout lives in the shell's account menu now — no per-screen button. */}
          </Stack>
        </Box>
      </Paper>

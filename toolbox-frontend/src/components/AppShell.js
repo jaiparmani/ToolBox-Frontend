@@ -23,6 +23,7 @@ import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
 import { authUtils } from './rest/authUtils';
 import { clearAllData } from './rest/userApis';
+import { useAuth } from '../contexts/AuthContext';
 import { useColorMode } from '../contexts/ColorModeContext';
 import { MoneyProvider } from '../contexts/MoneyContext';
 import BrandLogo from './motion/BrandLogo';
@@ -99,12 +100,18 @@ function NavItem({ item, active, onClick, reduce }) {
   );
 }
 
+/** Display name + avatar initial from the live profile (context), cache fallback. */
+function displayIdentity(user) {
+  const u = user || authUtils.getUser();
+  const name = u?.username || u?.email || 'Your account';
+  const initial = (u?.username || u?.email || 'U').trim().charAt(0).toUpperCase();
+  return { name, initial };
+}
+
 /** The rail's inner content — shared by the desktop rail and the mobile drawer. */
-function RailContent({ pathname, onNavigate, onOpenAccount, accountRef }) {
+function RailContent({ pathname, onNavigate, onOpenAccount, accountRef, user }) {
   const reduce = useReducedMotion();
-  const user = authUtils.getUser();
-  const name = user?.username || user?.email || 'Your account';
-  const initial = (user?.username || user?.email || 'U').trim().charAt(0).toUpperCase();
+  const { name, initial } = displayIdentity(user);
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', px: 1.5, py: 2 }}>
@@ -182,6 +189,8 @@ function AskButton({ compact }) {
 export default function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+  const { name: acctName, initial: acctInitial } = displayIdentity(user);
   const { mode, toggleColorMode } = useColorMode();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuEl, setMenuEl] = useState(null);
@@ -223,7 +232,7 @@ export default function AppShell() {
             zIndex: 2,
           }}
         >
-          <RailContent pathname={location.pathname} onNavigate={go} onOpenAccount={openMenu} accountRef={accountRef} />
+          <RailContent pathname={location.pathname} onNavigate={go} onOpenAccount={openMenu} accountRef={accountRef} user={user} />
         </Box>
 
         {/* ── Mobile drawer ── */}
@@ -235,7 +244,7 @@ export default function AppShell() {
               backgroundColor: (t) => t.palette.mode === 'dark' ? 'rgba(16,16,22,0.92)' : 'rgba(255,255,255,0.94)',
               backdropFilter: 'blur(28px) saturate(1.5)', WebkitBackdropFilter: 'blur(28px) saturate(1.5)' } }}
         >
-          <RailContent pathname={location.pathname} onNavigate={go} onOpenAccount={openMenu} accountRef={accountRef} />
+          <RailContent pathname={location.pathname} onNavigate={go} onOpenAccount={openMenu} accountRef={accountRef} user={user} />
         </Drawer>
 
         {/* ── Main column ── */}
@@ -275,7 +284,7 @@ export default function AppShell() {
               <IconButton onClick={openMenu} aria-label="Account menu" size="small" sx={{ display: { xs: 'none', md: 'inline-flex' } }}>
                 <Avatar sx={{ width: 30, height: 30, fontSize: '0.85rem', fontWeight: 700,
                   background: `linear-gradient(135deg, ${accents.violet}, ${accents.blue})`, color: '#fff' }}>
-                  {(authUtils.getUser()?.username || authUtils.getUser()?.email || 'U').trim().charAt(0).toUpperCase()}
+                  {acctInitial}
                 </Avatar>
               </IconButton>
             </Tooltip>
@@ -302,8 +311,8 @@ export default function AppShell() {
         slotProps={{ paper: { sx: { minWidth: 220, mt: -1 } } }}
       >
         <Box sx={{ px: 2, py: 1.25 }}>
-          <Typography noWrap sx={{ fontWeight: 650, fontSize: '0.92rem' }}>{authUtils.getUser()?.username || 'Your account'}</Typography>
-          <Typography noWrap sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>{authUtils.getUser()?.email || ''}</Typography>
+          <Typography noWrap sx={{ fontWeight: 650, fontSize: '0.92rem' }}>{acctName}</Typography>
+          <Typography noWrap sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>{(user || authUtils.getUser())?.email || ''}</Typography>
         </Box>
         <Divider />
         <MenuItem onClick={() => { closeMenu(); navigate('/profile'); }}>

@@ -348,10 +348,12 @@ export default function MoneyUniverse({
       {/* Center readout: the star's real figure, always legible. While scrubbing
           it names the day and counts to that day's projected balance. */}
       <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
-        <Typography sx={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: overrideActive ? accents.cyan : 'text.secondary', textTransform: 'uppercase' }}>
+        {/* The number sits on the coloured star core, so it reads white with a
+            dark halo (legible on mint or red); the star itself carries the +/- signal. */}
+        <Typography sx={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: overrideActive ? accents.cyan : 'rgba(255,255,255,0.9)', textTransform: 'uppercase', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
           {overrideActive ? (overrideLabel || 'Projected') : 'Net'}
         </Typography>
-        <Typography component="div" sx={{ fontSize: { xs: '1rem', sm: '1.2rem' }, fontWeight: 800, color: targetNet >= 0 ? accents.mint : accents.red, fontVariantNumeric: 'tabular-nums', textShadow: dark ? '0 1px 8px rgba(0,0,0,0.6)' : 'none' }}>
+        <Typography component="div" sx={{ fontSize: { xs: '1rem', sm: '1.2rem' }, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums', textShadow: '0 0 6px rgba(0,0,0,0.85), 0 1px 2px rgba(0,0,0,0.9)' }}>
           <AnimatedNumber value={targetNet} format="smart" />
         </Typography>
       </Box>

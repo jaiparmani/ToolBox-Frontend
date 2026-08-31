@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import {
-  Container, Paper, Typography, Box, TextField, Button, Alert, InputAdornment, Link, Divider,
+  Typography, Box, TextField, Button, Alert, InputAdornment, Link, Divider,
 } from '@mui/material';
 import { Email as EmailIcon, LockReset as LockResetIcon, MarkEmailReadRounded } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { requestPasswordReset } from '../rest/userApis';
+import AuthShell from '../ui/AuthShell';
 
 /**
  * Forgot password — request a reset link. Deliberately shows the same "if that
@@ -34,7 +35,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <AuroraShell>
+    <AuthShell>
       <Box display="flex" alignItems="center" gap={2} mb={3}>
         <LockResetIcon sx={{ fontSize: 32, color: 'primary.main' }} />
         <Box>
@@ -71,40 +72,6 @@ export default function ForgotPasswordPage() {
           </Box>
         </Box>
       )}
-    </AuroraShell>
-  );
-}
-
-/** The shared calm-futurism auth shell (matches the login/register screens). */
-export function AuroraShell({ children }) {
-  return (
-    <Box
-      sx={{
-        minHeight: '100vh', display: 'flex', alignItems: 'center', position: 'relative', overflow: 'hidden',
-        backgroundColor: 'background.default',
-        '&::before': {
-          content: '""', position: 'absolute', inset: 0,
-          background: `
-            radial-gradient(circle at 15% 20%, rgba(10,132,255,0.35), transparent 42%),
-            radial-gradient(circle at 85% 15%, rgba(191,90,242,0.28), transparent 45%),
-            radial-gradient(circle at 50% 100%, rgba(255,55,95,0.22), transparent 55%)
-          `,
-          opacity: (theme) => (theme.palette.mode === 'dark' ? 1 : 0.5),
-        },
-      }}
-    >
-      <Container maxWidth="sm" sx={{ position: 'relative' }}>
-        <Paper
-          elevation={0}
-          sx={{
-            p: 4, border: '1px solid', borderColor: 'divider',
-            backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(30,30,32,0.75)' : 'rgba(255,255,255,0.85)',
-            backdropFilter: 'blur(24px)', boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
-          }}
-        >
-          {children}
-        </Paper>
-      </Container>
-    </Box>
+    </AuthShell>
   );
 }

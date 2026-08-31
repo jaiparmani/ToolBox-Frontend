@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Typography, Box, TextField, Button, Alert, InputAdornment, Link, Container, Paper } from '@mui/material';
+import { Typography, Box, TextField, Button, Alert, InputAdornment, Link } from '@mui/material';
 import {
   Person as PersonIcon, Lock as LockIcon, PinRounded, LockRounded, ShieldRounded,
   MailOutlineRounded, ArrowBackRounded, BoltRounded,
@@ -11,6 +11,8 @@ import { requestOtp, verifyOtp, mpinLogin, requestMpinReset, confirmMpinReset } 
 import MpinField from '../ui/MpinField';
 import UnlockOverlay from '../motion/UnlockOverlay';
 import BrandLogo from '../motion/BrandLogo';
+import AuthShell from '../ui/AuthShell';
+import { feedback } from '../ui/feedback';
 import { accents, type } from '../../theme/tokens';
 
 /**
@@ -58,9 +60,11 @@ export default function LoginPage() {
       const res = await mpinLogin(identifier.trim(), p, remember);
       if (!res.token) throw new Error(res.error || 'Invalid credentials.');
       setPinStatus('success');
+      feedback('success');
       succeed('Welcome back');
     } catch (err) {
       setPinStatus('error');
+      feedback('error');
       setError(err.message || 'That MPIN is not right.');
       setTimeout(() => { setMpin(''); setPinStatus('idle'); }, 520);
     } finally { setLoading(false); }
@@ -89,9 +93,11 @@ export default function LoginPage() {
       const res = await confirmMpinReset(identifier.trim(), code.trim(), p, remember);
       if (!res.token) throw new Error(res.error || 'That code is invalid or has expired.');
       setPinStatus('success');
+      feedback('success');
       succeed('MPIN updated');
     } catch (err) {
       setPinStatus('error');
+      feedback('error');
       setError(err.message || 'Could not reset your MPIN. Check the code and try again.');
       setTimeout(() => { setMpin(''); setPinStatus('idle'); }, 520);
     } finally { setLoading(false); }
@@ -184,7 +190,7 @@ export default function LoginPage() {
   const panelTransition = { duration: reduce ? 0.18 : 0.34, ease: [0.32, 0.72, 0, 1] };
 
   return (
-    <VaultShell>
+    <AuthShell maxWidth={{ xs: 430, md: 780 }}>
       {/* Header — brand + secure status (spans both columns) */}
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={{ xs: 2, md: 3 }}>
         <Box display="flex" alignItems="center" gap={1.25}>
@@ -370,8 +376,8 @@ export default function LoginPage() {
       </Box>{/* /two-column grid */}
 
       {/* The signature success cinematic */}
-      {unlocked && <UnlockOverlay label={unlocked.label} onDone={__demoUnlock ? () => {} : finish} />}
-    </VaultShell>
+      {unlocked && <UnlockOverlay label={unlocked.label} onDone={finish} />}
+    </AuthShell>
   );
 }
 
@@ -479,89 +485,3 @@ function BackRow({ onClick, label, subtle }) {
   );
 }
 
-/**
- * The login-specific "vault" shell. A more cinematic take on the shared auth
- * shell: a scan-line sweeps the top edge, corner brackets frame the panel like
- * a security console, and the card floats over the app's living aurora. Left
- * deliberately separate from AuroraShell so register/forgot stay untouched.
- */
-function VaultShell({ children }) {
-  return (
-    <Box
-      sx={{
-        minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        position: 'relative', overflow: 'hidden',
-        // Respect notches / home indicators on mobile.
-        px: { xs: 2, sm: 3 },
-        pt: 'max(env(safe-area-inset-top), 24px)',
-        pb: 'max(env(safe-area-inset-bottom), 24px)',
-        '&::before': {
-          content: '""', position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: `
-            radial-gradient(circle at 18% 12%, ${accents.blue}30, transparent 40%),
-            radial-gradient(circle at 84% 8%, ${accents.violet}26, transparent 44%),
-            radial-gradient(circle at 50% 108%, ${accents.cyan}1f, transparent 55%)
-          `,
-          opacity: (t) => (t.palette.mode === 'dark' ? 1 : 0.55),
-        },
-        // A faint security grid, masked to fade toward the edges.
-        '&::after': {
-          content: '""', position: 'absolute', inset: 0, pointerEvents: 'none',
-          backgroundImage: (t) => `linear-gradient(${t.palette.mode === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.03)'} 1px, transparent 1px), linear-gradient(90deg, ${t.palette.mode === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.03)'} 1px, transparent 1px)`,
-          backgroundSize: '46px 46px',
-          maskImage: 'radial-gradient(ellipse 70% 60% at 50% 45%, #000 30%, transparent 78%)',
-          WebkitMaskImage: 'radial-gradient(ellipse 70% 60% at 50% 45%, #000 30%, transparent 78%)',
-        },
-      }}
-    >
-      <Container maxWidth={false} disableGutters sx={{ position: 'relative', zIndex: 1 }}>
-        <Box
-          component={motion.div}
-          initial={{ opacity: 0, y: 22, scale: 0.985 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
-          sx={{ position: 'relative', width: '100%', maxWidth: { xs: 430, md: 780 }, mx: 'auto' }}
-        >
-          {/* Corner brackets — the "console" framing */}
-          {[
-            { top: -1, left: -1, borderWidth: '2px 0 0 2px', borderRadius: '18px 0 0 0' },
-            { top: -1, right: -1, borderWidth: '2px 2px 0 0', borderRadius: '0 18px 0 0' },
-            { bottom: -1, left: -1, borderWidth: '0 0 2px 2px', borderRadius: '0 0 0 18px' },
-            { bottom: -1, right: -1, borderWidth: '0 2px 2px 0', borderRadius: '0 0 18px 0' },
-          ].map((pos, i) => (
-            <Box key={i} aria-hidden sx={{
-              position: 'absolute', width: 22, height: 22, borderStyle: 'solid',
-              borderColor: `${accents.cyan}88`, ...pos, zIndex: 2, pointerEvents: 'none',
-            }} />
-          ))}
-
-          <Paper
-            elevation={0}
-            sx={{
-              position: 'relative', overflow: 'hidden', p: { xs: 2.5, sm: 3.5 }, borderRadius: '18px',
-              border: '1px solid', borderColor: 'divider',
-              backgroundColor: (t) => t.palette.mode === 'dark' ? 'rgba(22,22,28,0.72)' : 'rgba(255,255,255,0.82)',
-              backdropFilter: 'blur(30px) saturate(1.6)', WebkitBackdropFilter: 'blur(30px) saturate(1.6)',
-              boxShadow: (t) => t.palette.mode === 'dark'
-                ? '0 30px 80px -24px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.05)'
-                : '0 30px 80px -30px rgba(20,30,60,0.28), inset 0 1px 0 rgba(255,255,255,0.6)',
-            }}
-          >
-            {/* Scan-line that sweeps the top edge — subtle "system active" signal */}
-            <Box aria-hidden sx={{
-              position: 'absolute', top: 0, left: 0, right: 0, height: '2px', overflow: 'hidden',
-              '&::before': {
-                content: '""', position: 'absolute', top: 0, left: '-40%', width: '40%', height: '100%',
-                background: `linear-gradient(90deg, transparent, ${accents.cyan}, ${accents.violet}, transparent)`,
-                animation: 'scanSweep 4.2s ease-in-out infinite',
-              },
-              '@keyframes scanSweep': { '0%': { left: '-40%' }, '55%,100%': { left: '110%' } },
-              '@media (prefers-reduced-motion: reduce)': { '&::before': { animation: 'none', opacity: 0.5, left: '30%' } },
-            }} />
-            {children}
-          </Paper>
-        </Box>
-      </Container>
-    </Box>
-  );
-}

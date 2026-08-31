@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Container, Paper, Typography, Box, Grid, TextField,
+  Typography, Box, Grid, TextField,
   Button, Alert, IconButton, InputAdornment,
   LinearProgress, Card, CardContent, Divider, Link
 } from '@mui/material';
@@ -13,11 +13,11 @@ import {
   Lock,
   CheckCircle,
   Error as ErrorIcon,
-  ArrowBack,
   HowToReg
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import AuthShell from '../ui/AuthShell';
 
 export default function UserRegistrationPage() {
   const navigate = useNavigate();
@@ -215,70 +215,34 @@ export default function UserRegistrationPage() {
 
   if (success) {
     return (
-      <Container maxWidth="sm" sx={{ mt: 8 }}>
-        <Paper elevation={3} sx={{ p: 4, textAlign: 'center' }}>
-          <CheckCircle sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
-          <Typography variant="h4" gutterBottom>
-            Registration Successful!
+      <AuthShell>
+        <Box sx={{ textAlign: 'center', py: 1 }}>
+          <CheckCircle sx={{ fontSize: 60, color: 'success.main', mb: 1.5 }} />
+          <Typography variant="h5" sx={{ fontWeight: 700 }} gutterBottom>
+            You're all set
           </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Your account has been created successfully. You will be redirected to the dashboard shortly.
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Your account is ready. Taking you to your dashboard…
           </Typography>
-          <Button
-            variant="contained"
-            onClick={() => navigate('/dashboard')}
-            startIcon={<ArrowBack />}
-          >
-            Go to Dashboard
+          <Button variant="contained" onClick={() => navigate('/dashboard')}>
+            Go to dashboard
           </Button>
-        </Paper>
-      </Container>
+        </Box>
+      </AuthShell>
     );
   }
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        py: 4,
-        position: 'relative',
-        overflow: 'hidden',
-        backgroundColor: 'background.default',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          inset: 0,
-          background: `
-            radial-gradient(circle at 15% 20%, rgba(10,132,255,0.35), transparent 42%),
-            radial-gradient(circle at 85% 15%, rgba(191,90,242,0.28), transparent 45%),
-            radial-gradient(circle at 50% 100%, rgba(255,55,95,0.22), transparent 55%)
-          `,
-          opacity: (theme) => (theme.palette.mode === 'dark' ? 1 : 0.5),
-        },
-      }}
-    >
-    <Container maxWidth="md" sx={{ position: 'relative' }}>
-      <Paper
-        elevation={0}
-        sx={{
-          p: 4,
-          border: '1px solid',
-          borderColor: 'divider',
-          backgroundColor: (theme) =>
-            theme.palette.mode === 'dark' ? 'rgba(30,30,32,0.75)' : 'rgba(255,255,255,0.85)',
-          backdropFilter: 'blur(24px)',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
-        }}
-      >
+    <AuthShell maxWidth={{ xs: 460, md: 660 }}>
         {/* Header */}
         <Box display="flex" alignItems="center" gap={2} mb={3}>
           <HowToReg sx={{ fontSize: 32, color: 'primary.main' }} />
           <Box>
             <Typography variant="h4" component="h1">
-              Create Account
+              Create your account
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Join ToolBox and start organizing your projects
+              Join ToolBox and take control of your money
             </Typography>
           </Box>
         </Box>
@@ -535,8 +499,6 @@ export default function UserRegistrationPage() {
             </Typography>
           </Box>
         </Box>
-      </Paper>
-    </Container>
-    </Box>
+    </AuthShell>
   );
 }

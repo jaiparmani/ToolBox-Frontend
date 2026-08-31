@@ -5,7 +5,7 @@ import {
 import { Lock as LockIcon, LockReset as LockResetIcon } from '@mui/icons-material';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { confirmPasswordReset } from '../rest/userApis';
-import { AuroraShell } from './ForgotPasswordPage';
+import AuthShell from '../ui/AuthShell';
 import { accents } from '../../theme/tokens';
 
 // Same cheap, honest meter as the profile screen, kept consistent.
@@ -54,7 +54,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <AuroraShell>
+    <AuthShell>
       <Box display="flex" alignItems="center" gap={2} mb={3}>
         <LockResetIcon sx={{ fontSize: 32, color: 'primary.main' }} />
         <Box>
@@ -100,6 +100,6 @@ export default function ResetPasswordPage() {
           </Box>
         </Box>
       )}
-    </AuroraShell>
+    </AuthShell>
   );
 }

@@ -1,6 +1,5 @@
 import React from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import PageTransition from './motion/PageTransition'
 import { authUtils } from './rest/authUtils'
 import DashboardLayoutBasic from './DashboardLayout'
 import ExpenseTrackerPage from './screens/ExpenseTrackerPage'
@@ -51,8 +50,12 @@ const PublicRoute = ({ children }) => {
 
 export default function Router() {
   const location = useLocation();
+  // No global page-transition wrapper here: it would re-mount the whole app
+  // shell on every navigation. The shell persists (see AppShell), the auth
+  // screens animate themselves (AuthShell), and only the routed content inside
+  // the shell transitions — so navigation reads as spatial continuity, not a
+  // full-screen flash.
   return (
-    <PageTransition key={location.pathname}>
     <Routes location={location}>
       {/* Public Routes */}
       <Route path="/login" element={
@@ -97,6 +100,5 @@ export default function Router() {
       {/* Catch all route */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-    </PageTransition>
   )
 }

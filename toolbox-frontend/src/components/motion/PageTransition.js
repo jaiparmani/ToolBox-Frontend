@@ -16,9 +16,9 @@ export default function PageTransition({ children }) {
   return (
     <Box
       sx={{
-        animation: 'pageIn 460ms cubic-bezier(0.32, 0.72, 0, 1) both',
+        animation: 'pageIn 360ms cubic-bezier(0.32, 0.72, 0, 1) both',
         '@keyframes pageIn': {
-          from: { opacity: 0, transform: 'translateY(14px) scale(0.99)' },
+          from: { opacity: 0, transform: 'translateY(10px) scale(0.994)' },
           to: { opacity: 1, transform: 'none' },
         },
         '@media (prefers-reduced-motion: reduce)': { animation: 'none' },

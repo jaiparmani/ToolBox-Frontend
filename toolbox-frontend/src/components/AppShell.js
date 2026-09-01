@@ -28,6 +28,7 @@ import { useColorMode } from '../contexts/ColorModeContext';
 import { MoneyProvider } from '../contexts/MoneyContext';
 import BrandLogo from './motion/BrandLogo';
 import ParticleFlow from './motion/ParticleFlow';
+import PageTransition from './motion/PageTransition';
 import { NotificationBell } from './ui';
 import Assistant from './ui/Assistant';
 import { accents, type } from '../theme/tokens';
@@ -192,6 +193,7 @@ export default function AppShell() {
   const { user } = useAuth();
   const { name: acctName, initial: acctInitial } = displayIdentity(user);
   const { mode, toggleColorMode } = useColorMode();
+  const reduceMotion = useReducedMotion();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuEl, setMenuEl] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -267,9 +269,20 @@ export default function AppShell() {
             <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1 }}>
               <BrandLogo size={26} />
             </Box>
-            <Typography sx={{ display: { xs: 'none', md: 'block' }, fontFamily: type.displayFamily, fontWeight: 700, fontSize: '1.15rem', letterSpacing: '-0.02em' }}>
-              {pageTitle}
-            </Typography>
+            {/* The page title animates in on route change — a quiet "you are here"
+                that reinforces spatial continuity as you move between sections. */}
+            <Box sx={{ display: { xs: 'none', md: 'block' }, position: 'relative', minWidth: 120, height: 24, overflow: 'hidden' }}>
+              <Typography
+                key={pageTitle}
+                component={motion.div}
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 14, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{ duration: reduceMotion ? 0.15 : 0.34, ease: [0.32, 0.72, 0, 1] }}
+                sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: '1.15rem', letterSpacing: '-0.02em', lineHeight: '24px' }}
+              >
+                {pageTitle}
+              </Typography>
+            </Box>
 
             <Box sx={{ flex: 1 }} />
 
@@ -290,10 +303,13 @@ export default function AppShell() {
             </Tooltip>
           </Box>
 
-          {/* Routed content */}
+          {/* Routed content — the shell above/left persists; only this transitions
+              per route (keyed), so navigation feels continuous, not a full reload. */}
           <Box component="main" sx={{ flex: 1, px: { xs: 1.5, sm: 3 }, py: { xs: 2, sm: 3 } }}>
             <Box sx={{ maxWidth: 1200, mx: 'auto', width: '100%' }}>
-              <Outlet />
+              <PageTransition key={location.pathname}>
+                <Outlet />
+              </PageTransition>
             </Box>
           </Box>
         </Box>

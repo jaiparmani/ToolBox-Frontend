@@ -52,8 +52,7 @@ import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
 import AutocompleteComponent from '../ReusableComponents/AutocompleteComponent';
 import SummaryStrip from '../ui/SummaryStrip';
 import SectionNav from '../ui/SectionNav';
-import ExpenseItem from '../ui/ExpenseItem';
-import SwipeAction from '../ui/SwipeAction';
+import ExpenseTimeline from '../ui/ExpenseTimeline';
 import ExpenseComposer from '../ui/ExpenseComposer';
 import QuickCapture from '../ui/QuickCapture';
 import ThinkingHint from '../ui/ThinkingHint';
@@ -62,7 +61,7 @@ import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { money } from '../ui/money';
 import { feedback } from '../ui/feedback';
 import { TransactionStoryDrawer, buildStoryFromExpense, PageHeader } from '../ui';
-import AuroraBackground from '../motion/AuroraBackground';
+import CursorGlow from '../motion/CursorGlow';
 import AssistantOrb from '../ui/AssistantOrb';
 import { accents } from '../../theme/tokens';
 
@@ -917,8 +916,8 @@ export default function ExpenseTrackerPage() {
          pb: { xs: 'calc(72px + env(safe-area-inset-bottom))', md: 4 },
        }}
      >
-     {/* Living backdrop, keyed to the same financial weather as the rest of the app */}
-     <AuroraBackground />
+     {/* A whisper of cursor light — restrained, matching the dashboard. */}
+     <CursorGlow />
      <Box sx={{ position: 'relative', zIndex: 1 }}>
      {/* Financial weather now lives once in the app top bar, not per-screen. */}
      <PageHeader
@@ -980,9 +979,7 @@ export default function ExpenseTrackerPage() {
          borderColor: 'divider',
          borderRadius: 3,
          overflow: 'hidden',
-         backgroundColor: (theme) =>
-           theme.palette.mode === 'dark' ? 'rgba(30,30,36,0.55)' : 'rgba(255,255,255,0.78)',
-         backdropFilter: 'blur(20px)',
+         bgcolor: 'background.paper',
        }}
      >
        <SectionNav
@@ -1006,8 +1003,7 @@ export default function ExpenseTrackerPage() {
              sx={{
                p: { xs: 1.5, sm: 2.5 }, mb: { xs: 2, sm: 3 }, borderRadius: 3,
                border: '1px solid', borderColor: 'divider',
-               backgroundColor: (theme) =>
-                 theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+               bgcolor: 'background.paper',
              }}
            >
              <AssistantNudge label="Ask about your spending — e.g. “how much on food this month?”" />
@@ -1089,8 +1085,7 @@ export default function ExpenseTrackerPage() {
                borderRadius: 3,
                border: '1px solid',
                borderColor: 'divider',
-               backgroundColor: (theme) =>
-                 theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+               bgcolor: 'background.paper',
              }}
            >
              <Box
@@ -1101,11 +1096,11 @@ export default function ExpenseTrackerPage() {
                <Box
                  sx={{
                    width: 26, height: 26, borderRadius: '8px',
-                   backgroundColor: 'rgba(10,132,255,0.12)',
+                   border: '1px solid', borderColor: 'divider',
                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                  }}
                >
-                 <FilterIcon sx={{ color: '#0A84FF', fontSize: 15 }} />
+                 <FilterIcon sx={{ color: 'text.secondary', fontSize: 15 }} />
                </Box>
                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600, flexGrow: 1 }}>
                  Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
@@ -1172,7 +1167,7 @@ export default function ExpenseTrackerPage() {
                      <IconButton
                        onClick={clearFilters}
                        size="small"
-                       sx={{ '&:hover': { backgroundColor: 'rgba(255,69,58,0.1)', color: '#FF453A' } }}
+                       sx={{ '&:hover': { color: accents.red } }}
                      >
                        <CloseIcon fontSize="small" />
                      </IconButton>
@@ -1181,7 +1176,7 @@ export default function ExpenseTrackerPage() {
                      <IconButton
                        onClick={(e) => handleMenuOpen(e, 'filter', null)}
                        size="small"
-                       sx={{ '&:hover': { backgroundColor: 'rgba(10,132,255,0.1)', color: '#0A84FF' } }}
+                       sx={{ '&:hover': { color: 'text.primary' } }}
                      >
                        <FilterIcon fontSize="small" />
                      </IconButton>
@@ -1192,44 +1187,30 @@ export default function ExpenseTrackerPage() {
              </Collapse>
            </Paper>
 
-           {/* The list. A six-column table scrolled sideways on a phone and
-               hid the amount, so each expense is one row that reflows instead. */}
-           <Paper
-             elevation={0}
-             sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}
-           >
-             {loading && expenses.length === 0 ? (
-               <Box sx={{ p: 1.5 }}><ExpenseListSkeleton rows={6} /></Box>
-             ) : expenses.length === 0 ? (
-               <Box sx={{ p: 5, textAlign: 'center' }}>
-                 <DashboardIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
-                 <Typography variant="body1" sx={{ fontWeight: 500 }}>Nothing here yet</Typography>
-                 <Typography variant="body2" color="text.secondary">
-                   Add one above, or clear the filters if you're expecting something.
-                 </Typography>
-               </Box>
-             ) : (
-               <Box sx={{ px: { xs: 1, sm: 1.5 } }}>
-                 {expenses.map((expense) => (
-                   <SwipeAction
-                     key={expense.id}
-                     onAction={() => deleteExpenseDirect(expense.id)}
-                     color="#FF453A"
-                     icon={<DeleteIcon sx={{ color: '#fff' }} />}
-                     label="Delete"
-                     borderRadius={0}
-                   >
-                     <ExpenseItem
-                       expense={expense}
-                       onEdit={openExpenseForm}
-                       onDelete={deleteExpenseHandler}
-                       onOpen={setStory}
-                     />
-                   </SwipeAction>
-                 ))}
-               </Box>
-             )}
-           </Paper>
+           {/* The list, as a chronological timeline grouped by day — each day a
+               quiet header with its net total over flat, hairline-separated rows. */}
+           {loading && expenses.length === 0 ? (
+             <Box sx={{ p: 1.5, borderRadius: '14px', border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
+               <ExpenseListSkeleton rows={6} />
+             </Box>
+           ) : expenses.length === 0 ? (
+             <Box sx={{ p: { xs: 4, sm: 5 }, textAlign: 'center', borderRadius: '14px', border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
+               <Typography sx={{ fontSize: 14, fontWeight: 600, color: 'text.primary' }}>
+                 {activeFilterCount > 0 ? 'Nothing matches those filters' : 'No expenses yet'}
+               </Typography>
+               <Typography sx={{ fontSize: 12.5, color: 'text.disabled', mt: 0.5 }}>
+                 {activeFilterCount > 0 ? 'Try clearing a filter to see more.' : 'Add your first — it will appear here.'}
+               </Typography>
+             </Box>
+           ) : (
+             <ExpenseTimeline
+               expenses={expenses}
+               onEdit={openExpenseForm}
+               onDelete={deleteExpenseHandler}
+               onDeleteDirect={deleteExpenseDirect}
+               onOpen={setStory}
+             />
+           )}
 
            {/* Pagination */}
            <TablePagination
@@ -1265,27 +1246,24 @@ export default function ExpenseTrackerPage() {
                    sx={{
                      border: '1px solid',
                      borderColor: 'divider',
-                     borderRadius: 3,
-                     backgroundColor: (theme) =>
-                       theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
-                     backdropFilter: 'blur(20px)',
-                     transition: 'transform 0.2s ease, border-color 0.2s ease',
-                     '&:hover': { transform: 'translateY(-3px)', borderColor: category.color },
+                     borderRadius: '14px',
+                     bgcolor: 'background.paper',
+                     transition: 'border-color 0.15s ease',
+                     '&:hover': { borderColor: 'text.disabled' },
                    }}
                  >
                    <CardContent>
                      <Box display="flex" justifyContent="space-between" alignItems="center">
-                       <Box display="flex" alignItems="center" gap={2}>
+                       <Box display="flex" alignItems="center" gap={1.5}>
                          <Box
                            sx={{
-                             width: 40, height: 40, borderRadius: '12px',
-                             background: `linear-gradient(135deg, ${category.color}, ${category.color}cc)`,
+                             width: 34, height: 34, borderRadius: '10px',
+                             bgcolor: `${category.color}1f`,
                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                             boxShadow: `0 4px 12px ${category.color}55`,
                              flexShrink: 0,
                            }}
                          >
-                           <CategoryIcon sx={{ color: '#fff', fontSize: 20 }} />
+                           <CategoryIcon sx={{ color: category.color, fontSize: 18 }} />
                          </Box>
                          <Box>
                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{category.name}</Typography>
@@ -1297,7 +1275,7 @@ export default function ExpenseTrackerPage() {
                        <IconButton
                          size="small"
                          onClick={(e) => handleMenuOpen(e, 'category', category)}
-                         sx={{ '&:hover': { backgroundColor: 'rgba(10,132,255,0.1)' } }}
+                         sx={{ color: 'text.disabled', '&:hover': { color: 'text.primary' } }}
                        >
                          <MoreVertIcon fontSize="small" />
                        </IconButton>
@@ -1331,34 +1309,31 @@ export default function ExpenseTrackerPage() {
                    sx={{
                      border: '1px solid',
                      borderColor: 'divider',
-                     borderRadius: 3,
-                     backgroundColor: (theme) =>
-                       theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
-                     backdropFilter: 'blur(20px)',
-                     transition: 'transform 0.2s ease, border-color 0.2s ease',
-                     '&:hover': { transform: 'translateY(-3px)', borderColor: tag.color },
+                     borderRadius: '14px',
+                     bgcolor: 'background.paper',
+                     transition: 'border-color 0.15s ease',
+                     '&:hover': { borderColor: 'text.disabled' },
                    }}
                  >
                    <CardContent>
                      <Box display="flex" justifyContent="space-between" alignItems="center">
-                       <Box display="flex" alignItems="center" gap={2}>
+                       <Box display="flex" alignItems="center" gap={1.5}>
                          <Box
                            sx={{
-                             width: 40, height: 40, borderRadius: '12px',
-                             background: `linear-gradient(135deg, ${tag.color}, ${tag.color}cc)`,
+                             width: 34, height: 34, borderRadius: '10px',
+                             bgcolor: `${tag.color}1f`,
                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                             boxShadow: `0 4px 12px ${tag.color}55`,
                              flexShrink: 0,
                            }}
                          >
-                           <TagIcon sx={{ color: '#fff', fontSize: 20 }} />
+                           <TagIcon sx={{ color: tag.color, fontSize: 18 }} />
                          </Box>
                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{tag.name}</Typography>
                        </Box>
                        <IconButton
                          size="small"
                          onClick={(e) => handleMenuOpen(e, 'tag', tag)}
-                         sx={{ '&:hover': { backgroundColor: 'rgba(10,132,255,0.1)' } }}
+                         sx={{ color: 'text.disabled', '&:hover': { color: 'text.primary' } }}
                        >
                          <MoreVertIcon fontSize="small" />
                        </IconButton>
@@ -1415,9 +1390,9 @@ export default function ExpenseTrackerPage() {
                <Paper
                  elevation={0}
                  sx={{
-                   p: 3, mb: 3, borderRadius: 3,
+                   p: 3, mb: 3, borderRadius: '14px',
                    border: '1px solid', borderColor: 'divider',
-                   background: 'linear-gradient(135deg, rgba(48,209,88,0.10), rgba(10,132,255,0.06))',
+                   bgcolor: 'background.paper',
                  }}
                >
                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
@@ -1499,8 +1474,7 @@ export default function ExpenseTrackerPage() {
              elevation={0}
              sx={{
                p: 2.5, mb: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider',
-               backgroundColor: (theme) =>
-                 theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+               bgcolor: 'background.paper',
              }}
            >
              <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
@@ -1542,9 +1516,9 @@ export default function ExpenseTrackerPage() {
              <Paper
                elevation={0}
                sx={{
-                 p: 2.5, mb: 3, borderRadius: 3, border: '1px solid',
-                 borderColor: 'rgba(255,69,58,0.4)',
-                 background: 'linear-gradient(135deg, rgba(255,69,58,0.10), transparent)',
+                 p: 2.5, mb: 3, borderRadius: '14px', border: '1px solid',
+                 borderColor: `${accents.red}66`,
+                 bgcolor: 'background.paper',
                }}
              >
                <Typography variant="overline" color="text.secondary">You owe</Typography>
@@ -1588,8 +1562,8 @@ export default function ExpenseTrackerPage() {
              <Paper
                elevation={0}
                sx={{
-                 p: 3, mb: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider',
-                 background: 'linear-gradient(135deg, rgba(255,159,10,0.12), rgba(191,90,242,0.06))',
+                 p: 3, mb: 3, borderRadius: '14px', border: '1px solid', borderColor: 'divider',
+                 bgcolor: 'background.paper',
                }}
              >
                <Typography variant="overline" color="text.secondary">Owed to you</Typography>
@@ -1625,15 +1599,13 @@ export default function ExpenseTrackerPage() {
                        <Box display="flex" alignItems="center" gap={2} mb={1.5}>
                          <Box
                            sx={{
-                             width: 40, height: 40, borderRadius: '50%',
-                             background: balance.owed > 0
-                               ? 'linear-gradient(135deg, #FF9F0A, #FF453A)'
-                               : 'linear-gradient(135deg, #30D158, #0A84FF)',
+                             width: 38, height: 38, borderRadius: '50%',
+                             bgcolor: balance.owed > 0 ? `${accents.amber}1f` : `${accents.mint}1f`,
                              display: 'flex', alignItems: 'center', justifyContent: 'center',
                              flexShrink: 0,
                            }}
                          >
-                           <PersonIcon sx={{ color: '#fff', fontSize: 20 }} />
+                           <PersonIcon sx={{ color: balance.owed > 0 ? accents.amber : accents.mint, fontSize: 19 }} />
                          </Box>
                          <Box sx={{ minWidth: 0 }}>
                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>
@@ -1758,14 +1730,13 @@ export default function ExpenseTrackerPage() {
          <Box
            sx={{
              width: 40, height: 40, borderRadius: '12px',
-             background: `linear-gradient(135deg, ${categoryForm.data.color}, ${categoryForm.data.color}cc)`,
+             bgcolor: `${categoryForm.data.color}1f`,
              display: 'flex', alignItems: 'center', justifyContent: 'center',
-             boxShadow: `0 6px 16px ${categoryForm.data.color}66`,
              flexShrink: 0,
-             transition: 'background 0.2s ease, box-shadow 0.2s ease',
+             transition: 'background-color 0.2s ease',
            }}
          >
-           <CategoryIcon sx={{ color: '#fff', fontSize: 20 }} />
+           <CategoryIcon sx={{ color: categoryForm.data.color, fontSize: 20 }} />
          </Box>
          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
            <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
@@ -1840,7 +1811,6 @@ export default function ExpenseTrackerPage() {
                    backgroundColor: categoryForm.data.color,
                    color: '#fff',
                    fontWeight: 600,
-                   boxShadow: `0 2px 8px ${categoryForm.data.color}55`,
                  }}
                />
              </Grid>
@@ -1861,14 +1831,13 @@ export default function ExpenseTrackerPage() {
          <Box
            sx={{
              width: 40, height: 40, borderRadius: '12px',
-             background: `linear-gradient(135deg, ${tagForm.data.color}, ${tagForm.data.color}cc)`,
+             bgcolor: `${tagForm.data.color}1f`,
              display: 'flex', alignItems: 'center', justifyContent: 'center',
-             boxShadow: `0 6px 16px ${tagForm.data.color}66`,
              flexShrink: 0,
-             transition: 'background 0.2s ease, box-shadow 0.2s ease',
+             transition: 'background-color 0.2s ease',
            }}
          >
-           <TagIcon sx={{ color: '#fff', fontSize: 20 }} />
+           <TagIcon sx={{ color: tagForm.data.color, fontSize: 20 }} />
          </Box>
          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
            <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
@@ -1916,7 +1885,6 @@ export default function ExpenseTrackerPage() {
                      backgroundColor: tagForm.data.color,
                      color: '#fff',
                      fontWeight: 500,
-                     boxShadow: `0 2px 8px ${tagForm.data.color}55`,
                    }}
                  />
                </Box>
@@ -1941,12 +1909,12 @@ export default function ExpenseTrackerPage() {
          <Box
            sx={{
              width: 40, height: 40, borderRadius: '12px',
-             background: 'linear-gradient(135deg, #FF9F0A, #FF453A)',
+             bgcolor: `${accents.amber}1f`,
              display: 'flex', alignItems: 'center', justifyContent: 'center',
-             boxShadow: '0 6px 16px rgba(255,159,10,0.4)', flexShrink: 0,
+             flexShrink: 0,
            }}
          >
-           <CallSplitIcon sx={{ color: '#fff', fontSize: 20 }} />
+           <CallSplitIcon sx={{ color: accents.amber, fontSize: 20 }} />
          </Box>
          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
            <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>Split a bill</Typography>
@@ -2115,14 +2083,14 @@ export default function ExpenseTrackerPage() {
 
      {/* Floating Action Button for mobile */}
      <Fab
-       color="primary"
        aria-label="add"
        sx={{
          position: 'fixed', right: 16,
          // Sits above the bottom bar on a phone, in the corner on desktop.
          bottom: { xs: 'calc(76px + env(safe-area-inset-bottom))', md: 24 },
-         background: 'linear-gradient(135deg, #0A84FF, #2997FF)',
-         '&:hover': { background: 'linear-gradient(135deg, #0071e3, #0A84FF)' },
+         bgcolor: accents.mint, color: '#04150e',
+         boxShadow: '0 8px 24px -6px rgba(0,0,0,0.5)',
+         '&:hover': { bgcolor: accents.mint, filter: 'brightness(1.05)' },
        }}
        onClick={() => openExpenseForm()}
      >

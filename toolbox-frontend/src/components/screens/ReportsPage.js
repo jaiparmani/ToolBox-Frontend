@@ -3,30 +3,35 @@ import { useNavigate } from 'react-router-dom';
 import { Box, Container, IconButton, Paper, Stack, Typography } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
-import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { getExpenseSummary, getMonthlyReport } from '../rest/expenseTrackerApis';
+import { getExpenses, getMonthlyReport } from '../rest/expenseTrackerApis';
 import Reveal from '../ui/Reveal';
-import AuroraBackground from '../motion/AuroraBackground';
-import TiltCard from '../motion/TiltCard';
-import CategoryBreakdown from '../ui/CategoryBreakdown';
-import TrendBars from '../ui/TrendBars';
+import CursorGlow from '../motion/CursorGlow';
 import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
-import { PageHeader, MetricCard, ChartContainer, EmptyState, InsightConstellation } from '../ui';
-import { accents } from '../../theme/tokens';
+import { PageHeader, ChartContainer, EmptyState } from '../ui';
+
+import InsightsMonthTrend from '../insights/InsightsMonthTrend';
+import InsightsCategoryDelta from '../insights/InsightsCategoryDelta';
+import InsightsDailyRhythm from '../insights/InsightsDailyRhythm';
+import InsightsBiggestExpenses from '../insights/InsightsBiggestExpenses';
+import InsightsWeekdayPattern from '../insights/InsightsWeekdayPattern';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
+const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const pad = (n) => String(n).padStart(2, '0');
+const daysInMonth = (year, month) => new Date(year, month, 0).getDate();
 
 /**
- * Reports, rebuilt around the two questions a month actually raises: where did
- * it go (the category breakdown) and when (the daily trend). Both are real
- * charts from the shared kit, not progress bars in a table.
+ * Insights — an expense-focused read on one month, always in the context of the
+ * months around it. Everything is data-true: monthly totals from the reports
+ * API, per-category moves computed from two adjacent months, the daily rhythm
+ * and biggest line items from the month's own expenses. Flat hairline surfaces,
+ * one green accent; semantic red only where money leaves.
  */
 export default function ReportsPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -34,22 +39,43 @@ export default function ReportsPage() {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
-  const [summary, setSummary] = useState(null);
-  const [report, setReport] = useState(null);
+
+  const [reports, setReports] = useState([]);   // last 6 monthly reports, oldest→selected
+  const [expenses, setExpenses] = useState([]); // selected month's expense rows
   const [loading, setLoading] = useState(true);
+
+  // The trailing 6-month window ending at the selected month.
+  const windowMonths = useMemo(() => {
+    const out = [];
+    for (let i = 5; i >= 0; i--) {
+      let m = month - i, y = year;
+      while (m < 1) { m += 12; y -= 1; }
+      out.push({ year: y, month: m });
+    }
+    return out;
+  }, [year, month]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const from = `${year}-${String(month).padStart(2, '0')}-01`;
-    const to = `${year}-${String(month).padStart(2, '0')}-31`;
-    const [s, r] = await Promise.allSettled([
-      getExpenseSummary({ dateFrom: from, dateTo: to }),
-      getMonthlyReport(year, month),
+    const from = `${year}-${pad(month)}-01`;
+    const to = `${year}-${pad(month)}-${daysInMonth(year, month)}`;
+
+    const reportCalls = windowMonths.map((w) =>
+      getMonthlyReport(w.year, w.month).catch(() => null));
+    const expenseCall = getExpenses({
+      dateFrom: from, dateTo: to, transactionType: 'expense',
+      ordering: '-amount', pageSize: 500,
+    }).catch(() => null);
+
+    const [reportResults, expenseResult] = await Promise.all([
+      Promise.all(reportCalls),
+      expenseCall,
     ]);
-    setSummary(s.status === 'fulfilled' ? s.value : null);
-    setReport(r.status === 'fulfilled' ? r.value : null);
+
+    setReports(reportResults);
+    setExpenses(expenseResult?.results || []);
     setLoading(false);
-  }, [year, month]);
+  }, [year, month, windowMonths]);
 
   useEffect(() => { if (isAuthenticated) load(); }, [isAuthenticated, load]);
 
@@ -61,15 +87,30 @@ export default function ReportsPage() {
   };
   const isThisMonth = year === today.getFullYear() && month === today.getMonth() + 1;
 
-  const categories = useMemo(() =>
-    (report?.category_totals || []).map(c => ({ label: c.category__name, value: parseFloat(c.total) })),
-    [report]);
+  const selectedReport = reports[reports.length - 1] || null;
+  const prevReport = reports[reports.length - 2] || null;
 
-  const constellation = useMemo(() =>
-    (report?.category_totals || [])
-      .filter(c => c.category__id != null)
-      .map(c => ({ id: c.category__id, label: c.category__name || 'Uncategorised', value: parseFloat(c.total), color: c.category__color })),
-    [report]);
+  const monthSeries = useMemo(() =>
+    windowMonths.map((w, i) => ({
+      key: `${w.year}-${w.month}`,
+      label: `${MONTHS[w.month - 1]} ${w.year}`,
+      short: SHORT[w.month - 1],
+      value: parseFloat(reports[i]?.total_amount ?? 0),
+      isSelected: i === windowMonths.length - 1,
+    })),
+    [windowMonths, reports]);
+
+  const total = parseFloat(selectedReport?.total_amount ?? 0);
+  const count = selectedReport?.total_count ?? 0;
+  const dailyTotals = selectedReport?.daily_totals || [];
+  const categoryTotals = selectedReport?.category_totals || [];
+
+  // Average per day: over days elapsed for the current month, whole month otherwise.
+  const daysBasis = isThisMonth ? today.getDate() : daysInMonth(year, month);
+  const avgPerDay = daysBasis > 0 ? total / daysBasis : 0;
+  const avgPerTxn = count > 0 ? total / count : 0;
+
+  const hasData = total > 0 || count > 0 || categoryTotals.length > 0;
 
   if (isLoading) return null;
   if (!isAuthenticated) {
@@ -82,96 +123,89 @@ export default function ReportsPage() {
     );
   }
 
-  const stats = [
-    { label: 'Spent', raw: summary?.totalExpenses ?? 0, icon: TrendingUpIcon, color: accents.red },
-    { label: 'Income', raw: summary?.totalIncome ?? 0, icon: TrendingDownIcon, color: accents.mint },
-    { label: 'Net', raw: summary?.netBalance ?? 0, icon: AccountBalanceIcon, color: accents.blue },
-    { label: 'Count', raw: report?.total_count ?? 0, icon: ReceiptLongIcon, color: accents.purple, plain: true },
-  ];
-
   return (
     <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 6, position: 'relative' }}>
-      {/* Living backdrop, reacting to the same financial weather as the dashboard */}
-      <AuroraBackground />
+      <CursorGlow />
       <Box sx={{ position: 'relative', zIndex: 1 }}>
-      {/* Month navigator */}
-      <Reveal>
-        <PageHeader
-          icon={AssessmentIcon}
-          gradient={`linear-gradient(135deg, ${accents.purple}, ${accents.red})`}
-          glow={`${accents.purple}55`}
-          title={MONTHS[month - 1]}
-          subtitle={String(year)}
-          actions={
-            <Stack direction="row" spacing={0.5}>
-              <IconButton onClick={() => changeMonth(-1)} aria-label="Previous month">
-                <ChevronLeftIcon />
-              </IconButton>
-              <IconButton onClick={() => changeMonth(1)} disabled={isThisMonth} aria-label="Next month">
-                <ChevronRightIcon />
-              </IconButton>
-            </Stack>
-          }
-        />
-        {/* Financial weather now lives once in the app top bar, not per-screen. */}
-      </Reveal>
-
-      {/* Animated stat grid */}
-      <Reveal index={1}>
-        {loading ? (
-          <Box sx={{ mb: 2.5 }}><SummarySkeleton /></Box>
-        ) : (
-          <Box
-            sx={{
-              display: 'grid', gap: 1.25, mb: 2.5,
-              gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
-            }}
-          >
-            {stats.map((stat) => (
-              <TiltCard key={stat.label} max={7}>
-                <MetricCard
-                  icon={stat.icon}
-                  color={stat.color}
-                  label={stat.label}
-                  amount={stat.raw}
-                  format={stat.plain ? 'plain' : 'smart'}
-                />
-              </TiltCard>
-            ))}
-          </Box>
-        )}
-      </Reveal>
-
-      {/* Where it went */}
-      <Reveal index={2}>
-        <ChartContainer sx={{ mb: 2.5 }}>
-          {loading ? <ExpenseListSkeleton rows={4} />
-            : categories.length ? <CategoryBreakdown data={categories} title="Where it went" />
-            : <EmptyState icon={ReceiptLongIcon} title="Nothing recorded this month" dense />}
-        </ChartContainer>
-      </Reveal>
-
-      {/* Explore — the category constellation, every node drills into its transactions */}
-      {!loading && constellation.length > 0 && (
-        <Reveal index={3}>
-          <ChartContainer sx={{ mb: 2.5 }}>
-            <InsightConstellation
-              data={constellation}
-              title="Explore spending"
-              onSelect={(n) => navigate(`/expense-tracker?category=${n.id}`)}
-            />
-          </ChartContainer>
+        {/* Month navigator */}
+        <Reveal>
+          <PageHeader
+            icon={AssessmentIcon}
+            title={MONTHS[month - 1]}
+            subtitle={String(year)}
+            actions={
+              <Stack direction="row" spacing={0.5}>
+                <IconButton onClick={() => changeMonth(-1)} aria-label="Previous month">
+                  <ChevronLeftIcon />
+                </IconButton>
+                <IconButton onClick={() => changeMonth(1)} disabled={isThisMonth} aria-label="Next month">
+                  <ChevronRightIcon />
+                </IconButton>
+              </Stack>
+            }
+          />
         </Reveal>
-      )}
 
-      {/* When */}
-      <Reveal index={4}>
-        <ChartContainer title="When">
-          {loading ? <Box sx={{ height: 120 }} />
-            : (report?.daily_totals?.length) ? <TrendBars data={report.daily_totals} />
-            : <EmptyState icon={AssessmentIcon} title="No daily activity to chart" dense />}
-        </ChartContainer>
-      </Reveal>
+        {loading ? (
+          <Stack spacing={2.5}>
+            <Box><SummarySkeleton /></Box>
+            <ChartContainer><ExpenseListSkeleton rows={4} /></ChartContainer>
+            <ChartContainer><ExpenseListSkeleton rows={5} /></ChartContainer>
+          </Stack>
+        ) : !hasData ? (
+          <Reveal index={1}>
+            <ChartContainer>
+              <EmptyState
+                icon={ReceiptLongIcon}
+                title={`No spending recorded for ${MONTHS[month - 1]} yet.`}
+                description="Add an expense, or step back to a month with activity."
+              />
+            </ChartContainer>
+          </Reveal>
+        ) : (
+          <Stack spacing={2.5}>
+            {/* 1. Spend trend across months */}
+            <Reveal index={1}>
+              <InsightsMonthTrend months={monthSeries} count={count} />
+            </Reveal>
+
+            {/* 2. Where it went — categories with per-category MoM delta */}
+            {categoryTotals.length > 0 && (
+              <Reveal index={2}>
+                <InsightsCategoryDelta current={categoryTotals} previous={prevReport?.category_totals || []} />
+              </Reveal>
+            )}
+
+            {/* 3. Daily rhythm */}
+            {dailyTotals.length > 0 && (
+              <Reveal index={3}>
+                <InsightsDailyRhythm
+                  daily={dailyTotals}
+                  avgPerDay={avgPerDay}
+                  avgPerTxn={avgPerTxn}
+                  perDayLabel={isThisMonth ? 'Avg / day so far' : 'Avg / day'}
+                />
+              </Reveal>
+            )}
+
+            {/* 4. Biggest expenses */}
+            {expenses.length > 0 && (
+              <Reveal index={4}>
+                <InsightsBiggestExpenses
+                  expenses={expenses}
+                  onSelect={(e) => navigate(`/expense-tracker${e.category?.id ? `?category=${e.category.id}` : ''}`)}
+                />
+              </Reveal>
+            )}
+
+            {/* 5. Day-of-week pattern — only when dated rows exist */}
+            {expenses.length > 0 && (
+              <Reveal index={5}>
+                <InsightsWeekdayPattern expenses={expenses} />
+              </Reveal>
+            )}
+          </Stack>
+        )}
       </Box>
     </Container>
   );

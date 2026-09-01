@@ -15,6 +15,7 @@ import ForgotPasswordPage from './screens/ForgotPasswordPage'
 import ResetPasswordPage from './screens/ResetPasswordPage'
 import ApiKeysPage from './screens/ApiKeysPage'
 import SplitsPage from './screens/SplitsPage'
+import MoneyUniversePage from './screens/MoneyUniversePage'
 import { Box, CircularProgress, Typography } from '@mui/material'
 
 // Loading Component
@@ -83,6 +84,7 @@ export default function Router() {
         <Route path="/recurring" element={<RecurringPage />} />
         <Route path="/profile" element={<UserProfilePage />} />
         <Route path="/expense-tracker" element={<ExpenseTrackerPage />} />
+        <Route path="/universe" element={<MoneyUniversePage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/health-tracker" element={<HealthTrackerPage />} />
         <Route path="/splits" element={<SplitsPage />} />

@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography } from '@mui/material';
-import { motion, useReducedMotion } from 'framer-motion';
 import HandshakeRoundedIcon from '@mui/icons-material/HandshakeRounded';
 import NorthEastRoundedIcon from '@mui/icons-material/NorthEastRounded';
 import SouthWestRoundedIcon from '@mui/icons-material/SouthWestRounded';
@@ -17,6 +16,7 @@ import { useMoney } from '../../contexts/MoneyContext';
 import { getExpenseSummary, getSplitBalances, getCopilotCards, dismissCopilotCard } from '../rest/expenseTrackerApis';
 import ProjectionChart from '../ui/ProjectionChart';
 import CursorGlow from '../motion/CursorGlow';
+import Reveal from '../ui/Reveal';
 import { copilotIcon } from '../ui';
 import { money } from '../ui/money';
 import { accents, type } from '../../theme/tokens';
@@ -36,16 +36,6 @@ const FEATURES = [
 ];
 
 const cardSx = { border: '1px solid', borderColor: 'divider', borderRadius: '14px', bgcolor: 'background.paper', p: { xs: 2, sm: 2.25 } };
-
-// staggered entrance
-const rise = (reduce, i = 0) => ({
-  initial: reduce ? { opacity: 0 } : { opacity: 0, y: 16 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: reduce ? 0.2 : 0.5, ease: [0.32, 0.72, 0, 1], delay: reduce ? 0 : 0.06 + i * 0.07 },
-});
-const MRise = ({ i = 0, reduce, children, sx, ...rest }) => (
-  <Box component={motion.div} {...rise(reduce, i)} sx={sx} {...rest}>{children}</Box>
-);
 
 const Eyebrow = ({ children, sx }) => (
   <Typography sx={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.11em', textTransform: 'uppercase', color: 'text.disabled', ...sx }}>{children}</Typography>
@@ -121,7 +111,6 @@ function Donut({ cats }) {
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const reduce = useReducedMotion();
   const { user } = useAuth();
   const { projection } = useMoney();
   const [expense, setExpense] = useState(null);
@@ -190,16 +179,16 @@ export default function LandingPage() {
 
         {/* ── HERO ── open composition, not a card ── */}
         <Box sx={{ pt: { xs: 0.5, md: 1 }, pb: { xs: 3, md: 4 }, borderBottom: '1px solid', borderColor: 'divider', mb: { xs: 2.5, md: 3 } }}>
-          <MRise i={0} reduce={reduce}>
+          <Reveal index={0}>
             <Typography sx={{ fontSize: 12.5, color: 'text.disabled', fontWeight: 500 }}>{dateStr}</Typography>
             <Typography sx={{ fontFamily: type.displayFamily, fontSize: { xs: '1.35rem', sm: '1.5rem' }, fontWeight: 600, letterSpacing: '-0.03em', mt: 0.25 }}>
               {greetOf()}, {name}.
             </Typography>
-          </MRise>
+          </Reveal>
 
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.9fr 1.1fr' }, gap: { xs: 2.5, md: 5 }, alignItems: 'center', mt: { xs: 2.5, md: 3 } }}>
             {/* the one number */}
-            <MRise i={1} reduce={reduce}>
+            <Reveal index={1}>
               <Eyebrow>Safe to spend today</Eyebrow>
               <Typography sx={{ ...num, fontSize: { xs: '3.4rem', sm: '4.4rem', md: '4.9rem' }, fontWeight: 640, letterSpacing: '-0.045em', lineHeight: 0.92, mt: 1, color: (safe != null && safe < 0) ? RED : 'text.primary' }}>
                 {safe != null ? fmt(safe) : '—'}
@@ -213,10 +202,10 @@ export default function LandingPage() {
                 <HeroStat label="Next income" value={p.upcoming_income > 0 ? `${fmt(p.upcoming_income)} · ${fmtDate(p.next_income_date)}` : '—'} tone={p.upcoming_income > 0 ? GREEN : undefined} />
                 <HeroStat label="Balance" value={balance != null ? fmt(balance) : '—'} tone={balance != null && balance < 0 ? RED : undefined} />
               </Box>
-            </MRise>
+            </Reveal>
 
             {/* interactive chart — the signature */}
-            <MRise i={2} reduce={reduce}>
+            <Reveal index={2}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.5 }}>
                 <Eyebrow>30-day projection</Eyebrow>
                 <Typography sx={{ fontSize: 11, color: 'text.disabled', display: { xs: 'none', sm: 'block' } }}>hover to inspect any day</Typography>
@@ -227,12 +216,12 @@ export default function LandingPage() {
                 {low && <Typography sx={{ fontSize: 10.5, color: AMBER }}>Low {money(low.balance)} · {fmtDate(low.date)}</Typography>}
                 <Typography sx={{ fontSize: 10.5, color: 'text.disabled' }}>+{p.horizon_days || 30}d</Typography>
               </Box>
-            </MRise>
+            </Reveal>
           </Box>
         </Box>
 
         {/* ── METRICS BAND — typographic, no cards ── */}
-        <MRise i={3} reduce={reduce}>
+        <Reveal index={3}>
           <Box sx={{ display: 'flex', overflowX: 'auto', borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider',
             '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none', mb: { xs: 2.5, md: 3 } }}>
             {metrics.map((m, i) => (
@@ -243,15 +232,15 @@ export default function LandingPage() {
               </Box>
             ))}
           </Box>
-        </MRise>
+        </Reveal>
 
         {/* ── breakdown | attention ── */}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
-          <MRise i={4} reduce={reduce} sx={cardSx}>
+          <Reveal index={4} sx={cardSx}>
             <SectionHead title="Where it went" count={expense ? fmt(expense.totalExpenses || 0) : ''} />
             <Donut cats={expense?.categoryBreakdown} />
-          </MRise>
-          <MRise i={5} reduce={reduce} sx={cardSx}>
+          </Reveal>
+          <Reveal index={5} sx={cardSx}>
             <SectionHead title="Needs attention" count={copilot.length || undefined} />
             {copilot.length === 0 ? (
               <Box sx={{ py: 2.5, textAlign: 'center' }}>
@@ -263,12 +252,12 @@ export default function LandingPage() {
                 right="›" tone="text.disabled" last={i === Math.min(copilot.length, 4) - 1}
                 onClick={() => (c.action_route ? navigate(c.action_route) : dismiss(c.id))} />
             ))}
-          </MRise>
+          </Reveal>
         </Box>
 
         {/* ── upcoming | shared ── */}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5, mt: 1.5 }}>
-          <MRise i={6} reduce={reduce} sx={cardSx}>
+          <Reveal index={6} sx={cardSx}>
             <SectionHead title="Upcoming" count={`next ${p.horizon_days || 30} days`} />
             {upcoming.length === 0 ? (
               <Box sx={{ py: 2.5, textAlign: 'center' }}><Typography sx={{ fontSize: 12.5, color: 'text.disabled' }}>Nothing scheduled ahead.</Typography></Box>
@@ -293,9 +282,9 @@ export default function LandingPage() {
                 })}
               </Box>
             )}
-          </MRise>
+          </Reveal>
 
-          <MRise i={7} reduce={reduce} sx={cardSx}>
+          <Reveal index={7} sx={cardSx}>
             <SectionHead title="Shared" action="View all" onAction={() => navigate('/splits')} />
             {people.length === 0 ? (
               <Box sx={{ py: 2.5, textAlign: 'center' }}>
@@ -315,14 +304,14 @@ export default function LandingPage() {
                 ))}
               </>
             )}
-          </MRise>
+          </Reveal>
         </Box>
 
         {/* ── jump to ── */}
-        <MRise i={8} reduce={reduce}><Eyebrow sx={{ mt: 1 }}>Jump to</Eyebrow></MRise>
+        <Reveal index={8}><Eyebrow sx={{ mt: 1 }}>Jump to</Eyebrow></Reveal>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2,1fr)', sm: 'repeat(3,1fr)', md: 'repeat(6,1fr)' }, gap: 1, mt: 1.25 }}>
           {FEATURES.map((f, i) => (
-            <MRise key={f.to} i={9 + i} reduce={reduce}>
+            <Reveal key={f.to} index={9 + i}>
               <Box role="button" tabIndex={0} onClick={() => navigate(f.to)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(f.to); } }}
                 sx={{ ...cardSx, p: 1.75, cursor: 'pointer', transition: 'border-color .12s ease, transform .12s ease',
                   '&:hover': { borderColor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(17,17,20,0.22)', transform: 'translateY(-2px)' },
@@ -333,7 +322,7 @@ export default function LandingPage() {
                 <Typography sx={{ fontSize: 12.5, fontWeight: 600 }}>{f.title}</Typography>
                 <Typography sx={{ fontSize: 11, color: 'text.disabled' }}>{f.hint}</Typography>
               </Box>
-            </MRise>
+            </Reveal>
           ))}
         </Box>
       </Box>

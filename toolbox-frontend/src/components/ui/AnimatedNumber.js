@@ -22,23 +22,37 @@ export default function AnimatedNumber({ value, format = 'money', duration = 650
     const from = fromRef.current;
     const to = Number(value) || 0;
 
-    if (reduce || from === to) {
+    // rAF is throttled/paused in a hidden or backgrounded tab, which would leave
+    // the figure frozen at its old value (e.g. ₹0 while data loads off-screen).
+    // When we can't animate, snap to the real value so it's never stale.
+    if (reduce || from === to || (typeof document !== 'undefined' && document.hidden)) {
       fromRef.current = to;
       setDisplay(to);
       return undefined;
     }
 
     const start = performance.now();
+    let done = false;
+    const finish = () => { if (done) return; done = true; fromRef.current = to; setDisplay(to); };
     const tick = (now) => {
       const t = Math.min((now - start) / duration, 1);
       // Ease out: most of the distance early, so it feels responsive.
       const eased = 1 - Math.pow(1 - t, 3);
       setDisplay(from + (to - from) * eased);
       if (t < 1) frameRef.current = requestAnimationFrame(tick);
-      else fromRef.current = to;
+      else finish();
     };
     frameRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frameRef.current);
+    // Safety net: if rAF never delivers the final frame (tab hidden mid-count),
+    // guarantee the value lands once past the duration.
+    const guard = setTimeout(finish, duration + 120);
+    const onHide = () => { if (document.hidden) finish(); };
+    document.addEventListener('visibilitychange', onHide);
+    return () => {
+      cancelAnimationFrame(frameRef.current);
+      clearTimeout(guard);
+      document.removeEventListener('visibilitychange', onHide);
+    };
   }, [value, duration]);
 
   const formatted = format === 'smart' ? moneySmart(display)

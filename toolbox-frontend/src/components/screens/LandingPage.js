@@ -146,6 +146,20 @@ export default function LandingPage() {
     if (!cats.length) return null;
     return [...cats].sort((a, b) => b.amount - a.amount)[0];
   }, [cats]);
+
+  // this month's rhythm — all factual, straight from the report (no projection)
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const rhythm = useMemo(() => {
+    const dt = report?.daily_totals || [];
+    const active = dt.filter((d) => (Number(d.total) || 0) > 0);
+    const busiest = active.reduce((m, d) => (Number(d.total) > (m ? Number(m.total) : -1) ? d : m), null);
+    return {
+      avgPerTxn: count > 0 ? spent / count : 0,
+      activeDays: active.length,
+      busiest: busiest ? { date: busiest.date, total: Number(busiest.total) } : null,
+    };
+  }, [report, spent, count]);
+
   const insightText = insight ? (insight.summary || insight.text || insight.body || insight.message || (typeof insight === 'string' ? insight : null)) : null;
 
   const catName = (e) => e.category?.name || e.categoryName || e.category_name || (typeof e.category === 'string' ? e.category : '');
@@ -248,9 +262,28 @@ export default function LandingPage() {
           </Reveal>
         )}
 
+        {/* ── this month's rhythm — factual stats ── */}
+        {spent > 0 && (
+          <Reveal index={4}>
+            <Box sx={{ ...cardSx, mb: { xs: 2.5, md: 3 }, display: 'flex', alignItems: 'stretch', p: { xs: 1.75, sm: 2.25 } }}>
+              {[
+                { label: 'Transactions', value: String(count) },
+                { label: 'Avg / transaction', value: money(rhythm.avgPerTxn) },
+                { label: 'Active days', value: `${rhythm.activeDays} of ${daysInMonth}` },
+                ...(rhythm.busiest ? [{ label: 'Busiest day', value: money(rhythm.busiest.total), sub: new Date(rhythm.busiest.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) }] : []),
+              ].map((s, i) => (
+                <Box key={s.label} sx={{ flex: 1, minWidth: 0, px: { xs: 1, sm: 1.75 }, borderLeft: i === 0 ? 'none' : '1px solid', borderColor: 'divider' }}>
+                  <Typography sx={{ ...num, fontSize: { xs: 17, sm: 20 }, fontWeight: 640, letterSpacing: '-0.02em', lineHeight: 1.05 }} noWrap>{s.value}</Typography>
+                  <Typography sx={{ fontSize: 10.5, color: 'text.disabled', letterSpacing: '0.02em', mt: 0.4 }} noWrap>{s.label}{s.sub ? ` · ${s.sub}` : ''}</Typography>
+                </Box>
+              ))}
+            </Box>
+          </Reveal>
+        )}
+
         {/* ── category breakdown | recent activity ── */}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
-          <Reveal index={4} sx={cardSx}>
+          <Reveal index={5} sx={cardSx}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
               <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Where it went</Typography>
               <Typography onClick={() => navigate('/reports')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', '&:hover': { color: 'text.primary' } }}>Insights</Typography>
@@ -258,7 +291,7 @@ export default function LandingPage() {
             <CategoryDonut cats={cats} />
           </Reveal>
 
-          <Reveal index={5} sx={cardSx}>
+          <Reveal index={6} sx={cardSx}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Recent</Typography>
               <Typography onClick={() => navigate('/expense-tracker')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 0.4, '&:hover': { color: 'text.primary' } }}>

@@ -242,7 +242,7 @@ export default function UserRegistrationPage() {
               Create your account
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Join ToolBox and take control of your money
+              Join Money OS and take control of your money
             </Typography>
           </Box>
         </Box>

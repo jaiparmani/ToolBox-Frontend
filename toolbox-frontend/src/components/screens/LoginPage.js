@@ -196,7 +196,7 @@ export default function LoginPage() {
         <Box display="flex" alignItems="center" gap={1.25}>
           <BrandLogo size={30} />
           <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: '1.05rem', letterSpacing: '-0.01em' }}>
-            ToolBox
+            Money OS
           </Typography>
         </Box>
         <SecureBadge />

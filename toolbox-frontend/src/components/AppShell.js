@@ -123,7 +123,7 @@ function RailContent({ pathname, onNavigate, onOpenAccount, accountRef, user }) 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, mb: 3 }}>
         <BrandLogo size={30} />
         <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: '1.15rem', letterSpacing: '-0.02em' }}>
-          ToolBox
+          Money OS
         </Typography>
       </Box>
 
@@ -167,13 +167,13 @@ function RailContent({ pathname, onNavigate, onOpenAccount, accountRef, user }) 
   );
 }
 
-/** The ⌘K "Ask ToolBox" affordance. */
+/** The ⌘K "Ask Money OS" affordance. */
 function AskButton({ compact }) {
   const open = () => window.dispatchEvent(new Event('toolbox:command-palette'));
   return (
-    <Tooltip title="Ask ToolBox (⌘K)">
+    <Tooltip title="Ask Money OS (⌘K)">
       <Box
-        onClick={open} role="button" aria-label="Open the ToolBox assistant"
+        onClick={open} role="button" aria-label="Open the Money OS assistant"
         sx={{
           display: 'flex', alignItems: 'center', gap: 0.9, cursor: 'pointer',
           px: compact ? 1 : 1.4, py: 0.6, borderRadius: '11px',

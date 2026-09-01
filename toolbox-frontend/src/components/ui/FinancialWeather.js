@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, useTheme } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import WbSunnyRoundedIcon from '@mui/icons-material/WbSunnyRounded';
 import CloudQueueRoundedIcon from '@mui/icons-material/CloudQueueRounded';
 import ThunderstormRoundedIcon from '@mui/icons-material/ThunderstormRounded';
@@ -64,13 +64,11 @@ export function deriveWeather({ projection, pulse } = {}) {
  * pill instead (for headers / other screens). `onClick` is optional.
  */
 export default function FinancialWeather({ projection, pulse, loading, compact, onClick, sx }) {
-  const theme = useTheme();
   const w = deriveWeather({ projection, pulse });
   const Icon = w.icon;
-  const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   if (loading) {
-    return <Box sx={{ height: compact ? 30 : 52, borderRadius: 999, border: '1px solid', borderColor: 'divider', opacity: 0.5, ...sx }} />;
+    return <Box sx={{ height: compact ? 30 : 56, borderRadius: compact ? 999 : 2.5, border: '1px solid', borderColor: 'divider', opacity: 0.5, ...sx }} />;
   }
 
   if (compact) {
@@ -81,51 +79,42 @@ export default function FinancialWeather({ projection, pulse, loading, compact, 
         aria-label={`Financial weather: ${w.label}. ${w.reason}`}
         sx={{
           display: 'inline-flex', alignItems: 'center', gap: 0.75, px: 1.25, py: 0.5,
-          borderRadius: 999, border: '1px solid', borderColor: `${w.color}55`,
-          backgroundColor: `${w.color}14`, cursor: onClick ? 'pointer' : 'default', ...sx,
+          borderRadius: 999, border: '1px solid', borderColor: 'divider',
+          cursor: onClick ? 'pointer' : 'default', ...sx,
         }}
       >
-        <Icon sx={{ fontSize: 15, color: w.color }} />
-        <Typography variant="caption" sx={{ fontWeight: 650, color: w.color, whiteSpace: 'nowrap' }}>{w.label}</Typography>
+        <Box aria-hidden sx={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: w.color, flexShrink: 0 }} />
+        <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', whiteSpace: 'nowrap' }}>{w.label}</Typography>
       </Box>
     );
   }
 
+  // Restrained band: a flat hairline surface. Colour is carried only by a small
+  // status icon and the label — no gradient wash, particles, or glow.
   return (
     <Box
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       aria-label={`Financial weather: ${w.label}. ${w.reason}`}
       sx={{
-        position: 'relative', overflow: 'hidden',
-        display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.25,
-        borderRadius: 3, border: '1px solid', borderColor: `${w.color}44`,
-        background: `linear-gradient(100deg, ${w.color}1f, transparent 70%)`,
+        display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.5,
+        borderRadius: 2.5, border: '1px solid', borderColor: 'divider',
+        backgroundColor: 'background.paper',
         cursor: onClick ? 'pointer' : 'default', ...sx,
       }}
     >
-      {/* drifting particles — subtle, motion-gated */}
-      {!reduce && (
-        <Box aria-hidden sx={{
-          position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.5,
-          background: `radial-gradient(1.5px 1.5px at 20% 40%, ${w.color}, transparent), radial-gradient(1.5px 1.5px at 60% 70%, ${w.color}, transparent), radial-gradient(1.5px 1.5px at 85% 30%, ${w.color}, transparent)`,
-          backgroundSize: '180px 100%',
-          animation: 'weatherDrift 14s linear infinite',
-          '@keyframes weatherDrift': { from: { backgroundPositionX: '0px' }, to: { backgroundPositionX: '180px' } },
-        }} />
-      )}
       <Box sx={{
-        width: 38, height: 38, borderRadius: '50%', flexShrink: 0, position: 'relative',
+        width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: `${w.color}22`, boxShadow: `0 0 18px ${w.color}44`,
+        backgroundColor: `${w.color}1a`,
       }}>
-        <Icon sx={{ fontSize: 20, color: w.color }} />
+        <Icon sx={{ fontSize: 18, color: w.color }} />
       </Box>
-      <Box sx={{ minWidth: 0, position: 'relative' }}>
-        <Typography variant="caption" sx={{ fontWeight: 750, letterSpacing: '0.05em', textTransform: 'uppercase', color: w.color }}>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: w.color }}>
           {w.label}
         </Typography>
-        <Typography variant="body2" sx={{ color: theme.palette.text.secondary, lineHeight: 1.25 }} noWrap>
+        <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.25 }} noWrap>
           {w.reason}
         </Typography>
       </Box>

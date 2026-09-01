@@ -162,9 +162,15 @@ export default function LandingPage() {
               backgroundSize: '220% auto',
               backgroundClip: 'text', WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent', color: 'transparent',
-              animation: 'greetShimmer 7s linear infinite',
+              // Signature entrance: the greeting unveils left-to-right, then the
+              // gradient shimmer takes over. Reduced motion shows it settled.
+              animation: 'greetWipe 720ms cubic-bezier(0.32,0.72,0,1) both, greetShimmer 7s linear infinite 0.5s',
+              '@keyframes greetWipe': {
+                from: { clipPath: 'inset(0 105% 0 0)', WebkitClipPath: 'inset(0 105% 0 0)' },
+                to: { clipPath: 'inset(0 -5% 0 0)', WebkitClipPath: 'inset(0 -5% 0 0)' },
+              },
               '@keyframes greetShimmer': { to: { backgroundPositionX: '220%' } },
-              '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+              '@media (prefers-reduced-motion: reduce)': { animation: 'none', clipPath: 'none', WebkitClipPath: 'none' },
             }}
           >
             {getGreeting()}, {displayName}.

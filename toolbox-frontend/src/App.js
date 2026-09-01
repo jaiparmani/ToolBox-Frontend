@@ -63,6 +63,19 @@ const getTheme = (mode) => createTheme({
     borderRadius: 14,
   },
   components: {
+    // One consistent, keyboard-only focus ring across every interactive element
+    // — bespoke Boxes, links, and MUI controls alike — so tab navigation is
+    // always visible without adding rings on mouse click.
+    MuiCssBaseline: {
+      styleOverrides: {
+        ':focus:not(:focus-visible)': { outline: 'none' },
+        'a:focus-visible, button:focus-visible, [role="button"]:focus-visible, [tabindex]:focus-visible, summary:focus-visible, [contenteditable]:focus-visible': {
+          outline: `2px solid ${mode === 'dark' ? '#0A84FF' : '#0071e3'}`,
+          outlineOffset: '2px',
+          borderRadius: '6px',
+        },
+      },
+    },
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {

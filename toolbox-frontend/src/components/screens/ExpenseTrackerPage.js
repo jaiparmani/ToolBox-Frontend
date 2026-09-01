@@ -9,7 +9,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, TablePagination, InputAdornment, Menu, MenuItem,
   ListItemIcon, ListItemText, LinearProgress, Autocomplete,
-  Stack, useMediaQuery, Collapse
+  useMediaQuery, Collapse
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -61,10 +61,10 @@ import ErrorBanner from '../ui/ErrorBanner';
 import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { money } from '../ui/money';
 import { feedback } from '../ui/feedback';
-import { TransactionStoryDrawer, buildStoryFromExpense } from '../ui';
+import { TransactionStoryDrawer, buildStoryFromExpense, PageHeader } from '../ui';
 import AuroraBackground from '../motion/AuroraBackground';
 import AssistantOrb from '../ui/AssistantOrb';
-import { accents, type } from '../../theme/tokens';
+import { accents } from '../../theme/tokens';
 
 // Color palette for categories
 const categoryColors = [
@@ -83,41 +83,20 @@ function AssistantNudge({ label }) {
      aria-label="Open the ToolBox assistant"
      onClick={open}
      sx={{
-       position: 'relative', overflow: 'hidden',
-       display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1.15, borderRadius: 3, cursor: 'pointer',
-       border: '1px solid', borderColor: `${accents.violet}55`,
-       backgroundImage: `radial-gradient(120% 160% at 0% 0%, ${accents.violet}16, transparent 60%)`,
-       transition: 'border-color 0.2s ease, box-shadow 0.3s ease',
-       '@keyframes nudgeSheen': { '0%': { transform: 'translateX(-160%) skewX(-16deg)' }, '55%,100%': { transform: 'translateX(520%) skewX(-16deg)' } },
-       '@keyframes nudgeGlow': { '0%,100%': { boxShadow: `0 0 0 0 ${accents.violet}00` }, '50%': { boxShadow: `0 8px 30px -12px ${accents.violet}88` } },
-       '@keyframes caretBlink': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.2 } },
-       animation: 'nudgeGlow 4.5s ease-in-out infinite',
-       '&:hover': { borderColor: accents.violet, boxShadow: `0 10px 34px -12px ${accents.violet}aa` },
-       '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+       display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1.15, borderRadius: 2.5, cursor: 'pointer',
+       border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper',
+       transition: 'border-color 0.15s ease',
+       '&:hover': { borderColor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(17,17,20,0.22)' },
+       '&:focus-visible': { outline: `2px solid ${accents.mint}`, outlineOffset: 2 },
      }}
    >
-     {/* A band of light sweeping the bar — this is a live console, not a static field */}
-     <Box aria-hidden sx={{
-       position: 'absolute', top: 0, bottom: 0, left: 0, width: '30%', pointerEvents: 'none',
-       background: `linear-gradient(100deg, transparent, ${accents.violet}22, transparent)`,
-       animation: 'nudgeSheen 7s ease-in-out infinite',
-       '@media (prefers-reduced-motion: reduce)': { display: 'none' },
-     }} />
-     <Box sx={{ flexShrink: 0, position: 'relative' }}>
-       <AssistantOrb state="idle" size={30} />
+     <Box sx={{ flexShrink: 0 }}>
+       <AssistantOrb state="idle" size={28} />
      </Box>
-     <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', position: 'relative' }}>
+     <Box sx={{ flex: 1, minWidth: 0 }}>
        <Typography variant="body2" sx={{ color: 'text.secondary' }} noWrap>{label}</Typography>
-       {/* A soft caret, so the bar reads as something you type into */}
-       <Box aria-hidden sx={{
-         ml: '3px', width: '2px', height: '1.05em', borderRadius: '1px', flexShrink: 0,
-         background: `linear-gradient(180deg, ${accents.cyan}, ${accents.violet})`,
-         boxShadow: `0 0 7px ${accents.violet}aa`,
-         animation: 'caretBlink 1.1s steps(1) infinite',
-         '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
-       }} />
      </Box>
-     <Box sx={{ display: { xs: 'none', sm: 'block' }, px: 0.75, py: 0.15, borderRadius: 1, border: '1px solid', borderColor: `${accents.violet}44`, fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', position: 'relative', flexShrink: 0 }}>⌘K</Box>
+     <Box sx={{ display: { xs: 'none', sm: 'block' }, px: 0.75, py: 0.15, borderRadius: 1, border: '1px solid', borderColor: 'divider', fontSize: '0.7rem', fontWeight: 700, color: 'text.disabled', flexShrink: 0 }}>⌘K</Box>
    </Box>
  );
 }
@@ -942,106 +921,21 @@ export default function ExpenseTrackerPage() {
      <AuroraBackground />
      <Box sx={{ position: 'relative', zIndex: 1 }}>
      {/* Financial weather now lives once in the app top bar, not per-screen. */}
-     {/* Header - stays reachable, shrinks to icons on a phone */}
-     <Paper
-       elevation={0}
-       sx={{
-         p: { xs: 2.25, sm: 3 }, mb: { xs: 2, sm: 3 },
-         position: 'relative', overflow: 'hidden', borderRadius: 4,
-         border: '1px solid',
-         borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-         backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(22,22,28,0.55)' : 'rgba(255,255,255,0.72)',
-         backdropFilter: 'blur(20px)',
-         boxShadow: (theme) => theme.palette.mode === 'dark'
-           ? '0 1px 0 rgba(255,255,255,0.045) inset, 0 24px 60px -36px rgba(10,132,255,0.4)'
-           : '0 1px 0 rgba(255,255,255,0.9) inset, 0 24px 60px -38px rgba(10,132,255,0.32)',
-         // One committed accent, held back — a whisper of blue at the corner, not a wash.
-         '&::before': {
-           content: '""', position: 'absolute', inset: 0, pointerEvents: 'none',
-           background: 'radial-gradient(90% 80% at 0% 0%, rgba(10,132,255,0.10), transparent 52%)',
-         },
-       }}
-     >
-       <Box display="flex" justifyContent="space-between" alignItems="center" gap={1.5} sx={{ position: 'relative' }}>
-         <Box display="flex" alignItems="center" gap={{ xs: 1.5, sm: 2 }} sx={{ minWidth: 0 }}>
-           {/* Nested-bezel icon with a spinning gradient halo and a pulsing glow */}
-           <Box sx={{
-             position: 'relative', flexShrink: 0,
-             '@keyframes iconSpin': { to: { transform: 'rotate(360deg)' } },
-             '@keyframes iconPulse': { '0%,100%': { opacity: 0.45, transform: 'scale(1)' }, '50%': { opacity: 0.8, transform: 'scale(1.14)' } },
-           }}>
-             {/* Pulsing glow halo */}
-             <Box aria-hidden sx={{
-               position: 'absolute', inset: -11, borderRadius: '50%',
-               background: 'radial-gradient(circle, rgba(10,132,255,0.55), transparent 68%)', filter: 'blur(10px)',
-               animation: 'iconPulse 3s ease-in-out infinite',
-               '@media (prefers-reduced-motion: reduce)': { animation: 'none', opacity: 0.5 },
-             }} />
-             {/* Spinning gradient-border ring */}
-             <Box aria-hidden sx={{
-               position: 'absolute', inset: -2.5, borderRadius: '18px', padding: '2px',
-               background: 'conic-gradient(from 0deg, transparent 0%, #64D2FF 16%, #0A84FF 38%, transparent 58%)',
-               WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
-               WebkitMaskComposite: 'xor', maskComposite: 'exclude',
-               animation: 'iconSpin 3.4s linear infinite',
-               '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
-             }} />
-             <Box sx={{
-               position: 'relative', p: '4px', borderRadius: '16px',
-               background: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(10,132,255,0.08)',
-             }}>
-               <Box sx={{
-                 width: { xs: 40, sm: 50 }, height: { xs: 40, sm: 50 }, borderRadius: '13px',
-                 background: 'linear-gradient(135deg, #0A84FF, #64D2FF)',
-                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                 boxShadow: '0 12px 26px -6px rgba(10,132,255,0.7), inset 0 1px 0 rgba(255,255,255,0.45)',
-               }}>
-                 <DashboardIcon sx={{ fontSize: { xs: 22, sm: 27 }, color: '#fff' }} />
-               </Box>
-             </Box>
-           </Box>
-           <Box sx={{ minWidth: 0 }}>
-             <Typography sx={{
-               fontFamily: type.displayFamily,
-               fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
-               color: 'primary.main', mb: 0.25, display: 'block',
-             }}>
-               Activity
-             </Typography>
-             <Typography sx={{
-               fontFamily: type.displayFamily, fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 0.95,
-               fontSize: { xs: '1.5rem', sm: '2.5rem' },
-               backgroundImage: (theme) => theme.palette.mode === 'dark'
-                 ? 'linear-gradient(120deg, #ffffff 30%, #8ec9ff 100%)'
-                 : 'linear-gradient(120deg, #0b1220 40%, #0A84FF 100%)',
-               backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-             }} noWrap>
-               Expenses
-             </Typography>
-             <Typography variant="body2" color="text.secondary" noWrap sx={{ display: { xs: 'none', sm: 'block' }, mt: 0.4 }}>
-               Every transaction, in one clear stream.
-             </Typography>
-           </Box>
-         </Box>
-         <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
+     <PageHeader
+       icon={DashboardIcon}
+       title="Expenses"
+       subtitle="Every transaction, in one clear stream"
+       actions={
+         <>
            <Tooltip title="Refresh">
-             <IconButton onClick={loadAllData} disabled={loading} size="small" sx={{ width: 40, height: 40 }}>
-               <RefreshIcon fontSize="small" />
-             </IconButton>
+             <span><IconButton onClick={loadAllData} disabled={loading} size="small"><RefreshIcon fontSize="small" /></IconButton></span>
            </Tooltip>
-           {/* Full-form actions only where there is room for them */}
-           <Button
-             variant="contained"
-             startIcon={<AddIcon />}
-             onClick={() => openExpenseForm()}
-             sx={{ display: { xs: 'none', md: 'inline-flex' } }}
-           >
+           <Button variant="contained" startIcon={<AddIcon />} onClick={() => openExpenseForm()} sx={{ display: { xs: 'none', md: 'inline-flex' } }}>
              Add Expense
            </Button>
-           {/* Logout lives in the shell's account menu now — no per-screen button. */}
-         </Stack>
-       </Box>
-     </Paper>
+         </>
+       }
+     />
 
      {/* Capture, ask, and insights now all live in the one ToolBox Assistant. */}
      <Box sx={{ mb: { xs: 2, sm: 3 } }}>

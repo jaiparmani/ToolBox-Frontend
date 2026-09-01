@@ -1,25 +1,29 @@
 import React from 'react';
 import { Box, Stack, Typography } from '@mui/material';
+import { type } from '../../theme/tokens';
 
 /**
  * Consistent page title block: a gradient icon badge, title, optional subtitle,
  * and right-aligned actions. One per screen.
  */
-export default function PageHeader({ icon: Icon, title, subtitle, gradient = 'linear-gradient(135deg, #0A84FF, #7C5CFF)', glow = 'rgba(10,132,255,0.4)', actions, sx }) {
+export default function PageHeader({ icon: Icon, title, subtitle, actions, sx }) {
+  // Restrained: a neutral hairline icon chip (no gradient/glow); hierarchy from
+  // the title's size/weight. `gradient`/`glow` props are accepted-and-ignored
+  // for back-compat with existing callers.
   return (
     <Box display="flex" alignItems="center" justifyContent="space-between" gap={1.5} sx={{ mb: 2.5, ...sx }}>
       <Box display="flex" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
         {Icon && (
-          <Box sx={{ width: 44, height: 44, borderRadius: '13px', flexShrink: 0, background: gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 20px ${glow}` }}>
-            <Icon sx={{ color: '#fff', fontSize: 22 }} />
+          <Box sx={{ width: 40, height: 40, borderRadius: '11px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
+            <Icon sx={{ color: 'text.secondary', fontSize: 20 }} />
           </Box>
         )}
         <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h6" sx={{ fontWeight: 650, lineHeight: 1.15 }} noWrap>{title}</Typography>
+          <Typography sx={{ fontFamily: type.displayFamily, fontSize: '1.35rem', fontWeight: 650, letterSpacing: '-0.02em', lineHeight: 1.1 }} noWrap>{title}</Typography>
           {subtitle && <Typography variant="caption" color="text.secondary" noWrap>{subtitle}</Typography>}
         </Box>
       </Box>
-      {actions && <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>{actions}</Stack>}
+      {actions && <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexShrink: 0 }}>{actions}</Stack>}
     </Box>
   );
 }

@@ -158,20 +158,24 @@ export default function RecurringPage() {
       ) : (
         <>
           {income.length > 0 && (
-            <Reveal index={1}>
-              <SectionHeader title="Income" count={income.length} />
-              <Stack spacing={1.25} sx={{ mb: 3 }}>
-                {income.map(r => <RuleRow key={r.id} rule={r} onDelete={() => setConfirmDel(r)} />)}
+            <Box sx={{ mb: 3 }}>
+              <Reveal index={1}><SectionHeader title="Income" count={income.length} /></Reveal>
+              <Stack spacing={1.25}>
+                {income.map((r, i) => (
+                  <Reveal key={r.id} index={2 + i}><RuleRow rule={r} onDelete={() => setConfirmDel(r)} /></Reveal>
+                ))}
               </Stack>
-            </Reveal>
+            </Box>
           )}
           {bills.length > 0 && (
-            <Reveal index={2}>
-              <SectionHeader title="Bills & subscriptions" count={bills.length} />
+            <Box>
+              <Reveal index={2}><SectionHeader title="Bills & subscriptions" count={bills.length} /></Reveal>
               <Stack spacing={1.25}>
-                {bills.map(r => <RuleRow key={r.id} rule={r} onDelete={() => setConfirmDel(r)} />)}
+                {bills.map((r, i) => (
+                  <Reveal key={r.id} index={3 + i}><RuleRow rule={r} onDelete={() => setConfirmDel(r)} /></Reveal>
+                ))}
               </Stack>
-            </Reveal>
+            </Box>
           )}
         </>
       )}

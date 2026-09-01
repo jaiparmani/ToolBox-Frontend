@@ -90,39 +90,42 @@ export default function InboxPage() {
       ) : (
         <>
           {copilot.length > 0 && (
-            <Reveal index={1}>
-              <SectionHeader title="Needs attention" count={copilot.length} />
-              <Stack spacing={1.25} sx={{ mb: 3 }}>
-                {copilot.map((card) => (
-                  <EventRow
-                    key={card.id}
-                    icon={copilotIcon(card)}
-                    tone={copilotTone(card)}
-                    title={card.title}
-                    detail={card.body}
-                    onClick={() => card.action_route && navigate(card.action_route)}
-                    onDismiss={() => handleDismiss(card.id)}
-                  />
+            <Box sx={{ mb: 3 }}>
+              <Reveal index={1}><SectionHeader title="Needs attention" count={copilot.length} /></Reveal>
+              <Stack spacing={1.25}>
+                {copilot.map((card, i) => (
+                  <Reveal key={card.id} index={2 + i}>
+                    <EventRow
+                      icon={copilotIcon(card)}
+                      tone={copilotTone(card)}
+                      title={card.title}
+                      detail={card.body}
+                      onClick={() => card.action_route && navigate(card.action_route)}
+                      onDismiss={() => handleDismiss(card.id)}
+                    />
+                  </Reveal>
                 ))}
               </Stack>
-            </Reveal>
+            </Box>
           )}
 
           {settlements.length > 0 && (
-            <Reveal index={2}>
-              <SectionHeader title="Settlements" count={settlements.length} />
+            <Box>
+              <Reveal index={2}><SectionHeader title="Settlements" count={settlements.length} /></Reveal>
               <Stack spacing={1.25}>
-                {settlements.map((item) => (
-                  <EventRow key={item.id} icon={item.icon} tone={item.tone} title={item.title} detail={item.detail}
-                    onClick={() => navigate(item.to)}
-                    right={
-                      <Typography sx={{ fontWeight: 700, color: item.amount >= 0 ? accents.blue : accents.red, fontVariantNumeric: 'tabular-nums' }}>
-                        {item.amount >= 0 ? '+' : '−'}{money(Math.abs(item.amount))}
-                      </Typography>
-                    } />
+                {settlements.map((item, i) => (
+                  <Reveal key={item.id} index={3 + i}>
+                    <EventRow icon={item.icon} tone={item.tone} title={item.title} detail={item.detail}
+                      onClick={() => navigate(item.to)}
+                      right={
+                        <Typography sx={{ fontWeight: 700, color: item.amount >= 0 ? accents.blue : accents.red, fontVariantNumeric: 'tabular-nums' }}>
+                          {item.amount >= 0 ? '+' : '−'}{money(Math.abs(item.amount))}
+                        </Typography>
+                      } />
+                  </Reveal>
                 ))}
               </Stack>
-            </Reveal>
+            </Box>
           )}
         </>
       )}

@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getMonthlyReport, getRecentExpenses, getLatestExpenseInsight, getCategories } from '../rest/expenseTrackerApis';
 import ProjectionChart from '../ui/ProjectionChart';
 import QuickAddExpense from '../ui/QuickAddExpense';
+import AnimatedNumber from '../ui/AnimatedNumber';
 import CursorGlow from '../motion/CursorGlow';
 import Reveal from '../ui/Reveal';
 import { money, moneySmart } from '../ui/money';
@@ -66,7 +67,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [report, setReport] = useState(null);
-  const [lastTotal, setLastTotal] = useState(null);
+  const [lastReport, setLastReport] = useState(null);
   const [recent, setRecent] = useState([]);
   const [insight, setInsight] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -83,7 +84,7 @@ export default function LandingPage() {
       getCategories({ type: 'expense' }),
     ]).then(([r, l, rc, ins, cat]) => {
       if (r.status === 'fulfilled') setReport(r.value);
-      if (l.status === 'fulfilled') setLastTotal(l.value?.total_amount ?? null);
+      if (l.status === 'fulfilled') setLastReport(l.value ?? null);
       if (rc.status === 'fulfilled') setRecent(Array.isArray(rc.value) ? rc.value : []);
       if (ins.status === 'fulfilled') setInsight(ins.value);
       if (cat.status === 'fulfilled') setCategories(Array.isArray(cat.value) ? cat.value : (cat.value?.results || []));
@@ -104,7 +105,7 @@ export default function LandingPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const name = user?.username || 'there';
+  const name = user?.firstName || user?.first_name || user?.username || 'there';
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
   const spent = report?.total_amount ?? 0;
   const count = report?.total_count ?? 0;
@@ -130,7 +131,21 @@ export default function LandingPage() {
     [report],
   );
 
-  const delta = (lastTotal != null && lastTotal > 0) ? ((spent - lastTotal) / lastTotal) * 100 : null;
+  // fair comparison: this month-to-date vs the SAME stretch of last month
+  const lastSamePeriod = useMemo(() => {
+    if (!lastReport?.daily_totals) return null;
+    const dayOfMonth = new Date().getDate();
+    return lastReport.daily_totals.reduce((s, d) => {
+      const dd = new Date(d.date).getDate();
+      return dd <= dayOfMonth ? s + (Number(d.total) || 0) : s;
+    }, 0);
+  }, [lastReport]);
+  const delta = (lastSamePeriod != null && lastSamePeriod > 0) ? ((spent - lastSamePeriod) / lastSamePeriod) * 100 : null;
+  const avgPerDay = spent > 0 ? spent / new Date().getDate() : 0;
+  const topCat = useMemo(() => {
+    if (!cats.length) return null;
+    return [...cats].sort((a, b) => b.amount - a.amount)[0];
+  }, [cats]);
   const insightText = insight ? (insight.summary || insight.text || insight.body || insight.message || (typeof insight === 'string' ? insight : null)) : null;
 
   const catName = (e) => e.category?.name || e.categoryName || e.category_name || (typeof e.category === 'string' ? e.category : '');
@@ -153,8 +168,8 @@ export default function LandingPage() {
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.95fr 1.05fr' }, gap: { xs: 3, md: 5 }, alignItems: 'center', mt: { xs: 2.5, md: 3 } }}>
             <Reveal index={1}>
               <Eyebrow>Spent this month</Eyebrow>
-              <Typography sx={{ ...num, fontSize: { xs: '3.4rem', sm: '4.4rem', md: '4.9rem' }, fontWeight: 640, letterSpacing: '-0.045em', lineHeight: 0.92, mt: 1 }}>
-                {money(spent)}
+              <Typography component="div" sx={{ ...num, fontSize: { xs: '3.4rem', sm: '4.4rem', md: '4.9rem' }, fontWeight: 640, letterSpacing: '-0.045em', lineHeight: 0.92, mt: 1 }}>
+                <AnimatedNumber value={spent} format="money" />
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 1.25, flexWrap: 'wrap' }}>
                 <Typography sx={{ fontSize: 13.5, color: 'text.secondary' }}>
@@ -162,10 +177,29 @@ export default function LandingPage() {
                 </Typography>
                 {delta != null && (
                   <Typography sx={{ ...num, fontSize: 12.5, fontWeight: 600, color: delta <= 0 ? GREEN : accents.amber }}>
-                    {delta <= 0 ? '↓' : '↑'} {Math.abs(delta).toFixed(0)}% vs last month
+                    {delta <= 0 ? '↓' : '↑'} {Math.abs(delta).toFixed(0)}% vs last month to date
                   </Typography>
                 )}
               </Box>
+
+              {/* data-true micro-stats */}
+              {spent > 0 && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mt: 1.75 }}>
+                  <Box>
+                    <Typography sx={{ ...num, fontSize: 15, fontWeight: 600 }}>{money(avgPerDay)}</Typography>
+                    <Typography sx={{ fontSize: 10.5, color: 'text.disabled', letterSpacing: '0.02em' }}>avg / day</Typography>
+                  </Box>
+                  {topCat && (
+                    <>
+                      <Box sx={{ width: '1px', alignSelf: 'stretch', bgcolor: 'divider' }} />
+                      <Box>
+                        <Typography sx={{ fontSize: 14, fontWeight: 600, color: 'text.primary', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topCat.name}</Typography>
+                        <Typography sx={{ fontSize: 10.5, color: 'text.disabled', letterSpacing: '0.02em' }}>top category · {money(topCat.amount)}</Typography>
+                      </Box>
+                    </>
+                  )}
+                </Box>
+              )}
 
               {/* hero action */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 3, flexWrap: 'wrap' }}>

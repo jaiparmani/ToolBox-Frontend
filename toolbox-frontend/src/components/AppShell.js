@@ -105,8 +105,10 @@ function NavItem({ item, active, onClick, reduce }) {
 /** Display name + avatar initial from the live profile (context), cache fallback. */
 function displayIdentity(user) {
   const u = user || authUtils.getUser();
-  const name = u?.username || u?.email || 'Your account';
-  const initial = (u?.username || u?.email || 'U').trim().charAt(0).toUpperCase();
+  const first = u?.firstName || u?.first_name;
+  const full = [first, u?.lastName || u?.last_name].filter(Boolean).join(' ').trim();
+  const name = full || u?.displayName || first || u?.username || u?.email || 'Your account';
+  const initial = (first || u?.username || u?.email || 'U').trim().charAt(0).toUpperCase();
   return { name, initial };
 }
 

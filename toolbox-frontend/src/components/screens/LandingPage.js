@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Card, CardActionArea, Stack, Typography } from '@mui/material';
+import { Box, Card, CardActionArea, Typography } from '@mui/material';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import AutorenewRoundedIcon from '@mui/icons-material/AutorenewRounded';
 import FavoriteIcon from '@mui/icons-material/Favorite';
@@ -16,13 +16,10 @@ import { useMoney } from '../../contexts/MoneyContext';
 import { getExpenseSummary, getSplitBalances, getCopilotCards, dismissCopilotCard } from '../rest/expenseTrackerApis';
 import OwedHero from '../ui/OwedHero';
 import Reveal from '../ui/Reveal';
-import AuroraBackground from '../motion/AuroraBackground';
-import CursorComet from '../motion/CursorComet';
-import TiltCard from '../motion/TiltCard';
 import SummaryStrip from '../ui/SummaryStrip';
 import { SummarySkeleton } from '../ui/Skeletons';
 import {
-  Panel, MetricCard, EmptyState, SectionHeader,
+  Panel, EmptyState, SectionHeader,
   FinancialWeather, SafeToSpendHero, MoneyCommandBar, MoneyPulse, CashFlowRiver, AttentionLayer,
   MoneyUniverse, TransactionStoryDrawer, buildStoryFromEvent, copilotToItem,
 } from '../ui';
@@ -64,8 +61,6 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(true);
   const [story, setStory] = useState(null);
   const [scrub, setScrub] = useState(null); // scrubbed day from the Cash Flow River
-  const heroRef = React.useRef(null); // greeting block, parallaxed to the pointer
-  const gridRef = React.useRef(null); // feature grid, magnetically leans to the pointer
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -134,43 +129,17 @@ export default function LandingPage() {
   const hasProjection = projection && projection.series && projection.series.length > 1;
 
   return (
-    <Box
-      sx={{ pb: { xs: 4, md: 2 }, position: 'relative' }}
-      onPointerMove={(e) => {
-        if (!heroRef.current || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-        const r = e.currentTarget.getBoundingClientRect();
-        const dx = (e.clientX - r.left) / r.width - 0.5;
-        const dy = (e.clientY - r.top) / r.height - 0.5;
-        heroRef.current.style.transform = `translate3d(${dx * 14}px, ${dy * 10}px, 0)`;
-      }}
-      onPointerLeave={() => { if (heroRef.current) { heroRef.current.style.transition = 'transform 500ms cubic-bezier(0.34,1.56,0.64,1)'; heroRef.current.style.transform = 'none'; setTimeout(() => { if (heroRef.current) heroRef.current.style.transition = 'transform 80ms linear'; }, 40); } }}
-    >
-      {/* Living backdrop — reflects the derived weather, or the scrubbed day's outlook */}
-      <AuroraBackground weatherKey={scrub && !scrub.isToday ? (scrub.balance < 0 ? 'storm' : scrub.balance < 3000 ? 'pressure' : 'clear') : undefined} />
-      {/* A comet of sparks trailing the cursor (desktop, motion-on only) */}
-      <CursorComet />
+    <Box sx={{ pb: { xs: 4, md: 2 }, position: 'relative' }}>
       <Box sx={{ position: 'relative', zIndex: 1 }}>
-      {/* Greeting + climate */}
+      {/* Greeting + climate — clean type, no gradient. Hierarchy from size/weight. */}
       <Reveal>
-        <Box ref={heroRef} sx={{ px: { xs: 0.5, sm: 1 }, pt: { xs: 1, sm: 2 }, mb: 2, willChange: 'transform' }}>
+        <Box sx={{ px: { xs: 0.5, sm: 1 }, pt: { xs: 1, sm: 2 }, mb: 2 }}>
           <Typography
             sx={{
               fontFamily: type.displayFamily,
-              fontWeight: 800, letterSpacing: '-0.035em', lineHeight: 1.0,
-              fontSize: { xs: '2rem', sm: '2.7rem' },
-              backgroundImage: `linear-gradient(110deg, ${accents.blue} 0%, ${accents.cyan} 22%, ${accents.violet} 52%, ${accents.red} 82%, ${accents.blue} 100%)`,
-              backgroundSize: '220% auto',
-              backgroundClip: 'text', WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent', color: 'transparent',
-              // Signature entrance: the greeting unveils left-to-right, then the
-              // gradient shimmer takes over. Reduced motion shows it settled.
-              animation: 'greetWipe 720ms cubic-bezier(0.32,0.72,0,1) both, greetShimmer 7s linear infinite 0.5s',
-              '@keyframes greetWipe': {
-                from: { clipPath: 'inset(0 105% 0 0)', WebkitClipPath: 'inset(0 105% 0 0)' },
-                to: { clipPath: 'inset(0 -5% 0 0)', WebkitClipPath: 'inset(0 -5% 0 0)' },
-              },
-              '@keyframes greetShimmer': { to: { backgroundPositionX: '220%' } },
-              '@media (prefers-reduced-motion: reduce)': { animation: 'none', clipPath: 'none', WebkitClipPath: 'none' },
+              fontWeight: 680, letterSpacing: '-0.03em', lineHeight: 1.05,
+              fontSize: { xs: '1.9rem', sm: '2.4rem' },
+              color: 'text.primary',
             }}
           >
             {getGreeting()}, {displayName}.
@@ -293,49 +262,37 @@ export default function LandingPage() {
         <SectionHeader title="Jump to" sx={{ px: 0.5 }} />
       </Reveal>
       <Box
-        ref={gridRef}
-        onPointerMove={(e) => {
-          if (window.matchMedia?.('(pointer: coarse)').matches || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-          const r = e.currentTarget.getBoundingClientRect();
-          const dx = (e.clientX - r.left) / r.width - 0.5;
-          const dy = (e.clientY - r.top) / r.height - 0.5;
-          e.currentTarget.style.transition = 'transform 120ms ease-out';
-          e.currentTarget.style.transform = `translate3d(${dx * 10}px, ${dy * 8}px, 0)`;
-        }}
-        onPointerLeave={(e) => { e.currentTarget.style.transition = 'transform 500ms cubic-bezier(0.34,1.56,0.64,1)'; e.currentTarget.style.transform = 'none'; }}
         sx={{
-          display: 'grid', gap: 1.25, willChange: 'transform',
+          display: 'grid', gap: 1,
           gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(5, 1fr)' },
         }}
       >
         {FEATURES.map((f, i) => (
           <Reveal key={f.to} index={8 + i}>
-            <TiltCard>
-              <Card
-                elevation={0}
-                sx={{
-                  borderRadius: 4, height: '100%', border: '1px solid', borderColor: 'divider',
-                  backgroundColor: 'transparent',
-                  transition: 'border-color 0.2s ease',
-                  '&:hover': { borderColor: f.color },
-                }}
-              >
-                <CardActionArea onClick={() => navigate(f.to)} sx={{ p: 2, height: '100%' }}>
-                  <Box
-                    sx={{
-                      width: 42, height: 42, borderRadius: '13px', mb: 1.5,
-                      background: `linear-gradient(135deg, ${f.color}, ${f.color}bb)`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      boxShadow: `0 6px 16px ${f.color}55`,
-                    }}
-                  >
-                    <f.icon sx={{ color: '#fff', fontSize: 22 }} />
-                  </Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.2 }}>{f.title}</Typography>
-                  <Typography variant="caption" color="text.secondary">{f.hint}</Typography>
-                </CardActionArea>
-              </Card>
-            </TiltCard>
+            <Card
+              elevation={0}
+              sx={{
+                borderRadius: 3, height: '100%', border: '1px solid', borderColor: 'divider',
+                backgroundColor: 'background.paper',
+                transition: 'border-color 0.15s ease',
+                '&:hover': { borderColor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(17,17,20,0.22)' },
+              }}
+            >
+              <CardActionArea onClick={() => navigate(f.to)} sx={{ p: 2, height: '100%' }}>
+                <Box
+                  sx={{
+                    width: 34, height: 34, borderRadius: '9px', mb: 1.5,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'text.secondary',
+                    backgroundColor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(17,17,20,0.045)',
+                  }}
+                >
+                  <f.icon sx={{ fontSize: 19 }} />
+                </Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, lineHeight: 1.2 }}>{f.title}</Typography>
+                <Typography variant="caption" color="text.secondary">{f.hint}</Typography>
+              </CardActionArea>
+            </Card>
           </Reveal>
         ))}
       </Box>

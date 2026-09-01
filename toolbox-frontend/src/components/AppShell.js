@@ -27,7 +27,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useColorMode } from '../contexts/ColorModeContext';
 import { MoneyProvider } from '../contexts/MoneyContext';
 import BrandLogo from './motion/BrandLogo';
-import ParticleFlow from './motion/ParticleFlow';
 import PageTransition from './motion/PageTransition';
 import { NotificationBell, FinancialWeatherBar } from './ui';
 import Assistant from './ui/Assistant';
@@ -229,8 +228,7 @@ export default function AppShell() {
             display: { xs: 'none', md: 'flex' }, flexDirection: 'column',
             width: RAIL_W, flexShrink: 0, position: 'sticky', top: 0, height: '100dvh',
             borderRight: '1px solid', borderColor: 'divider',
-            backgroundColor: (t) => t.palette.mode === 'dark' ? 'rgba(16,16,22,0.55)' : 'rgba(255,255,255,0.55)',
-            backdropFilter: 'blur(28px) saturate(1.5)', WebkitBackdropFilter: 'blur(28px) saturate(1.5)',
+            backgroundColor: (t) => t.palette.mode === 'dark' ? '#0c0c0e' : '#ffffff',
             zIndex: 2,
           }}
         >
@@ -258,8 +256,8 @@ export default function AppShell() {
               position: 'sticky', top: 0, zIndex: 3, display: 'flex', alignItems: 'center', gap: 1,
               px: { xs: 1.5, sm: 2.5 }, py: 1, minHeight: 60,
               borderBottom: '1px solid', borderColor: 'divider',
-              backgroundColor: (t) => t.palette.mode === 'dark' ? 'rgba(11,11,16,0.6)' : 'rgba(238,240,244,0.6)',
-              backdropFilter: 'blur(20px) saturate(1.4)', WebkitBackdropFilter: 'blur(20px) saturate(1.4)',
+              backgroundColor: (t) => t.palette.mode === 'dark' ? 'rgba(10,10,12,0.85)' : 'rgba(251,251,250,0.85)',
+              backdropFilter: 'saturate(1.2) blur(8px)', WebkitBackdropFilter: 'saturate(1.2) blur(8px)',
             }}
           >
             <IconButton onClick={() => setDrawerOpen(true)} sx={{ display: { xs: 'inline-flex', md: 'none' } }} aria-label="Open navigation">
@@ -319,9 +317,8 @@ export default function AppShell() {
           </Box>
         </Box>
 
-        {/* The one ToolBox Assistant + money-in-motion particle layer */}
+        {/* The one ToolBox Assistant */}
         <Assistant />
-        <ParticleFlow />
       </Box>
 
       {/* Account menu */}

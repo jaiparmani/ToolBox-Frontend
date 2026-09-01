@@ -4,11 +4,10 @@ import Router from './components/Router';
 import ErrorBoundary from './components/ErrorBoundary';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { motion, shadows, surfaces } from './theme/tokens';
+import { motion, surfaces } from './theme/tokens';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import { AuthProvider } from './contexts/AuthContext';
-import AuroraBackground from './components/motion/AuroraBackground';
 import { ColorModeContext } from './contexts/ColorModeContext';
 
 const STORAGE_KEY = 'toolbox-color-mode';
@@ -37,13 +36,11 @@ const getTheme = (mode) => createTheme({
       ? { primary: '#f5f5f7', secondary: '#a1a1a6' }
       : { primary: '#1d1d1f', secondary: '#6e6e73' },
     background: mode === 'dark'
-      // Not pure black: a near-black with a touch of blue gives the glass
-      // panels something to sit on, so edges read as depth instead of seams.
-      // transparent canvas: the AuroraBackground shows through everything.
-      // Surfaces stay glassy (translucent + blur) so the colour drifts behind
-      // the content instead of a flat fill.
-      ? { default: 'transparent', paper: 'rgba(20,20,24,0.86)' }
-      : { default: 'transparent', paper: 'rgba(255,255,255,0.86)' },
+      // Restraint pivot: solid, still grounds — no aurora behind glass. A flat
+      // near-black canvas with a marginally raised solid surface. Depth comes
+      // from a single hairline + one restrained shadow, never a glow.
+      ? { default: '#0a0a0c', paper: '#141416' }
+      : { default: '#fbfbfa', paper: '#ffffff' },
     divider: mode === 'dark' ? surfaces.dark.hairline : surfaces.light.hairline,
   },
   typography: {
@@ -101,14 +98,12 @@ const getTheme = (mode) => createTheme({
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 18,
-          backgroundColor: mode === 'dark' ? 'rgba(24,24,28,0.82)' : 'rgba(255,255,255,0.84)',
-          backdropFilter: 'blur(30px) saturate(1.6)',
-          WebkitBackdropFilter: 'blur(30px) saturate(1.6)',
+          borderRadius: 12,
+          backgroundColor: mode === 'dark' ? '#141416' : '#ffffff',
           border: '1px solid',
-          borderColor: mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.5)',
-          boxShadow: mode === 'dark' ? shadows.dark.card : shadows.light.card,
-          transition: `transform ${motion.normal}ms ${motion.ease}, box-shadow ${motion.normal}ms ${motion.ease}, border-color ${motion.normal}ms ${motion.ease}`,
+          borderColor: mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(17,17,20,0.08)',
+          boxShadow: mode === 'dark' ? 'none' : '0 1px 2px rgba(17,17,20,0.04)',
+          transition: `border-color ${motion.normal}ms ${motion.ease}`,
           '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
         },
       },
@@ -148,11 +143,6 @@ const getTheme = (mode) => createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
-        },
-        // Only the raised paper variants get the glass; flat/outlined stay clean.
-        elevation: {
-          backdropFilter: 'blur(24px) saturate(1.4)',
-          WebkitBackdropFilter: 'blur(24px) saturate(1.4)',
         },
       },
     },
@@ -318,9 +308,7 @@ function App() {
         <ColorModeContext.Provider value={colorMode}>
           <ThemeProvider theme={theme}>
             <CssBaseline />
-            <AuroraBackground />
             <AuthProvider>
-              {/* Everything sits above the living background */}
               <Box sx={{ position: 'relative', zIndex: 1, minHeight: '100vh' }}>
                 <BrowserRouter basename={process.env.PUBLIC_URL}>
                   <Router />

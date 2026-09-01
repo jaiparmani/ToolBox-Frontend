@@ -61,7 +61,7 @@ import ErrorBanner from '../ui/ErrorBanner';
 import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { money } from '../ui/money';
 import { feedback } from '../ui/feedback';
-import { FinancialWeatherBar, TransactionStoryDrawer, buildStoryFromExpense } from '../ui';
+import { TransactionStoryDrawer, buildStoryFromExpense } from '../ui';
 import AuroraBackground from '../motion/AuroraBackground';
 import AssistantOrb from '../ui/AssistantOrb';
 import { accents, type } from '../../theme/tokens';
@@ -941,9 +941,7 @@ export default function ExpenseTrackerPage() {
      {/* Living backdrop, keyed to the same financial weather as the rest of the app */}
      <AuroraBackground />
      <Box sx={{ position: 'relative', zIndex: 1 }}>
-     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
-       <FinancialWeatherBar compact />
-     </Box>
+     {/* Financial weather now lives once in the app top bar, not per-screen. */}
      {/* Header - stays reachable, shrinks to icons on a phone */}
      <Paper
        elevation={0}

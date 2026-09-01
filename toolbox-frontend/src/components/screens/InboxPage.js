@@ -13,7 +13,7 @@ import { getSplitBalances, getCopilotCards, dismissCopilotCard } from '../rest/e
 import Reveal from '../ui/Reveal';
 import { BalanceSkeleton } from '../ui/Skeletons';
 import { money } from '../ui/money';
-import { PageHeader, SectionHeader, EmptyState, FinancialWeather, copilotIcon, copilotTone } from '../ui';
+import { PageHeader, SectionHeader, EmptyState, copilotIcon, copilotTone } from '../ui';
 import { accents } from '../../theme/tokens';
 
 /**
@@ -24,7 +24,7 @@ import { accents } from '../../theme/tokens';
 export default function InboxPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
-  const { projection, pulse, loading: loadingMoney } = useMoney();
+  const { loading: loadingMoney } = useMoney();
   const [loading, setLoading] = useState(true);
   const [settlements, setSettlements] = useState([]);
   const [copilot, setCopilot] = useState([]);
@@ -73,9 +73,7 @@ export default function InboxPage() {
           title="Inbox"
           subtitle="What needs your attention"
         />
-        <Box sx={{ mb: 2.5 }}>
-          <FinancialWeather projection={projection} pulse={pulse} loading={loadingMoney} onClick={() => navigate('/reports')} />
-        </Box>
+        {/* Financial weather now lives once in the app top bar, not per-screen. */}
       </Reveal>
 
       {busy ? (

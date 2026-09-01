@@ -29,7 +29,7 @@ import { MoneyProvider } from '../contexts/MoneyContext';
 import BrandLogo from './motion/BrandLogo';
 import ParticleFlow from './motion/ParticleFlow';
 import PageTransition from './motion/PageTransition';
-import { NotificationBell } from './ui';
+import { NotificationBell, FinancialWeatherBar } from './ui';
 import Assistant from './ui/Assistant';
 import { accents, type } from '../theme/tokens';
 
@@ -286,6 +286,9 @@ export default function AppShell() {
 
             <Box sx={{ flex: 1 }} />
 
+            {/* The climate lives here now — one persistent chip, not a banner
+                repeated on every screen. Tap to open Insights. */}
+            <FinancialWeatherBar compact sx={{ display: { xs: 'none', md: 'inline-flex' }, mr: 0.5 }} />
             <AskButton compact={false} />
             <NotificationBell />
             <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'}>

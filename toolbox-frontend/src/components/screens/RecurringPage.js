@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Box, Button, Container, IconButton, MenuItem, Stack, TextField, Typography,
 } from '@mui/material';
@@ -16,7 +15,7 @@ import Reveal from '../ui/Reveal';
 import AuroraBackground from '../motion/AuroraBackground';
 import {
   PageHeader, SectionHeader, Panel, EmptyState, AmountDisplay, SegmentedControl,
-  BottomSheet, ConfirmDialog, ErrorBanner, FinancialWeatherBar,
+  BottomSheet, ConfirmDialog, ErrorBanner,
 } from '../ui';
 import { accents } from '../../theme/tokens';
 import { feedback } from '../ui/feedback';
@@ -49,7 +48,6 @@ const EMPTY_FORM = { transaction_type: 'expense', amount: '', description: '', c
  */
 export default function RecurringPage() {
   const { isAuthenticated, isLoading } = useAuth();
-  const navigate = useNavigate();
   const { refresh: refreshMoney } = useMoney();
   const [rules, setRules] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -138,9 +136,7 @@ export default function RecurringPage() {
             </Button>
           }
         />
-        <Box sx={{ mb: 2.5 }}>
-          <FinancialWeatherBar onClick={() => navigate('/reports')} />
-        </Box>
+        {/* Financial weather now lives once in the app top bar, not per-screen. */}
       </Reveal>
 
       {loading ? (

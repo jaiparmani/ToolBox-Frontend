@@ -24,7 +24,6 @@ import { money, relativeDay } from '../ui/money';
 import { accents, type } from '../../theme/tokens';
 import { feedback } from '../ui/feedback';
 import GroupStrip from '../ui/GroupStrip';
-import { FinancialWeatherBar } from '../ui';
 import {
   getSplitBalances, settleUpWith, getSplits,
   getGroups, createGroup, getGroupBalances, getGroupExpenses, splitInGroup,
@@ -277,12 +276,7 @@ export default function SplitsPage() {
         <AuroraBackground />
         <Box sx={{ position: 'relative', zIndex: 1 }}>
         <ErrorBanner error={error} onClose={() => setError(null)} />
-
-        {!openGroup && (
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
-            <FinancialWeatherBar compact />
-          </Box>
-        )}
+        {/* Financial weather now lives once in the app top bar, not per-screen. */}
 
         {/* The headline: one number saying which way you stand overall */}
         <Reveal>

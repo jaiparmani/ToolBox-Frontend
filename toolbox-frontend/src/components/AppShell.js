@@ -306,7 +306,9 @@ export default function AppShell() {
           {/* Routed content — the shell above/left persists; only this transitions
               per route (keyed), so navigation feels continuous, not a full reload. */}
           <Box component="main" sx={{ flex: 1, px: { xs: 1.5, sm: 3 }, py: { xs: 2, sm: 3 } }}>
-            <Box sx={{ maxWidth: 1200, mx: 'auto', width: '100%' }}>
+            {/* Generous cap: fills the canvas on typical PC widths (up to ~1080p),
+                only reins in ultra-wide monitors so lines don't sprawl. */}
+            <Box sx={{ maxWidth: 1600, mx: 'auto', width: '100%' }}>
               <PageTransition key={location.pathname}>
                 <Outlet />
               </PageTransition>

@@ -31,7 +31,10 @@ export default function MoneyUniversePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const hasData = !!expense && (expense.totalIncome > 0 || (expense.categoryBreakdown || []).length > 0 || Math.abs(expense.netBalance || 0) > 0);
+  // Render the scene whenever anything's loaded — the component draws the net
+  // star + any bills/income even in a quiet month; only a total absence of both
+  // reads (a failed/empty account) falls back to the guidance state.
+  const hasData = !!expense || !!projection;
 
   return (
     <Box sx={{ pb: 4 }}>

@@ -53,6 +53,9 @@ import AutocompleteComponent from '../ReusableComponents/AutocompleteComponent';
 import SummaryStrip from '../ui/SummaryStrip';
 import SectionNav from '../ui/SectionNav';
 import ExpenseTimeline from '../ui/ExpenseTimeline';
+import ActivityScopeBar, { scopeRange } from '../ui/ActivityScopeBar';
+import ActivityCategoryChips from '../ui/ActivityCategoryChips';
+import ActivityGlance from '../ui/ActivityGlance';
 import ExpenseComposer from '../ui/ExpenseComposer';
 import QuickCapture from '../ui/QuickCapture';
 import ThinkingHint from '../ui/ThinkingHint';
@@ -189,6 +192,16 @@ export default function ExpenseTrackerPage() {
    total: 0
  });
  const [sortBy, setSortBy] = useState('-date');
+ // Active date scope (This month / Last 30 / All, or a stepped month). It
+ // drives the same date_from/date_to the list and summary already read, so the
+ // SPENT/INCOME/BALANCE header and the timeline scope together.
+ const [scope, setScope] = useState({ mode: 'all' });
+ const applyScope = (next) => {
+   setScope(next);
+   const { dateFrom, dateTo } = scopeRange(next);
+   setFilters(prev => ({ ...prev, dateFrom, dateTo }));
+   setPagination(prev => ({ ...prev, page: 0 }));
+ };
  // Filters start closed on a phone, open on desktop where there's room.
  const isCompact = useMediaQuery((theme) => theme.breakpoints.down('md'));
  const [filtersOpen, setFiltersOpen] = useState(false);
@@ -798,6 +811,7 @@ export default function ExpenseTrackerPage() {
  };
 
  const clearFilters = () => {
+   setScope({ mode: 'all' });
    setFilters({
      search: '',
      category: '',
@@ -1186,6 +1200,21 @@ export default function ExpenseTrackerPage() {
              </Grid>
              </Collapse>
            </Paper>
+
+           {/* Scope the stream — segmented control + month stepping. Drives the
+               same date filter the list and the SPENT/INCOME/BALANCE header read. */}
+           <ActivityScopeBar scope={scope} onScope={applyScope} />
+
+           {/* Month-at-a-glance — days with spend, average per active day, and the
+               biggest single expense, all derived from the loaded rows. */}
+           <ActivityGlance expenses={expenses} />
+
+           {/* One-tap category narrowing, wired into the existing category filter. */}
+           <ActivityCategoryChips
+             categories={categories}
+             selected={filters.category}
+             onSelect={(id) => handleFilterChange('category', id)}
+           />
 
            {/* The list, as a chronological timeline grouped by day — each day a
                quiet header with its net total over flat, hairline-separated rows. */}

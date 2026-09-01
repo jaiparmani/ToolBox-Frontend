@@ -120,7 +120,13 @@ export default function ExpenseTimeline({ expenses = [], onEdit, onDelete, onDel
       groups: keys.map((k) => {
         const rows = map.get(k);
         const net = rows.reduce((s, e) => s + (isIncomeOf(e) ? 1 : -1) * (Number(e.amount) || 0), 0);
-        return { key: k, rows, net };
+        // The day's largest single expense, for a whisper of context in the
+        // header — income rows don't count as "spend".
+        let topSpend = 0;
+        for (const e of rows) {
+          if (!isIncomeOf(e)) topSpend = Math.max(topSpend, Math.abs(Number(e.amount) || 0));
+        }
+        return { key: k, rows, net, count: rows.length, topSpend };
       }),
       threshold: amts.length > 3 ? avg * 2 : Infinity,
     };
@@ -130,13 +136,26 @@ export default function ExpenseTimeline({ expenses = [], onEdit, onDelete, onDel
     <Box>
       {groups.map((g) => (
         <Box key={g.key || 'undated'} sx={{ mb: 2.5, '&:last-of-type': { mb: 0 } }}>
-          {/* day header */}
-          <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', px: { xs: 0.75, sm: 1 }, pb: 0.75 }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'text.disabled' }}>
-              {dayLabel(g.key)}
-            </Typography>
-            <Typography sx={{ ...num, fontSize: 12, fontWeight: 550, color: 'text.secondary' }}>
-              {g.net >= 0 ? '+' : '−'}{money(Math.abs(g.net))}
+          {/* day header — sticks under the app bar so the current day stays
+              labelled while its rows scroll past */}
+          <Box
+            sx={{
+              position: 'sticky', top: { xs: 54, md: 60 }, zIndex: 2,
+              bgcolor: 'background.default', pt: 0.5, pb: 0.75, px: { xs: 0.75, sm: 1 },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
+              <Typography sx={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'text.disabled' }}>
+                {dayLabel(g.key)}
+              </Typography>
+              <Typography sx={{ ...num, fontSize: 12, fontWeight: 550, color: 'text.secondary' }}>
+                {g.net >= 0 ? '+' : '−'}{money(Math.abs(g.net))}
+              </Typography>
+            </Box>
+            {/* transaction count + the day's biggest expense, kept quiet */}
+            <Typography sx={{ fontSize: 10.5, color: 'text.disabled', mt: 0.2 }} noWrap>
+              {g.count} {g.count === 1 ? 'transaction' : 'transactions'}
+              {g.topSpend > 0 ? ` · max ${money(g.topSpend)}` : ''}
             </Typography>
           </Box>
 

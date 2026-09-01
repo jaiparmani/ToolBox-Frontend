@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography } from '@mui/material';
+import { motion, useReducedMotion } from 'framer-motion';
 import HandshakeRoundedIcon from '@mui/icons-material/HandshakeRounded';
 import NorthEastRoundedIcon from '@mui/icons-material/NorthEastRounded';
 import SouthWestRoundedIcon from '@mui/icons-material/SouthWestRounded';
@@ -9,12 +10,13 @@ import AutorenewIcon from '@mui/icons-material/AutorenewRounded';
 import CallSplitIcon from '@mui/icons-material/CallSplitRounded';
 import AssessmentIcon from '@mui/icons-material/InsightsRounded';
 import FavoriteIcon from '@mui/icons-material/FavoriteRounded';
+import BubbleChartIcon from '@mui/icons-material/BubbleChartRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { useMoney } from '../../contexts/MoneyContext';
 import { getExpenseSummary, getSplitBalances, getCopilotCards, dismissCopilotCard } from '../rest/expenseTrackerApis';
-import Reveal from '../ui/Reveal';
 import ProjectionChart from '../ui/ProjectionChart';
+import CursorGlow from '../motion/CursorGlow';
 import { copilotIcon } from '../ui';
 import { money } from '../ui/money';
 import { accents, type } from '../../theme/tokens';
@@ -29,13 +31,25 @@ const FEATURES = [
   { to: '/recurring', icon: AutorenewIcon, title: 'Recurring', hint: 'Income & bills' },
   { to: '/splits', icon: CallSplitIcon, title: 'Shared', hint: 'Who owes whom' },
   { to: '/reports', icon: AssessmentIcon, title: 'Insights', hint: 'Trends' },
+  { to: '/universe', icon: BubbleChartIcon, title: 'Universe', hint: 'Explore' },
   { to: '/health-tracker', icon: FavoriteIcon, title: 'Health', hint: 'Body metrics' },
 ];
 
-// ── restrained primitives ───────────────────────────────────────────────────
-const cardSx = { border: '1px solid', borderColor: 'divider', borderRadius: '13px', bgcolor: 'background.paper', p: { xs: 2, sm: 2.25 } };
-const Card = ({ children, sx }) => <Box sx={{ ...cardSx, ...sx }}>{children}</Box>;
-const Eyebrow = ({ children }) => <Typography sx={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'text.disabled' }}>{children}</Typography>;
+const cardSx = { border: '1px solid', borderColor: 'divider', borderRadius: '14px', bgcolor: 'background.paper', p: { xs: 2, sm: 2.25 } };
+
+// staggered entrance
+const rise = (reduce, i = 0) => ({
+  initial: reduce ? { opacity: 0 } : { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: reduce ? 0.2 : 0.5, ease: [0.32, 0.72, 0, 1], delay: reduce ? 0 : 0.06 + i * 0.07 },
+});
+const MRise = ({ i = 0, reduce, children, sx, ...rest }) => (
+  <Box component={motion.div} {...rise(reduce, i)} sx={sx} {...rest}>{children}</Box>
+);
+
+const Eyebrow = ({ children, sx }) => (
+  <Typography sx={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.11em', textTransform: 'uppercase', color: 'text.disabled', ...sx }}>{children}</Typography>
+);
 const num = { fontVariantNumeric: 'tabular-nums', fontFamily: type.displayFamily };
 
 function SectionHead({ title, count, action, onAction }) {
@@ -44,25 +58,6 @@ function SectionHead({ title, count, action, onAction }) {
       <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{title}</Typography>
       {action ? <Typography onClick={onAction} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', '&:hover': { color: 'text.primary' } }}>{action}</Typography>
         : count != null ? <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>{count}</Typography> : null}
-    </Box>
-  );
-}
-
-function Metric({ label, value, tone, sub }) {
-  return (
-    <Card sx={{ p: 1.75 }}>
-      <Typography sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 500 }} noWrap>{label}</Typography>
-      <Typography sx={{ ...num, fontSize: '1.35rem', fontWeight: 600, letterSpacing: '-0.025em', mt: 0.75, color: tone || 'text.primary' }} noWrap>{value}</Typography>
-      {sub && <Typography sx={{ fontSize: 11, color: 'text.disabled', mt: 0.25 }} noWrap>{sub}</Typography>}
-    </Card>
-  );
-}
-
-function StatRow({ k, v, tone, first }) {
-  return (
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', py: 0.9, borderTop: first ? 'none' : '1px solid', borderColor: 'divider' }}>
-      <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>{k}</Typography>
-      <Typography sx={{ ...num, fontSize: 12.5, fontWeight: 600, color: tone || 'text.primary' }}>{v}</Typography>
     </Box>
   );
 }
@@ -85,30 +80,27 @@ function ListRow({ icon: Icon, title, detail, right, tone, onClick, last }) {
   );
 }
 
-// category donut (green → neutral shades; monochromatic, restrained)
 const DONUT_SHADES = ['#35c98a', '#2ba377', '#3f6f5c', '#4a4a52', '#33333a', '#2a2a30'];
 function Donut({ cats }) {
   const items = (cats || []).map((c) => ({ name: c.name || c.label, amount: Math.abs(Number(c.amount ?? c.value ?? 0)) }))
     .filter((c) => c.amount > 0).sort((a, b) => b.amount - a.amount);
   const total = items.reduce((s, c) => s + c.amount, 0);
   if (!total) {
-    return <Box sx={{ py: 3, textAlign: 'center', color: 'text.disabled' }}>
+    return <Box sx={{ py: 3, textAlign: 'center' }}>
       <Typography sx={{ fontSize: 13, fontWeight: 550, color: 'text.secondary' }}>No spending yet this month</Typography>
-      <Typography sx={{ fontSize: 12, mt: 0.5 }}>Add an expense and the breakdown appears here.</Typography>
+      <Typography sx={{ fontSize: 12, mt: 0.5, color: 'text.disabled' }}>Add an expense and the breakdown appears here.</Typography>
     </Box>;
   }
   const top = items.slice(0, 5);
   const otherAmt = items.slice(5).reduce((s, c) => s + c.amount, 0);
   const segs = otherAmt > 0 ? [...top, { name: 'Other', amount: otherAmt }] : top;
-  let acc = 25; // start at 12 o'clock
-  const R = 15.9, C = 2 * Math.PI * R;
+  let acc = 25; const R = 15.9, C = 2 * Math.PI * R;
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
       <svg width="108" height="108" viewBox="0 0 42 42" style={{ flexShrink: 0 }}>
         <circle cx="21" cy="21" r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
         {segs.map((s, i) => {
-          const frac = s.amount / total; const len = frac * 100; const dash = `${(len / 100) * C} ${C}`;
-          const off = (acc / 100) * C; acc -= len;
+          const len = (s.amount / total) * 100; const dash = `${(len / 100) * C} ${C}`; const off = (acc / 100) * C; acc -= len;
           return <circle key={i} cx="21" cy="21" r={R} fill="none" stroke={DONUT_SHADES[i]} strokeWidth="6" strokeDasharray={dash} strokeDashoffset={off} transform="rotate(-90 21 21)" />;
         })}
         <text x="21" y="20.5" textAnchor="middle" fill="#f5f5f6" fontSize="6" fontWeight="600" fontFamily="sans-serif">{segs.length}</text>
@@ -129,6 +121,7 @@ function Donut({ cats }) {
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const reduce = useReducedMotion();
   const { user } = useAuth();
   const { projection } = useMoney();
   const [expense, setExpense] = useState(null);
@@ -153,14 +146,21 @@ export default function LandingPage() {
   const balance = p.current_balance;
   const low = p.projected_low;
   const netMonth = expense?.netBalance ?? 0;
+  const runway = p.runway_days;
 
-  // upcoming bill/income events, derived straight from the projection series
+  // the hero's one-line status — the "why" behind the number
+  const heroStatus = useMemo(() => {
+    if (!projection) return 'Reading your money…';
+    if (safe != null && safe <= 0) return `You're at your limit today — the bills ahead already claim what's coming in.`;
+    if (runway != null && runway <= 3) return `Tight: about ${runway} day${runway === 1 ? '' : 's'} of runway before your next income lands${p.next_income_date ? ` on ${fmtDate(p.next_income_date)}` : ''}.`;
+    if (runway != null) return `On track — roughly ${runway} days of runway, and nothing unusual ahead.`;
+    return 'Add a recurring income or bill to forecast what today leaves you.';
+  }, [projection, safe, runway, p.next_income_date]);
+
   const upcoming = useMemo(() => {
     const start = new Date(); start.setHours(0, 0, 0, 0);
     const evs = [];
-    (p.series || []).forEach((d) => (d.events || []).forEach((e) => {
-      if (new Date(d.date) >= start) evs.push({ ...e, date: d.date });
-    }));
+    (p.series || []).forEach((d) => (d.events || []).forEach((e) => { if (new Date(d.date) >= start) evs.push({ ...e, date: d.date }); }));
     return evs.sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 6);
   }, [p.series]);
 
@@ -168,93 +168,90 @@ export default function LandingPage() {
     if (!splits) return [];
     const byName = new Map();
     (splits.balances || []).forEach((b) => byName.set(b.name.toLowerCase(), { name: b.name, net: b.owed }));
-    (splits.youOwe || []).forEach((d) => {
-      const k = d.name.toLowerCase(); const ex = byName.get(k);
-      if (ex) ex.net -= d.owed; else byName.set(k, { name: d.name, net: -d.owed });
-    });
+    (splits.youOwe || []).forEach((d) => { const k = d.name.toLowerCase(); const ex = byName.get(k); if (ex) ex.net -= d.owed; else byName.set(k, { name: d.name, net: -d.owed }); });
     return [...byName.values()].filter((x) => x.net !== 0).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
   }, [splits]);
   const owedNet = splits?.net || 0;
 
   const dismiss = (id) => { setCopilot((prev) => prev.filter((c) => c.id !== id)); dismissCopilotCard(id).catch(() => {}); };
 
-  return (
-    <Box sx={{ pb: 4 }}>
-      <Reveal>
-        <Typography sx={{ fontSize: 12.5, color: 'text.disabled', fontWeight: 500 }}>{dateStr}</Typography>
-        <Typography sx={{ fontFamily: type.displayFamily, fontSize: { xs: '1.5rem', sm: '1.75rem' }, fontWeight: 650, letterSpacing: '-0.03em', mt: 0.25, mb: 2.5 }}>
-          {greetOf()}, {name}.
-        </Typography>
-      </Reveal>
+  const metrics = [
+    { label: 'Spent · this month', value: fmt(expense?.totalExpenses ?? 0) },
+    { label: 'Income', value: fmt(expense?.totalIncome ?? 0), tone: expense?.totalIncome ? GREEN : undefined },
+    { label: 'Net', value: `${netMonth >= 0 ? '+' : ''}${fmt(netMonth)}`, tone: netMonth >= 0 ? GREEN : RED },
+    { label: 'Transactions', value: `${expense?.transactionCount ?? 0}` },
+    { label: 'Owed to you', value: fmt(Math.abs(owedNet)), tone: owedNet >= 0 ? GREEN : RED },
+  ];
 
-      {/* ── HERO: safe-to-spend + projection | forecast ── */}
-      <Reveal index={1}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.7fr 1fr' }, gap: 1.5 }}>
-          <Card>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
-              <Box>
-                <Eyebrow>Safe to spend today</Eyebrow>
-                <Typography sx={{ ...num, fontSize: { xs: '2.4rem', sm: '2.85rem' }, fontWeight: 650, letterSpacing: '-0.04em', lineHeight: 1, mt: 0.9, color: (safe != null && safe < 0) ? RED : 'text.primary' }}>
-                  {safe != null ? fmt(safe) : '—'}
-                </Typography>
+  return (
+    <Box sx={{ position: 'relative', pb: 4 }}>
+      <CursorGlow />
+      <Box sx={{ position: 'relative', zIndex: 1 }}>
+
+        {/* ── HERO ── open composition, not a card ── */}
+        <Box sx={{ pt: { xs: 0.5, md: 1 }, pb: { xs: 3, md: 4 }, borderBottom: '1px solid', borderColor: 'divider', mb: { xs: 2.5, md: 3 } }}>
+          <MRise i={0} reduce={reduce}>
+            <Typography sx={{ fontSize: 12.5, color: 'text.disabled', fontWeight: 500 }}>{dateStr}</Typography>
+            <Typography sx={{ fontFamily: type.displayFamily, fontSize: { xs: '1.35rem', sm: '1.5rem' }, fontWeight: 600, letterSpacing: '-0.03em', mt: 0.25 }}>
+              {greetOf()}, {name}.
+            </Typography>
+          </MRise>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '0.9fr 1.1fr' }, gap: { xs: 2.5, md: 5 }, alignItems: 'center', mt: { xs: 2.5, md: 3 } }}>
+            {/* the one number */}
+            <MRise i={1} reduce={reduce}>
+              <Eyebrow>Safe to spend today</Eyebrow>
+              <Typography sx={{ ...num, fontSize: { xs: '3.4rem', sm: '4.4rem', md: '4.9rem' }, fontWeight: 640, letterSpacing: '-0.045em', lineHeight: 0.92, mt: 1, color: (safe != null && safe < 0) ? RED : 'text.primary' }}>
+                {safe != null ? fmt(safe) : '—'}
+              </Typography>
+              <Typography sx={{ fontSize: { xs: 13.5, sm: 14.5 }, color: 'text.secondary', mt: 1.5, maxWidth: '38ch', lineHeight: 1.5 }}>
+                {heroStatus}
+              </Typography>
+              {/* inline forecast facts — no boxes */}
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 2, sm: 3 }, mt: 2.5 }}>
+                <HeroStat label="Runway" value={runway != null ? `${runway} day${runway === 1 ? '' : 's'}` : '—'} tone={runway != null && runway <= 3 ? AMBER : undefined} />
+                <HeroStat label="Next income" value={p.upcoming_income > 0 ? `${fmt(p.upcoming_income)} · ${fmtDate(p.next_income_date)}` : '—'} tone={p.upcoming_income > 0 ? GREEN : undefined} />
+                <HeroStat label="Balance" value={balance != null ? fmt(balance) : '—'} tone={balance != null && balance < 0 ? RED : undefined} />
               </Box>
-              {balance != null && (
-                <Box sx={{ textAlign: 'right' }}>
-                  <Eyebrow>Projected balance</Eyebrow>
-                  <Typography sx={{ ...num, fontSize: '1.15rem', fontWeight: 600, mt: 0.75, color: balance < 0 ? RED : 'text.primary' }}>{fmt(balance)}</Typography>
-                  {expense && <Typography sx={{ ...num, fontSize: 11.5, fontWeight: 600, mt: 0.25, color: netMonth >= 0 ? GREEN : RED }}>{netMonth >= 0 ? '+' : ''}{fmt(netMonth)} this month</Typography>}
-                </Box>
-              )}
-            </Box>
-            <Box sx={{ mt: 2 }}>
-              <ProjectionChart series={p.series} low={low} nextIncomeDate={p.next_income_date} accent={GREEN} />
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75, fontSize: 10.5 }}>
+            </MRise>
+
+            {/* interactive chart — the signature */}
+            <MRise i={2} reduce={reduce}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.5 }}>
+                <Eyebrow>30-day projection</Eyebrow>
+                <Typography sx={{ fontSize: 11, color: 'text.disabled', display: { xs: 'none', sm: 'block' } }}>hover to inspect any day</Typography>
+              </Box>
+              <ProjectionChart series={p.series} low={low} nextIncomeDate={p.next_income_date} accent={GREEN} height={200} />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75 }}>
                 <Typography sx={{ fontSize: 10.5, color: 'text.disabled' }}>Today</Typography>
                 {low && <Typography sx={{ fontSize: 10.5, color: AMBER }}>Low {money(low.balance)} · {fmtDate(low.date)}</Typography>}
-                {p.next_income_date && p.upcoming_income > 0 && <Typography sx={{ fontSize: 10.5, color: GREEN }}>+{money(p.upcoming_income)} · {fmtDate(p.next_income_date)}</Typography>}
                 <Typography sx={{ fontSize: 10.5, color: 'text.disabled' }}>+{p.horizon_days || 30}d</Typography>
               </Box>
-            </Box>
-          </Card>
-
-          <Card sx={{ display: 'flex', flexDirection: 'column' }}>
-            <Eyebrow>Forecast</Eyebrow>
-            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mt: 1 }}>
-              <Typography sx={{ ...num, fontSize: '2.1rem', fontWeight: 650, letterSpacing: '-0.03em', color: (p.runway_days != null && p.runway_days <= 3) ? AMBER : 'text.primary' }}>
-                {p.runway_days != null ? p.runway_days : '—'}
-              </Typography>
-              <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.25 }}>days of runway<br />at your usual pace</Typography>
-            </Box>
-            <Box sx={{ height: '1px', bgcolor: 'divider', my: 1.5 }} />
-            <StatRow first k="Next income" v={p.upcoming_income > 0 ? `${fmt(p.upcoming_income)} · ${fmtDate(p.next_income_date)}` : '—'} tone={p.upcoming_income > 0 ? GREEN : undefined} />
-            <StatRow k="Bills ahead" v={fmt(p.upcoming_bills || 0)} />
-            <StatRow k="Lowest point" v={low ? `${money(low.balance)} · ${fmtDate(low.date)}` : '—'} tone={low && low.balance < 0 ? AMBER : undefined} />
-            <StatRow k="Daily budget" v={p.daily_discretionary != null ? fmt(p.daily_discretionary) : '—'} />
-          </Card>
+            </MRise>
+          </Box>
         </Box>
-      </Reveal>
 
-      {/* ── metrics ── */}
-      <Reveal index={2}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2,1fr)', sm: 'repeat(3,1fr)', md: 'repeat(5,1fr)' }, gap: 1.5, mt: 1.5 }}>
-          <Metric label="Spent · this month" value={fmt(expense?.totalExpenses ?? 0)} />
-          <Metric label="Income" value={fmt(expense?.totalIncome ?? 0)} tone={expense?.totalIncome ? GREEN : undefined} />
-          <Metric label="Net" value={`${netMonth >= 0 ? '+' : ''}${fmt(netMonth)}`} tone={netMonth >= 0 ? GREEN : RED} />
-          <Metric label="Transactions" value={expense?.transactionCount ?? 0} />
-          <Metric label="Owed to you" value={fmt(Math.abs(owedNet))} tone={owedNet >= 0 ? GREEN : RED} sub={people.length ? `${people.length} ${people.length === 1 ? 'person' : 'people'}` : undefined} />
-        </Box>
-      </Reveal>
+        {/* ── METRICS BAND — typographic, no cards ── */}
+        <MRise i={3} reduce={reduce}>
+          <Box sx={{ display: 'flex', overflowX: 'auto', borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider',
+            '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none', mb: { xs: 2.5, md: 3 } }}>
+            {metrics.map((m, i) => (
+              <Box key={m.label} sx={{ flex: { xs: '0 0 auto', md: 1 }, minWidth: { xs: 140, md: 0 }, py: 2, px: { xs: 2, md: 2.75 },
+                borderLeft: i ? '1px solid' : 'none', borderColor: 'divider' }}>
+                <Typography sx={{ fontSize: 11, color: 'text.secondary', fontWeight: 500 }} noWrap>{m.label}</Typography>
+                <Typography sx={{ ...num, fontSize: '1.4rem', fontWeight: 620, letterSpacing: '-0.025em', mt: 0.75, color: m.tone || 'text.primary' }} noWrap>{m.value}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </MRise>
 
-      {/* ── breakdown | attention ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5, mt: 1.5 }}>
-        <Reveal index={3}>
-          <Card>
+        {/* ── breakdown | attention ── */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
+          <MRise i={4} reduce={reduce} sx={cardSx}>
             <SectionHead title="Where it went" count={expense ? fmt(expense.totalExpenses || 0) : ''} />
             <Donut cats={expense?.categoryBreakdown} />
-          </Card>
-        </Reveal>
-        <Reveal index={4}>
-          <Card>
+          </MRise>
+          <MRise i={5} reduce={reduce} sx={cardSx}>
             <SectionHead title="Needs attention" count={copilot.length || undefined} />
             {copilot.length === 0 ? (
               <Box sx={{ py: 2.5, textAlign: 'center' }}>
@@ -266,14 +263,12 @@ export default function LandingPage() {
                 right="›" tone="text.disabled" last={i === Math.min(copilot.length, 4) - 1}
                 onClick={() => (c.action_route ? navigate(c.action_route) : dismiss(c.id))} />
             ))}
-          </Card>
-        </Reveal>
-      </Box>
+          </MRise>
+        </Box>
 
-      {/* ── upcoming | shared ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5, mt: 1.5 }}>
-        <Reveal index={5}>
-          <Card>
+        {/* ── upcoming | shared ── */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5, mt: 1.5 }}>
+          <MRise i={6} reduce={reduce} sx={cardSx}>
             <SectionHead title="Upcoming" count={`next ${p.horizon_days || 30} days`} />
             {upcoming.length === 0 ? (
               <Box sx={{ py: 2.5, textAlign: 'center' }}><Typography sx={{ fontSize: 12.5, color: 'text.disabled' }}>Nothing scheduled ahead.</Typography></Box>
@@ -298,11 +293,9 @@ export default function LandingPage() {
                 })}
               </Box>
             )}
-          </Card>
-        </Reveal>
+          </MRise>
 
-        <Reveal index={6}>
-          <Card>
+          <MRise i={7} reduce={reduce} sx={cardSx}>
             <SectionHead title="Shared" action="View all" onAction={() => navigate('/splits')} />
             {people.length === 0 ? (
               <Box sx={{ py: 2.5, textAlign: 'center' }}>
@@ -312,40 +305,47 @@ export default function LandingPage() {
             ) : (
               <>
                 <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 0.5 }}>
-                  <Typography sx={{ ...num, fontSize: '1.35rem', fontWeight: 650, color: owedNet >= 0 ? GREEN : RED }}>{owedNet >= 0 ? '+' : '−'}{money(Math.abs(owedNet))}</Typography>
+                  <Typography sx={{ ...num, fontSize: '1.35rem', fontWeight: 640, color: owedNet >= 0 ? GREEN : RED }}>{owedNet >= 0 ? '+' : '−'}{money(Math.abs(owedNet))}</Typography>
                   <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>net {owedNet >= 0 ? 'owed to you' : 'you owe'}</Typography>
                 </Box>
                 {people.slice(0, 3).map((pr, i) => (
-                  <ListRow key={pr.name} icon={pr.net >= 0 ? NorthEastRoundedIcon : SouthWestRoundedIcon} title={pr.net >= 0 ? `${pr.name}` : `${pr.name}`}
+                  <ListRow key={pr.name} icon={pr.net >= 0 ? NorthEastRoundedIcon : SouthWestRoundedIcon} title={pr.name}
                     detail={pr.net >= 0 ? 'owes you' : 'you owe'} right={`${pr.net >= 0 ? '+' : '−'}${money(Math.abs(pr.net))}`}
                     tone={pr.net >= 0 ? GREEN : RED} onClick={() => navigate('/splits')} last={i === Math.min(people.length, 3) - 1} />
                 ))}
               </>
             )}
-          </Card>
-        </Reveal>
-      </Box>
+          </MRise>
+        </Box>
 
-      {/* ── jump to ── */}
-      <Reveal index={7}>
-        <Eyebrow>Jump to</Eyebrow>
-      </Reveal>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2,1fr)', sm: 'repeat(3,1fr)', md: 'repeat(5,1fr)' }, gap: 1, mt: 1.25 }}>
-        {FEATURES.map((f, i) => (
-          <Reveal key={f.to} index={8 + i}>
-            <Box role="button" tabIndex={0} onClick={() => navigate(f.to)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(f.to); } }}
-              sx={{ ...cardSx, p: 1.75, cursor: 'pointer', transition: 'border-color .12s ease',
-                '&:hover': { borderColor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(17,17,20,0.22)' },
-                '&:focus-visible': { outline: `2px solid ${GREEN}`, outlineOffset: 2 } }}>
-              <Box sx={{ width: 30, height: 30, borderRadius: '8px', mb: 1.25, display: 'grid', placeItems: 'center', bgcolor: 'action.hover' }}>
-                <f.icon sx={{ fontSize: 17, color: 'text.secondary' }} />
+        {/* ── jump to ── */}
+        <MRise i={8} reduce={reduce}><Eyebrow sx={{ mt: 1 }}>Jump to</Eyebrow></MRise>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2,1fr)', sm: 'repeat(3,1fr)', md: 'repeat(6,1fr)' }, gap: 1, mt: 1.25 }}>
+          {FEATURES.map((f, i) => (
+            <MRise key={f.to} i={9 + i} reduce={reduce}>
+              <Box role="button" tabIndex={0} onClick={() => navigate(f.to)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(f.to); } }}
+                sx={{ ...cardSx, p: 1.75, cursor: 'pointer', transition: 'border-color .12s ease, transform .12s ease',
+                  '&:hover': { borderColor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(17,17,20,0.22)', transform: 'translateY(-2px)' },
+                  '&:focus-visible': { outline: `2px solid ${GREEN}`, outlineOffset: 2 } }}>
+                <Box sx={{ width: 30, height: 30, borderRadius: '8px', mb: 1.25, display: 'grid', placeItems: 'center', bgcolor: 'action.hover' }}>
+                  <f.icon sx={{ fontSize: 17, color: 'text.secondary' }} />
+                </Box>
+                <Typography sx={{ fontSize: 12.5, fontWeight: 600 }}>{f.title}</Typography>
+                <Typography sx={{ fontSize: 11, color: 'text.disabled' }}>{f.hint}</Typography>
               </Box>
-              <Typography sx={{ fontSize: 12.5, fontWeight: 600 }}>{f.title}</Typography>
-              <Typography sx={{ fontSize: 11, color: 'text.disabled' }}>{f.hint}</Typography>
-            </Box>
-          </Reveal>
-        ))}
+            </MRise>
+          ))}
+        </Box>
       </Box>
+    </Box>
+  );
+}
+
+function HeroStat({ label, value, tone }) {
+  return (
+    <Box>
+      <Typography sx={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'text.disabled' }}>{label}</Typography>
+      <Typography sx={{ ...num, fontSize: 14.5, fontWeight: 600, mt: 0.25, color: tone || 'text.primary' }}>{value}</Typography>
     </Box>
   );
 }

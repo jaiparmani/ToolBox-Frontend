@@ -10,6 +10,7 @@ import { getMonthlyReport, getRecentExpenses, getLatestExpenseInsight, getCatego
 import ProjectionChart from '../ui/ProjectionChart';
 import DashPace from '../ui/DashPace';
 import DashWeekdayPattern from '../ui/DashWeekdayPattern';
+import DashSpendCalendar from '../ui/DashSpendCalendar';
 import QuickAddExpense from '../ui/QuickAddExpense';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import CursorGlow from '../motion/CursorGlow';
@@ -51,15 +52,23 @@ function CategoryDonut({ cats }) {
         <text x="21" y="19.5" textAnchor="middle" fill="#f5f5f6" fontSize="4.6" fontWeight="600" fontFamily="sans-serif">{moneySmart(total)}</text>
         <text x="21" y="24.5" textAnchor="middle" fill="#77777f" fontSize="2.5" fontFamily="sans-serif">this month</text>
       </svg>
-      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {segs.map((s, i) => (
-          <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box sx={{ width: 8, height: 8, borderRadius: '2px', flexShrink: 0, bgcolor: DONUT_SHADES[i] }} />
-            <Typography sx={{ flex: 1, fontSize: 12.5, color: 'text.secondary' }} noWrap>{s.name}</Typography>
-            <Typography sx={{ ...num, fontSize: 12, color: 'text.primary', fontWeight: 550 }}>{money(s.amount)}</Typography>
-            <Typography sx={{ ...num, fontSize: 11, color: 'text.disabled', width: 34, textAlign: 'right' }}>{Math.round((s.amount / total) * 100)}%</Typography>
-          </Box>
-        ))}
+      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.9 }}>
+        {segs.map((s, i) => {
+          const pct = (s.amount / total) * 100;
+          return (
+            <Box key={i} sx={{ display: 'flex', flexDirection: 'column', gap: 0.4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ width: 8, height: 8, borderRadius: '2px', flexShrink: 0, bgcolor: DONUT_SHADES[i] }} />
+                <Typography sx={{ flex: 1, fontSize: 12.5, color: 'text.secondary' }} noWrap>{s.name}</Typography>
+                <Typography sx={{ ...num, fontSize: 12, color: 'text.primary', fontWeight: 550 }}>{money(s.amount)}</Typography>
+                <Typography sx={{ ...num, fontSize: 11, color: 'text.disabled', width: 34, textAlign: 'right' }}>{Math.round(pct)}%</Typography>
+              </Box>
+              <Box aria-hidden sx={{ height: 3, borderRadius: 999, bgcolor: 'action.hover', overflow: 'hidden' }}>
+                <Box sx={{ height: '100%', width: `${Math.max(2, pct)}%`, borderRadius: 999, bgcolor: DONUT_SHADES[i] }} />
+              </Box>
+            </Box>
+          );
+        })}
       </Box>
     </Box>
   );
@@ -192,7 +201,7 @@ export default function LandingPage() {
       <Box sx={{ position: 'relative', zIndex: 1 }}>
 
         {/* ── HERO ── spending overview + the hero action ── */}
-        <Box sx={{ pt: { xs: 0.5, md: 1 }, pb: { xs: 3, md: 4 }, borderBottom: '1px solid', borderColor: 'divider', mb: { xs: 2.5, md: 3 } }}>
+        <Box sx={{ pt: { xs: 0.5, md: 1 }, pb: { xs: 2.5, md: 3.5 }, borderBottom: '1px solid', borderColor: 'divider', mb: { xs: 2, md: 2.5 } }}>
           <Reveal index={0}>
             <Typography sx={{ fontSize: 12.5, color: 'text.disabled', fontWeight: 500 }}>{dateStr}</Typography>
             <Typography sx={{ fontFamily: type.displayFamily, fontSize: { xs: '1.35rem', sm: '1.5rem' }, fontWeight: 600, letterSpacing: '-0.03em', mt: 0.25 }}>
@@ -271,7 +280,7 @@ export default function LandingPage() {
         {/* ── insight ── */}
         {insightText && (
           <Reveal index={3}>
-            <Box sx={{ ...cardSx, display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: { xs: 2.5, md: 3 } }}>
+            <Box sx={{ ...cardSx, display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: { xs: 2, md: 2.5 } }}>
               <Box sx={{ width: 28, height: 28, flexShrink: 0, borderRadius: '8px', display: 'grid', placeItems: 'center', bgcolor: `${accents.violet}1f` }}>
                 <AutoAwesomeRoundedIcon sx={{ fontSize: 15, color: accents.violet }} />
               </Box>
@@ -286,7 +295,7 @@ export default function LandingPage() {
         {/* ── this month's rhythm — factual stats ── */}
         {spent > 0 && (
           <Reveal index={4}>
-            <Box sx={{ ...cardSx, mb: { xs: 2.5, md: 3 }, display: 'flex', alignItems: 'stretch', p: { xs: 1.75, sm: 2.25 } }}>
+            <Box sx={{ ...cardSx, mb: { xs: 2, md: 2.5 }, display: 'flex', alignItems: 'stretch', p: { xs: 1.75, sm: 2.25 } }}>
               {[
                 { label: 'Transactions', value: String(count) },
                 { label: 'Avg / transaction', value: money(rhythm.avgPerTxn) },
@@ -302,49 +311,54 @@ export default function LandingPage() {
           </Reveal>
         )}
 
-        {/* ── spending pace — where the month lands at this rate (clearly a projection) ── */}
-        <Reveal index={5} sx={{ mb: { xs: 2.5, md: 3 }, '&:empty': { display: 'none' } }}>
-          <DashPace spent={spent} dayOfMonth={new Date().getDate()} daysInMonth={daysInMonth} lastMonthTotal={lastReport?.total_amount ?? 0} monthName={monthName} />
-        </Reveal>
+        {/* ── pace | weekday — two factual reads, side by side for density ── */}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: { xs: 2, md: 2.5 }, '&:not(:has(> *:not(:empty)))': { display: 'none' } }}>
+          <Reveal index={5} sx={{ flex: '1 1 300px', minWidth: 0, '&:empty': { display: 'none' } }}>
+            <DashPace spent={spent} dayOfMonth={new Date().getDate()} daysInMonth={daysInMonth} lastMonthTotal={lastReport?.total_amount ?? 0} monthName={monthName} />
+          </Reveal>
+          <Reveal index={6} sx={{ flex: '1 1 300px', minWidth: 0, '&:empty': { display: 'none' } }}>
+            <DashWeekdayPattern dailyTotals={report?.daily_totals || []} />
+          </Reveal>
+        </Box>
 
-        {/* ── which weekday your money goes out on — pure fact from daily totals ── */}
-        <Reveal index={6} sx={{ mb: { xs: 2.5, md: 3 }, '&:empty': { display: 'none' } }}>
-          <DashWeekdayPattern dailyTotals={report?.daily_totals || []} />
-        </Reveal>
-
-        {/* ── owed to you — money that's out but coming back ── */}
-        {settle && (
-          <Reveal index={7}>
-            <Box
-              role="button" tabIndex={0} onClick={() => navigate('/splits')}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/splits'); } }}
-              aria-label={`Owed to you ${money(settle.owed)}${settle.youOwe > 0 ? `, you owe ${money(settle.youOwe)}` : ''}. Open splits.`}
-              sx={{ ...cardSx, mb: { xs: 2.5, md: 3 }, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2,
-                transition: 'border-color .12s ease', '&:hover': { borderColor: 'text.disabled' },
-                '&:focus-visible': { outline: `2px solid ${GREEN}`, outlineOffset: 2 } }}
-            >
-              <Box sx={{ minWidth: 0 }}>
-                <Eyebrow>Owed to you</Eyebrow>
-                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mt: 0.75, flexWrap: 'wrap' }}>
-                  <Typography sx={{ ...num, fontSize: { xs: 24, sm: 28 }, fontWeight: 640, letterSpacing: '-0.03em', color: GREEN, lineHeight: 1 }}>{money(settle.owed)}</Typography>
-                  {settle.youOwe > 0 && (
-                    <Typography sx={{ ...num, fontSize: 12.5, color: accents.amber }}>· you owe {money(settle.youOwe)}</Typography>
+        {/* ── daily-spend heatmap | owed to you ── */}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: { xs: 2, md: 2.5 }, '&:not(:has(> *:not(:empty)))': { display: 'none' } }}>
+          <Reveal index={7} sx={{ flex: '1 1 320px', minWidth: 0, '&:empty': { display: 'none' } }}>
+            <DashSpendCalendar dailyTotals={report?.daily_totals || []} />
+          </Reveal>
+          {settle && (
+            <Reveal index={8} sx={{ flex: '1 1 300px', minWidth: 0 }}>
+              <Box
+                role="button" tabIndex={0} onClick={() => navigate('/splits')}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/splits'); } }}
+                aria-label={`Owed to you ${money(settle.owed)}${settle.youOwe > 0 ? `, you owe ${money(settle.youOwe)}` : ''}. Open splits.`}
+                sx={{ ...cardSx, height: '100%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2,
+                  transition: 'border-color .12s ease', '&:hover': { borderColor: 'text.disabled' },
+                  '&:focus-visible': { outline: `2px solid ${GREEN}`, outlineOffset: 2 } }}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <Eyebrow>Owed to you</Eyebrow>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mt: 0.75, flexWrap: 'wrap' }}>
+                    <Typography sx={{ ...num, fontSize: { xs: 24, sm: 28 }, fontWeight: 640, letterSpacing: '-0.03em', color: GREEN, lineHeight: 1 }}>{money(settle.owed)}</Typography>
+                    {settle.youOwe > 0 && (
+                      <Typography sx={{ ...num, fontSize: 12.5, color: accents.amber }}>· you owe {money(settle.youOwe)}</Typography>
+                    )}
+                  </Box>
+                  {settle.label && (
+                    <Typography sx={{ fontSize: 11.5, color: 'text.disabled', mt: 0.5 }} noWrap>{settle.label}</Typography>
                   )}
                 </Box>
-                {settle.label && (
-                  <Typography sx={{ fontSize: 11.5, color: 'text.disabled', mt: 0.5 }} noWrap>{settle.label}</Typography>
-                )}
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.4, color: 'text.secondary', flexShrink: 0, fontSize: 12.5, fontWeight: 600 }}>
+                  Settle up <ArrowForwardRoundedIcon sx={{ fontSize: 14 }} />
+                </Box>
               </Box>
-              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.4, color: 'text.secondary', flexShrink: 0, fontSize: 12.5, fontWeight: 600 }}>
-                Settle up <ArrowForwardRoundedIcon sx={{ fontSize: 14 }} />
-              </Box>
-            </Box>
-          </Reveal>
-        )}
+            </Reveal>
+          )}
+        </Box>
 
         {/* ── category breakdown | recent activity ── */}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
-          <Reveal index={8} sx={cardSx}>
+          <Reveal index={9} sx={cardSx}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
               <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Where it went</Typography>
               <Typography onClick={() => navigate('/reports')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', '&:hover': { color: 'text.primary' } }}>Insights</Typography>
@@ -352,7 +366,7 @@ export default function LandingPage() {
             <CategoryDonut cats={cats} />
           </Reveal>
 
-          <Reveal index={9} sx={cardSx}>
+          <Reveal index={10} sx={cardSx}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Recent</Typography>
               <Typography onClick={() => navigate('/expense-tracker')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 0.4, '&:hover': { color: 'text.primary' } }}>
@@ -361,10 +375,10 @@ export default function LandingPage() {
             </Box>
             {recent.length === 0 ? (
               <Box sx={{ py: 2.5, textAlign: 'center' }}><Typography sx={{ fontSize: 12.5, color: 'text.disabled' }}>No expenses yet — add your first.</Typography></Box>
-            ) : recent.slice(0, 6).map((e, i, arr) => (
+            ) : recent.slice(0, 8).map((e, i, arr) => (
               <Box key={e.id ?? i} onClick={() => navigate('/expense-tracker')}
-                sx={{ display: 'flex', alignItems: 'center', gap: 1.4, py: 1.05, cursor: 'pointer',
-                  borderBottom: i === Math.min(arr.length, 6) - 1 ? 'none' : '1px solid', borderColor: 'divider',
+                sx={{ display: 'flex', alignItems: 'center', gap: 1.4, py: 0.85, cursor: 'pointer',
+                  borderBottom: i === Math.min(arr.length, 8) - 1 ? 'none' : '1px solid', borderColor: 'divider',
                   mx: -1, px: 1, borderRadius: 2, transition: 'background-color .12s ease', '&:hover': { bgcolor: 'action.hover' } }}>
                 <Box sx={{ width: 8, height: 8, borderRadius: '2px', flexShrink: 0, bgcolor: e.category?.color || accents.blue }} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>

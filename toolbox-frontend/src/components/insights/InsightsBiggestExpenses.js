@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Stack, Typography } from '@mui/material';
 import { accents, type } from '../../theme/tokens';
 import { money } from '../ui/money';
+import { yourShareOf } from '../rest/expenseTrackerApis';
 import { ChartContainer } from '../ui';
 
 const fmtDate = (d) => {
@@ -17,7 +18,11 @@ const fmtDate = (d) => {
  * row here is money out.
  */
 export default function InsightsBiggestExpenses({ expenses = [], onSelect }) {
-  const rows = (expenses || []).slice(0, 5);
+  // Rank by *your* share, not the full bill, so a split you mostly lent out
+  // doesn't masquerade as your biggest spend.
+  const rows = [...(expenses || [])]
+    .sort((a, b) => yourShareOf(b) - yourShareOf(a))
+    .slice(0, 5);
   if (!rows.length) return null;
 
   return (
@@ -62,7 +67,7 @@ export default function InsightsBiggestExpenses({ expenses = [], onSelect }) {
               fontFamily: type.displayFamily, fontWeight: 650, fontSize: '0.95rem', flexShrink: 0,
               color: accents.red, fontVariantNumeric: 'tabular-nums',
             }}>
-              {money(e.amount)}
+              {money(yourShareOf(e))}
             </Typography>
           </Box>
         ))}

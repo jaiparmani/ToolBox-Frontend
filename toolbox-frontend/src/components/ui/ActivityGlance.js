@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { moneySmart } from './money';
+import { yourShareOf } from '../rest/expenseTrackerApis';
 import { type } from '../../theme/tokens';
 
 const num = { fontFamily: type.displayFamily, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' };
@@ -42,16 +43,19 @@ export default function ActivityGlance({ expenses = [] }) {
     const spend = expenses.filter((e) => !isIncome(e));
     if (spend.length === 0) return null;
     const days = new Set(spend.map((e) => dayKey(e.date)));
-    const total = spend.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    // Your share, not the full bill — keeps the strip consistent with the
+    // netted "spent" totals shown elsewhere.
+    const total = spend.reduce((s, e) => s + yourShareOf(e), 0);
     const activeDays = days.size || 1;
     let biggest = spend[0];
     for (const e of spend) {
-      if ((Number(e.amount) || 0) > (Number(biggest.amount) || 0)) biggest = e;
+      if (yourShareOf(e) > yourShareOf(biggest)) biggest = e;
     }
     return {
       activeDays: days.size,
       avgPerDay: total / activeDays,
       biggest,
+      biggestShare: yourShareOf(biggest),
     };
   }, [expenses]);
 
@@ -76,7 +80,7 @@ export default function ActivityGlance({ expenses = [] }) {
       />
       <Metric
         label="Biggest"
-        value={moneySmart(stats.biggest.amount)}
+        value={moneySmart(stats.biggestShare)}
         sub={stats.biggest.description || stats.biggest.category?.name}
       />
     </Box>

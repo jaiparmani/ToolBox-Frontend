@@ -6,7 +6,7 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { getMonthlyReport, getRecentExpenses, getLatestExpenseInsight, getCategories } from '../rest/expenseTrackerApis';
+import { getMonthlyReport, getRecentExpenses, getLatestExpenseInsight, getCategories, yourShareOf } from '../rest/expenseTrackerApis';
 import ProjectionChart from '../ui/ProjectionChart';
 import QuickAddExpense from '../ui/QuickAddExpense';
 import AnimatedNumber from '../ui/AnimatedNumber';
@@ -308,9 +308,12 @@ export default function LandingPage() {
                 <Box sx={{ width: 8, height: 8, borderRadius: '2px', flexShrink: 0, bgcolor: e.category?.color || accents.blue }} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography sx={{ fontSize: 12.75, fontWeight: 550 }} noWrap>{e.description || catName(e) || 'Expense'}</Typography>
-                  <Typography sx={{ fontSize: 11, color: 'text.disabled' }} noWrap>{catName(e)}{catName(e) && e.date ? ' · ' : ''}{e.date ? new Date(e.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}</Typography>
+                  <Typography sx={{ fontSize: 11, color: 'text.disabled' }} noWrap>
+                    {catName(e)}{catName(e) && e.date ? ' · ' : ''}{e.date ? new Date(e.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
+                    {e.isSplit ? ` · split of ${money(expAmount(e))}` : ''}
+                  </Typography>
                 </Box>
-                <Typography sx={{ ...num, fontSize: 13, fontWeight: 600 }}>−{money(expAmount(e))}</Typography>
+                <Typography sx={{ ...num, fontSize: 13, fontWeight: 600 }}>−{money(yourShareOf(e))}</Typography>
               </Box>
             ))}
           </Reveal>

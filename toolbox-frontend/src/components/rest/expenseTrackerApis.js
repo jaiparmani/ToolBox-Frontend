@@ -141,12 +141,29 @@ export const transformExpenseForUI = (apiExpense) => {
         })) : [],
         isRecent: apiExpense.is_recent,
         type: apiExpense.transaction_type,
+        // Your own share of this bill, and what others owe you on it. Absent on
+        // older API responses, so callers fall back to `amount` (see yourShareOf).
+        yourShare: apiExpense.your_share != null ? parseFloat(apiExpense.your_share) : undefined,
+        owedToYou: apiExpense.owed_to_you != null ? parseFloat(apiExpense.owed_to_you) : 0,
+        isSplit: apiExpense.owed_to_you != null && parseFloat(apiExpense.owed_to_you) > 0,
         location: apiExpense.location,
         paymentMethod: apiExpense.payment_method,
         isRecurring: apiExpense.is_recurring,
         createdAt: apiExpense.created_at,
         updatedAt: apiExpense.updated_at
     };
+};
+
+/**
+ * The amount that counts as *your* spending for an expense — your share when the
+ * bill was split, otherwise the full amount. Safe on API responses that predate
+ * split-aware fields (falls back to the full amount).
+ */
+export const yourShareOf = (expense) => {
+    if (!expense) return 0;
+    const share = expense.yourShare;
+    if (share != null && !Number.isNaN(share)) return Math.abs(share);
+    return Math.abs(Number(expense.amount ?? expense.amountValue ?? 0));
 };
 
 // Updated expense creation function

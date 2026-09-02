@@ -6,12 +6,17 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import SwipeAction from './SwipeAction';
 import { money } from './money';
+import { yourShareOf } from '../rest/expenseTrackerApis';
 import { accents, type } from '../../theme/tokens';
 
 const num = { fontFamily: type.displayFamily, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' };
 const NEUTRAL_DOT = '#8A8A8E';
 
 const isIncomeOf = (e) => e.transaction_type === 'income' || e.type === 'income';
+// What counts on the ledger: income at full value, an expense at your own share
+// (the split-adjusted amount), so day totals match the netted "spent".
+const ledgerAmt = (e) => (isIncomeOf(e) ? Math.abs(Number(e.amount) || 0) : yourShareOf(e));
+const fullAmt = (e) => Math.abs(Number(e.amount) || 0);
 const dayKey = (value) => {
   if (!value) return '';
   if (typeof value === 'string') return value.slice(0, 10);
@@ -59,7 +64,7 @@ function ExpenseRow({ expense, prominent, onEdit, onDelete, onOpen }) {
           {expense.description || subtitleOf(expense)}
         </Typography>
         <Typography sx={{ fontSize: 11, color: 'text.disabled', mt: 0.15 }} noWrap>
-          {subtitleOf(expense)}
+          {subtitleOf(expense)}{!income && expense.isSplit ? ` · split of ${money(fullAmt(expense))}` : ''}
         </Typography>
       </Box>
 
@@ -68,7 +73,7 @@ function ExpenseRow({ expense, prominent, onEdit, onDelete, onOpen }) {
         fontWeight: prominent ? 650 : 600,
         fontSize: prominent ? { xs: '1.02rem', sm: '1.1rem' } : { xs: '0.9rem', sm: '0.95rem' },
       }}>
-        {income ? '+' : '−'}{money(expense.amount)}
+        {income ? '+' : '−'}{money(ledgerAmt(expense))}
       </Typography>
 
       <IconButton
@@ -114,17 +119,17 @@ export default function ExpenseTimeline({ expenses = [], onEdit, onDelete, onDel
     const keys = [...map.keys()].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
     const amts = expenses
       .filter((e) => !isIncomeOf(e))
-      .map((e) => Math.abs(Number(e.amount) || 0));
+      .map((e) => ledgerAmt(e));
     const avg = amts.length ? amts.reduce((s, v) => s + v, 0) / amts.length : 0;
     return {
       groups: keys.map((k) => {
         const rows = map.get(k);
-        const net = rows.reduce((s, e) => s + (isIncomeOf(e) ? 1 : -1) * (Number(e.amount) || 0), 0);
-        // The day's largest single expense, for a whisper of context in the
-        // header — income rows don't count as "spend".
+        const net = rows.reduce((s, e) => s + (isIncomeOf(e) ? 1 : -1) * ledgerAmt(e), 0);
+        // The day's largest single expense (your share), for a whisper of context
+        // in the header — income rows don't count as "spend".
         let topSpend = 0;
         for (const e of rows) {
-          if (!isIncomeOf(e)) topSpend = Math.max(topSpend, Math.abs(Number(e.amount) || 0));
+          if (!isIncomeOf(e)) topSpend = Math.max(topSpend, ledgerAmt(e));
         }
         return { key: k, rows, net, count: rows.length, topSpend };
       }),
@@ -175,7 +180,7 @@ export default function ExpenseTimeline({ expenses = [], onEdit, onDelete, onDel
               >
                 <ExpenseRow
                   expense={expense}
-                  prominent={!isIncomeOf(expense) && Math.abs(Number(expense.amount) || 0) >= threshold}
+                  prominent={!isIncomeOf(expense) && ledgerAmt(expense) >= threshold}
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onOpen={onOpen}

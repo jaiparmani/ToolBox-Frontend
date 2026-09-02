@@ -8,6 +8,8 @@ import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import { useAuth } from '../../contexts/AuthContext';
 import { getMonthlyReport, getRecentExpenses, getLatestExpenseInsight, getCategories, getSplitBalances, yourShareOf } from '../rest/expenseTrackerApis';
 import ProjectionChart from '../ui/ProjectionChart';
+import DashPace from '../ui/DashPace';
+import DashWeekdayPattern from '../ui/DashWeekdayPattern';
 import QuickAddExpense from '../ui/QuickAddExpense';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import CursorGlow from '../motion/CursorGlow';
@@ -300,9 +302,19 @@ export default function LandingPage() {
           </Reveal>
         )}
 
+        {/* ── spending pace — where the month lands at this rate (clearly a projection) ── */}
+        <Reveal index={5} sx={{ mb: { xs: 2.5, md: 3 }, '&:empty': { display: 'none' } }}>
+          <DashPace spent={spent} dayOfMonth={new Date().getDate()} daysInMonth={daysInMonth} lastMonthTotal={lastReport?.total_amount ?? 0} monthName={monthName} />
+        </Reveal>
+
+        {/* ── which weekday your money goes out on — pure fact from daily totals ── */}
+        <Reveal index={6} sx={{ mb: { xs: 2.5, md: 3 }, '&:empty': { display: 'none' } }}>
+          <DashWeekdayPattern dailyTotals={report?.daily_totals || []} />
+        </Reveal>
+
         {/* ── owed to you — money that's out but coming back ── */}
         {settle && (
-          <Reveal index={5}>
+          <Reveal index={7}>
             <Box
               role="button" tabIndex={0} onClick={() => navigate('/splits')}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/splits'); } }}
@@ -332,7 +344,7 @@ export default function LandingPage() {
 
         {/* ── category breakdown | recent activity ── */}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
-          <Reveal index={6} sx={cardSx}>
+          <Reveal index={8} sx={cardSx}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
               <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Where it went</Typography>
               <Typography onClick={() => navigate('/reports')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', '&:hover': { color: 'text.primary' } }}>Insights</Typography>
@@ -340,7 +352,7 @@ export default function LandingPage() {
             <CategoryDonut cats={cats} />
           </Reveal>
 
-          <Reveal index={7} sx={cardSx}>
+          <Reveal index={9} sx={cardSx}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Recent</Typography>
               <Typography onClick={() => navigate('/expense-tracker')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 0.4, '&:hover': { color: 'text.primary' } }}>

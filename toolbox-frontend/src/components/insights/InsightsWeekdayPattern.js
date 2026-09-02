@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Tooltip, Typography } from '@mui/material';
 import { accents, motion, type } from '../../theme/tokens';
 import { money } from '../ui/money';
+import { yourShareOf } from '../rest/expenseTrackerApis';
 import { ChartContainer } from '../ui';
 
 const LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -11,6 +12,9 @@ const LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
  * into the seven weekday buckets (Mon-first), so a weekend-heavy or a payday
  * pattern shows up as a shape. Single accent — the heaviest day is the solid
  * mint bar, the rest dimmed; the busiest day is called out in words.
+ *
+ * Each row counts your *share* of a split bill, not the full amount, so this
+ * shape agrees with the netted monthly total and the rest of the page.
  */
 export default function InsightsWeekdayPattern({ expenses = [] }) {
   const totals = React.useMemo(() => {
@@ -19,7 +23,7 @@ export default function InsightsWeekdayPattern({ expenses = [] }) {
       const d = e.date instanceof Date ? e.date : new Date(e.date);
       if (Number.isNaN(d.getTime())) return;
       const idx = (d.getDay() + 6) % 7; // JS Sun=0 -> Mon-first
-      buckets[idx] += Number(e.amount) || 0;
+      buckets[idx] += yourShareOf(e);
     });
     return buckets;
   }, [expenses]);

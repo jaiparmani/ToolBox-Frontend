@@ -60,6 +60,7 @@ export default function InsightsBiggestExpenses({ expenses = [], onSelect }) {
                 )}
                 <Typography variant="caption" color="text.secondary" noWrap>
                   {e.category?.name || 'Uncategorised'} · {fmtDate(e.date)}
+                  {e.isSplit ? ` · split of ${money(Math.abs(Number(e.amount) || 0))}` : ''}
                 </Typography>
               </Box>
             </Box>

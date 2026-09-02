@@ -24,6 +24,7 @@ import { money, relativeDay } from '../ui/money';
 import { accents, type } from '../../theme/tokens';
 import { feedback } from '../ui/feedback';
 import GroupStrip from '../ui/GroupStrip';
+import SettleConfirmSheet from '../ui/SettleConfirmSheet';
 import {
   getSplitBalances, settleUpWith, getSplits,
   getGroups, createGroup, getGroupBalances, getGroupExpenses, splitInGroup,
@@ -54,6 +55,28 @@ function fireSettleFlow(person, amount) {
 }
 
 /**
+ * Clear a settled person from the board immediately, before the server confirms.
+ * Only the direction being settled is removed (a person can sit on both sides at
+ * once), and the running totals move by the exact figure that leaves — so the
+ * optimistic view stays truthful, and load() reconciles it against the server.
+ */
+function optimisticSettle(prev, person) {
+  const owedByMe = person.net < 0;
+  if (owedByMe) {
+    const entry = prev.youOwe.find(d => d.userId === person.owedToUserId);
+    const amt = entry ? entry.owed : 0;
+    const youOwe = prev.youOwe.filter(d => d.userId !== person.owedToUserId);
+    const totalYouOwe = Math.max(0, prev.totalYouOwe - amt);
+    return { ...prev, youOwe, totalYouOwe, net: prev.totalOwed - totalYouOwe };
+  }
+  const entry = prev.balances.find(b => b.personId === person.personId);
+  const amt = entry ? entry.owed : 0;
+  const balances = prev.balances.filter(b => b.personId !== person.personId);
+  const totalOwed = Math.max(0, prev.totalOwed - amt);
+  return { ...prev, balances, totalOwed, net: totalOwed - prev.totalYouOwe };
+}
+
+/**
  * Splitting lives on its own page now.
  *
  * As a tab inside the expense tracker it was buried under that page's own
@@ -75,7 +98,11 @@ export default function SplitsPage() {
   const [detail, setDetail] = useState({ loading: false, items: [] });
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [settling, setSettling] = useState(null);
+  // The settle confirm-and-seal sheet. `person` drives what it shows; the rest
+  // tracks the in-flight settle so the sheet can lock, celebrate, or recover.
+  const [settle, setSettle] = useState({
+    open: false, person: null, settling: false, done: false, doneTotal: 0, error: null,
+  });
 
   // Groups. `openGroup` switches the page into that group's own view rather
   // than navigating away, so the constellation can simply re-scope itself.
@@ -234,24 +261,47 @@ export default function SplitsPage() {
     }
   };
 
-  // The core settle, no confirm - used by the swipe gesture, where the swipe
-  // itself is the intent.
-  const settleDirect = async (person) => {
+  // Open the confirm-and-seal sheet for a person: the discoverable path, where
+  // the exact who/how-much is stated before anything moves.
+  const openSettle = (person) => {
+    feedback('open');
+    setSettle({ open: true, person, settling: false, done: false, doneTotal: 0, error: null });
+  };
+  const closeSettle = () => setSettle(prev => ({ ...prev, open: false }));
+
+  /**
+   * The one settle path. Optimistic: the person leaves the board the instant we
+   * commit, the money-in-motion flow fires while their node is still on screen,
+   * and the server's own settled_total seals it. On failure we put them back and
+   * surface the error — in the sheet (so it can be retried) for the confirm path,
+   * or on the banner for the express swipe.
+   */
+  const runSettle = async (person, { sheet = false } = {}) => {
     const owedByMe = person.net < 0;
-    setSettling(person.id);
+    const snapshot = state;
+    if (sheet) setSettle(prev => ({ ...prev, settling: true, error: null }));
+    fireSettleFlow(person, person.net);
+    setState(prev => optimisticSettle(prev, person));
+    if (selected?.id === person.id) setSelected(null);
     try {
       const result = await settleUpWith(
         owedByMe ? { owedToUserId: person.owedToUserId } : { personId: person.personId });
-      // Fire the particle stream while the node is still on screen, then refresh.
-      fireSettleFlow(person, result.total);
       feedback('success');
       setSuccess(`Settled ${money(result.total)} with ${person.name}`);
-      setSelected(null);
-      load();
+      if (sheet) {
+        setSettle(prev => ({ ...prev, settling: false, done: true, doneTotal: result.total }));
+        // Let the seal land, then dismiss — unless the user already closed it.
+        setTimeout(() => setSettle(prev => (prev.done ? { ...prev, open: false } : prev)), 1600);
+      }
+      load(); // reconcile the board with the server's truth
     } catch (err) {
-      setError(err.message || 'Could not settle');
-    } finally {
-      setSettling(null);
+      setState(snapshot); // put them back exactly as they were
+      feedback('error');
+      if (sheet) {
+        setSettle(prev => ({ ...prev, settling: false, error: err.message || 'Could not settle. Try again.' }));
+      } else {
+        setError(err.message || 'Could not settle');
+      }
     }
   };
 
@@ -563,8 +613,8 @@ export default function SplitsPage() {
                   transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                 >
                   <SwipeAction
-                    onAction={() => settleDirect(person)}
-                    color="#30D158"
+                    onAction={() => runSettle(person)}
+                    color={accents.mint}
                     icon={<DoneAllIcon sx={{ color: '#fff' }} />}
                     label={person.net < 0 ? 'Mark paid' : 'Settle'}
                     borderRadius={12}
@@ -604,17 +654,10 @@ export default function SplitsPage() {
                             <Button
                               size="small"
                               startIcon={<DoneAllIcon />}
-                              onClick={() => {
-                                const owedByMe = person.net < 0;
-                                const label = owedByMe
-                                  ? `Mark the ${money(Math.abs(person.net))} you owe ${person.name} as paid?`
-                                  : `Mark ${person.name}'s ${money(person.net)} as settled?`;
-                                if (window.confirm(label)) settleDirect(person);
-                              }}
-                              disabled={settling === person.id}
-                              sx={{ mt: 0.5 }}
+                              onClick={() => openSettle(person)}
+                              sx={{ mt: 0.5, color: accents.mint, fontWeight: 600 }}
                             >
-                              {settling === person.id ? 'Settling…' : 'Settle'}
+                              {person.net < 0 ? 'Mark paid' : 'Settle'}
                             </Button>
                           )}
                         </Box>
@@ -655,6 +698,14 @@ export default function SplitsPage() {
             )}
           </>
         )}
+
+        <SettleConfirmSheet
+          open={settle.open}
+          person={settle.person}
+          status={settle}
+          onConfirm={() => runSettle(settle.person, { sheet: true })}
+          onClose={closeSettle}
+        />
 
         <Snackbar
           open={!!success}

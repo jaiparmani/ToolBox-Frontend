@@ -165,6 +165,7 @@ export const transformUserForUI = (apiUser) => {
         firstName: apiUser.first_name,
         lastName: apiUser.last_name,
         phone: apiUser.phone || '',
+        hasMpin: apiUser.has_mpin === true, // whether a 6-digit MPIN is set (server-provided)
         displayName: `${apiUser.first_name} ${apiUser.last_name}`.trim() || apiUser.username,
         dateJoined: new Date(apiUser.date_joined),
         isActive: apiUser.is_active !== false // Default to true if not specified
@@ -190,6 +191,8 @@ export const transformUserForUI = (apiUser) => {
  * @property {string} last_name - Optional last name
  * @property {string} password - Required password
  * @property {string} password_confirm - Required password confirmation
+ * @property {string} phone - Required mobile number
+ * @property {string} mpin - Required 6-digit MPIN for immediate MPIN-login
  */
 
 /**
@@ -234,7 +237,9 @@ export const registerUser = async (userData, onSuccess, onError) => {
                 last_name: userData.last_name,
                 phone: userData.phone || '',
                 password: userData.password,
-                password_confirm: userData.password_confirm
+                password_confirm: userData.password_confirm,
+                // Mobile + 6-digit MPIN so the new account can MPIN-login immediately.
+                ...(userData.mpin ? { mpin: userData.mpin } : {})
             })
         });
 
@@ -400,10 +405,21 @@ export const confirmMpinReset = async (identifier, code, mpin, remember = true) 
     return data;
 };
 
-/** Set or change the signed-in user's MPIN (password-gated on the server). */
-export const setMpin = async (password, mpin) => {
+/**
+ * Set or change the signed-in user's MPIN.
+ *
+ * Endpoint: POST /api/users/mpin/set/ (Token auth). Body is { mpin } for a
+ * first-time setup and { mpin, current_mpin } to change an existing one — the
+ * server requires current_mpin only when the user already has an MPIN. The
+ * response echoes { success, has_mpin }; callers use has_mpin to know whether a
+ * PIN now exists. If the backend path/shape shifts, keep this function name and
+ * adjust only the URL/body here.
+ */
+export const setMpin = async (mpin, currentMpin) => {
+    const body = { mpin };
+    if (currentMpin) body.current_mpin = currentMpin;
     const response = await authenticatedFetch(`${API_BASE_URL}/mpin/set/`, {
-        method: 'POST', body: JSON.stringify({ password, mpin }),
+        method: 'POST', body: JSON.stringify(body),
     });
     return await response.json();
 };

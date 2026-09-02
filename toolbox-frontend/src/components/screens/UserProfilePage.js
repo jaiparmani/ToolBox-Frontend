@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert, Box, Button, Card, CardContent, Container, IconButton, InputAdornment,
-  LinearProgress, Paper, Snackbar, Stack, Switch, TextField, Typography,
+  LinearProgress, Link, Paper, Snackbar, Stack, Switch, TextField, Typography,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import LockIcon from '@mui/icons-material/Lock';
 import PersonIcon from '@mui/icons-material/Person';
+import PinIcon from '@mui/icons-material/Pin';
 import TouchAppIcon from '@mui/icons-material/TouchApp';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -15,9 +16,10 @@ import CheckIcon from '@mui/icons-material/Check';
 import LogoutIcon from '@mui/icons-material/Logout';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { clearAllData } from '../rest/userApis.js';
+import { clearAllData, setMpin as apiSetMpin, requestMpinReset, confirmMpinReset } from '../rest/userApis.js';
 import Reveal from '../ui/Reveal';
 import { ConfirmDialog } from '../ui';
+import MpinInput from '../ui/MpinInput';
 import { accents } from '../../theme/tokens';
 import { getFeedbackPrefs, setFeedbackPrefs, feedback } from '../ui/feedback';
 import { TelegramConnect } from '../ui';
@@ -47,7 +49,7 @@ function scorePassword(pw) {
 
 export default function UserProfilePage() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, isLoading, updateProfile, changePassword, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, updateProfile, changePassword, logout, refreshUserProfile } = useAuth();
 
   const [details, setDetails] = useState({ username: '', email: '', first_name: '', last_name: '', phone: '' });
   const [editing, setEditing] = useState(false);
@@ -56,6 +58,19 @@ export default function UserProfilePage() {
   const [pw, setPw] = useState({ old_password: '', new_password: '', new_password_confirm: '' });
   const [showPw, setShowPw] = useState(false);
   const [savingPw, setSavingPw] = useState(false);
+
+  // Security / MPIN. `hasMpin` gates whether the current MPIN is required to
+  // change it; seeded from the profile and refreshed after every set.
+  const [hasMpin, setHasMpin] = useState(false);
+  const [mpin, setMpin] = useState({ current: '', next: '', confirm: '' });
+  const [savingMpin, setSavingMpin] = useState(false);
+  const [mpinError, setMpinError] = useState('');
+  // Inline "forgot MPIN" reset, using the emailed-code flow.
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetStep, setResetStep] = useState('request'); // 'request' | 'confirm'
+  const [resetCode, setResetCode] = useState('');
+  const [resetMpin, setResetMpin] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
 
   const [feel, setFeel] = useState(getFeedbackPrefs());
   const toggleFeel = (key) => {
@@ -72,11 +87,14 @@ export default function UserProfilePage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (user) setDetails({
-      username: user.username || '', email: user.email || '',
-      first_name: user.first_name ?? user.firstName ?? '', last_name: user.last_name ?? user.lastName ?? '',
-      phone: user.phone || '',
-    });
+    if (user) {
+      setDetails({
+        username: user.username || '', email: user.email || '',
+        first_name: user.first_name ?? user.firstName ?? '', last_name: user.last_name ?? user.lastName ?? '',
+        phone: user.phone || '',
+      });
+      setHasMpin(user.hasMpin === true || user.has_mpin === true);
+    }
   }, [user]);
 
   const strength = useMemo(() => scorePassword(pw.new_password), [pw.new_password]);
@@ -102,6 +120,56 @@ export default function UserProfilePage() {
       setPw({ old_password: '', new_password: '', new_password_confirm: '' });
     } catch (e) { setError(e.message || 'Could not change your password'); }
     finally { setSavingPw(false); }
+  };
+
+  const saveMpin = async () => {
+    setMpinError('');
+    if (hasMpin && !/^\d{6}$/.test(mpin.current)) { setMpinError('Enter your current 6-digit MPIN'); return; }
+    if (!/^\d{6}$/.test(mpin.next)) { setMpinError('Your new MPIN must be exactly 6 digits'); return; }
+    if (mpin.next !== mpin.confirm) { setMpinError('The new MPINs do not match'); return; }
+    setSavingMpin(true);
+    try {
+      const res = await apiSetMpin(mpin.next, hasMpin ? mpin.current : undefined);
+      // Server echoes has_mpin; fall back to true since we just set one.
+      setHasMpin(res?.has_mpin ?? true);
+      setMpin({ current: '', next: '', confirm: '' });
+      feedback('success');
+      setToast(hasMpin ? 'MPIN changed' : 'MPIN set');
+      refreshUserProfile?.();
+    } catch (e) {
+      feedback('error');
+      setMpinError(e.message || 'Could not update your MPIN');
+    } finally { setSavingMpin(false); }
+  };
+
+  const startMpinReset = async () => {
+    if (!details.email) { setMpinError('Add an email to your profile first, then reset your MPIN'); return; }
+    setResetBusy(true); setMpinError('');
+    try {
+      await requestMpinReset(details.email);
+      setResetStep('confirm');
+      setToast('We emailed you a reset code');
+    } catch (e) {
+      setMpinError(e.message || 'Could not start an MPIN reset');
+    } finally { setResetBusy(false); }
+  };
+
+  const finishMpinReset = async () => {
+    setMpinError('');
+    if (!resetCode.trim()) { setMpinError('Enter the code we emailed you'); return; }
+    if (!/^\d{6}$/.test(resetMpin)) { setMpinError('Your new MPIN must be exactly 6 digits'); return; }
+    setResetBusy(true);
+    try {
+      await confirmMpinReset(details.email, resetCode.trim(), resetMpin);
+      setHasMpin(true);
+      feedback('success');
+      setToast('MPIN reset');
+      setResetOpen(false); setResetStep('request'); setResetCode(''); setResetMpin('');
+      refreshUserProfile?.();
+    } catch (e) {
+      feedback('error');
+      setMpinError(e.message || 'Could not reset your MPIN. Check the code and try again.');
+    } finally { setResetBusy(false); }
   };
 
   const doClear = async () => {
@@ -237,6 +305,94 @@ export default function UserProfilePage() {
                 disabled={savingPw || !pw.old_password || !pw.new_password}>
                 {savingPw ? 'Changing…' : 'Change password'}
               </Button>
+            </Stack>
+          </SectionCard>
+        </Reveal>
+
+        {/* Security / MPIN */}
+        <Reveal index={5}>
+          <SectionCard icon={<PinIcon />} color={accents.mint} title="Security · MPIN">
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
+              {hasMpin
+                ? 'Change the 6-digit PIN you use to unlock the app.'
+                : 'Set a 6-digit PIN so you can unlock the app quickly next time.'}
+            </Typography>
+            <Stack spacing={2.25}>
+              {hasMpin && (
+                <Box>
+                  <Typography component="label" htmlFor="mpin-current" variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+                    Current MPIN
+                  </Typography>
+                  <MpinInput id="mpin-current" label="Current 6-digit MPIN" value={mpin.current}
+                    onChange={(v) => { setMpin(m => ({ ...m, current: v })); if (mpinError) setMpinError(''); }} />
+                </Box>
+              )}
+              <Box>
+                <Typography component="label" htmlFor="mpin-next" variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+                  {hasMpin ? 'New MPIN' : 'Choose MPIN'}
+                </Typography>
+                <MpinInput id="mpin-next" label={hasMpin ? 'New 6-digit MPIN' : 'Choose a 6-digit MPIN'} value={mpin.next}
+                  onChange={(v) => { setMpin(m => ({ ...m, next: v })); if (mpinError) setMpinError(''); }} />
+              </Box>
+              <Box>
+                <Typography component="label" htmlFor="mpin-confirm" variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+                  Confirm MPIN
+                </Typography>
+                <MpinInput id="mpin-confirm" label="Confirm 6-digit MPIN" value={mpin.confirm}
+                  onChange={(v) => { setMpin(m => ({ ...m, confirm: v })); if (mpinError) setMpinError(''); }}
+                  status={mpin.confirm.length === 6 ? (mpin.next === mpin.confirm ? 'success' : 'error') : 'idle'} />
+              </Box>
+              {mpinError && !resetOpen && (
+                <Typography variant="caption" color="error.main">{mpinError}</Typography>
+              )}
+              <Button variant="contained" onClick={saveMpin}
+                disabled={savingMpin || mpin.next.length !== 6 || mpin.confirm.length !== 6 || (hasMpin && mpin.current.length !== 6)}
+                sx={{ backgroundColor: accents.mint, '&:hover': { backgroundColor: accents.mint }, color: '#04120d' }}>
+                {savingMpin ? 'Saving…' : hasMpin ? 'Change MPIN' : 'Set MPIN'}
+              </Button>
+
+              {/* Forgot MPIN — reset via the emailed-code flow */}
+              {!resetOpen ? (
+                <Link component="button" type="button" variant="body2" underline="hover" sx={{ color: 'text.secondary', alignSelf: 'flex-start' }}
+                  onClick={() => { setResetOpen(true); setResetStep('request'); setMpinError(''); }}>
+                  Forgot your MPIN? Reset it by email
+                </Link>
+              ) : (
+                <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
+                  {resetStep === 'request' ? (
+                    <>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                        We'll email a reset code to {details.email || 'your account'}. Enter it, then choose a new MPIN.
+                      </Typography>
+                      <Stack direction="row" spacing={1.5}>
+                        <Button variant="outlined" size="small" onClick={startMpinReset} disabled={resetBusy}>
+                          {resetBusy ? 'Sending…' : 'Email me a code'}
+                        </Button>
+                        <Button size="small" color="inherit" onClick={() => { setResetOpen(false); setMpinError(''); }}>Cancel</Button>
+                      </Stack>
+                    </>
+                  ) : (
+                    <>
+                      <TextField size="small" fullWidth label="Reset code" value={resetCode}
+                        onChange={(e) => { setResetCode(e.target.value); if (mpinError) setMpinError(''); }}
+                        inputProps={{ inputMode: 'numeric' }} sx={{ mb: 1.5 }} />
+                      <Typography component="label" htmlFor="mpin-reset-new" variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+                        New MPIN
+                      </Typography>
+                      <MpinInput id="mpin-reset-new" label="New 6-digit MPIN" value={resetMpin}
+                        onChange={(v) => { setResetMpin(v); if (mpinError) setMpinError(''); }} />
+                      {mpinError && <Typography variant="caption" color="error.main" sx={{ display: 'block', mt: 1 }}>{mpinError}</Typography>}
+                      <Stack direction="row" spacing={1.5} sx={{ mt: 1.5 }}>
+                        <Button variant="contained" size="small" onClick={finishMpinReset}
+                          disabled={resetBusy || !resetCode.trim() || resetMpin.length !== 6}>
+                          {resetBusy ? 'Resetting…' : 'Reset MPIN'}
+                        </Button>
+                        <Button size="small" color="inherit" onClick={() => { setResetOpen(false); setResetStep('request'); setResetCode(''); setResetMpin(''); setMpinError(''); }}>Cancel</Button>
+                      </Stack>
+                    </>
+                  )}
+                </Box>
+              )}
             </Stack>
           </SectionCard>
         </Reveal>

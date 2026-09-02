@@ -11,6 +11,7 @@ import {
   Email,
   Phone,
   Lock,
+  Pin,
   CheckCircle,
   Error as ErrorIcon,
   HowToReg
@@ -18,6 +19,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import AuthShell from '../ui/AuthShell';
+import MpinInput from '../ui/MpinInput';
 
 export default function UserRegistrationPage() {
   const navigate = useNavigate();
@@ -31,7 +33,9 @@ export default function UserRegistrationPage() {
     last_name: '',
     phone: '',
     password: '',
-    password_confirm: ''
+    password_confirm: '',
+    mpin: '',
+    mpin_confirm: ''
   });
 
   // UI state
@@ -77,6 +81,14 @@ export default function UserRegistrationPage() {
     // Real-time password strength check
     if (field === 'password') {
       validatePasswordStrength(value);
+    }
+  };
+
+  // MPIN fields come from MpinInput as raw digit strings, not DOM events.
+  const handleMpinChange = (field) => (value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (formErrors[field]) {
+      setFormErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
 
@@ -146,6 +158,27 @@ export default function UserRegistrationPage() {
       errors.password_confirm = 'Please confirm your password';
     } else if (formData.password !== formData.password_confirm) {
       errors.password_confirm = 'Passwords do not match';
+    }
+
+    // Mobile number validation (now mandatory) — accept +, spaces, dashes and
+    // parens, but require a plausible count of actual digits.
+    const phoneDigits = (formData.phone || '').replace(/\D/g, '');
+    if (!formData.phone.trim()) {
+      errors.phone = 'Mobile number is required';
+    } else if (!/^\+?[0-9\s\-()]+$/.test(formData.phone.trim())) {
+      errors.phone = 'Please enter a valid mobile number';
+    } else if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+      errors.phone = 'Please enter a valid mobile number';
+    }
+
+    // MPIN validation — exactly 6 digits, and the confirmation must match.
+    if (!/^\d{6}$/.test(formData.mpin)) {
+      errors.mpin = 'MPIN must be exactly 6 digits';
+    }
+    if (!formData.mpin_confirm) {
+      errors.mpin_confirm = 'Please confirm your MPIN';
+    } else if (formData.mpin !== formData.mpin_confirm) {
+      errors.mpin_confirm = 'MPINs do not match';
     }
 
     setFormErrors(errors);
@@ -348,15 +381,16 @@ export default function UserRegistrationPage() {
               />
             </Grid>
 
-            {/* Phone Field (optional) */}
+            {/* Phone Field (required) */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Phone number (optional)"
+                label="Mobile number"
                 type="tel"
                 value={formData.phone}
                 onChange={handleInputChange('phone')}
                 error={!!formErrors.phone}
+                required
                 helperText={renderFieldError(formErrors.phone) || 'Used for account recovery and sign-in codes.'}
                 InputProps={{
                   startAdornment: (
@@ -467,6 +501,53 @@ export default function UserRegistrationPage() {
               </Box>
             </CardContent>
           </Card>
+
+          {/* MPIN setup — a 6-digit PIN for fast sign-in */}
+          <Box display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
+            <Pin sx={{ fontSize: 18, color: 'text.secondary' }} />
+            <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1 }}>
+              Set your MPIN
+            </Typography>
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+            A 6-digit PIN you'll use to unlock the app quickly next time.
+          </Typography>
+          <Grid container spacing={3} sx={{ mt: 0, mb: 1 }}>
+            <Grid item xs={12} md={6}>
+              <Typography component="label" htmlFor="reg-mpin" variant="body2" sx={{ fontWeight: 600, display: 'block', mb: 1 }}>
+                Enter MPIN
+              </Typography>
+              <MpinInput
+                id="reg-mpin"
+                label="Enter 6-digit MPIN"
+                value={formData.mpin}
+                onChange={handleMpinChange('mpin')}
+                status={formErrors.mpin ? 'error' : 'idle'}
+              />
+              {formErrors.mpin && (
+                <Typography variant="caption" color="error.main" sx={{ display: 'block', mt: 0.75 }}>
+                  {renderFieldError(formErrors.mpin)}
+                </Typography>
+              )}
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography component="label" htmlFor="reg-mpin-confirm" variant="body2" sx={{ fontWeight: 600, display: 'block', mb: 1 }}>
+                Confirm MPIN
+              </Typography>
+              <MpinInput
+                id="reg-mpin-confirm"
+                label="Confirm 6-digit MPIN"
+                value={formData.mpin_confirm}
+                onChange={handleMpinChange('mpin_confirm')}
+                status={formErrors.mpin_confirm ? 'error' : (formData.mpin_confirm.length === 6 && formData.mpin === formData.mpin_confirm ? 'success' : 'idle')}
+              />
+              {formErrors.mpin_confirm && (
+                <Typography variant="caption" color="error.main" sx={{ display: 'block', mt: 0.75 }}>
+                  {renderFieldError(formErrors.mpin_confirm)}
+                </Typography>
+              )}
+            </Grid>
+          </Grid>
 
           {/* Loading Progress */}
           {isLoading && <LinearProgress sx={{ mb: 2 }} />}

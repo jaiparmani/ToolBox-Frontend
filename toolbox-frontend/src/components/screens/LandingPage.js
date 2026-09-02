@@ -6,7 +6,7 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { getMonthlyReport, getRecentExpenses, getLatestExpenseInsight, getCategories, yourShareOf } from '../rest/expenseTrackerApis';
+import { getMonthlyReport, getRecentExpenses, getLatestExpenseInsight, getCategories, getSplitBalances, yourShareOf } from '../rest/expenseTrackerApis';
 import ProjectionChart from '../ui/ProjectionChart';
 import QuickAddExpense from '../ui/QuickAddExpense';
 import AnimatedNumber from '../ui/AnimatedNumber';
@@ -71,6 +71,7 @@ export default function LandingPage() {
   const [recent, setRecent] = useState([]);
   const [insight, setInsight] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [balances, setBalances] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
 
   const load = useCallback(() => {
@@ -82,12 +83,14 @@ export default function LandingPage() {
       getRecentExpenses(),
       getLatestExpenseInsight(),
       getCategories({ type: 'expense' }),
-    ]).then(([r, l, rc, ins, cat]) => {
+      getSplitBalances(),
+    ]).then(([r, l, rc, ins, cat, bal]) => {
       if (r.status === 'fulfilled') setReport(r.value);
       if (l.status === 'fulfilled') setLastReport(l.value ?? null);
       if (rc.status === 'fulfilled') setRecent(Array.isArray(rc.value) ? rc.value : []);
       if (ins.status === 'fulfilled') setInsight(ins.value);
       if (cat.status === 'fulfilled') setCategories(Array.isArray(cat.value) ? cat.value : (cat.value?.results || []));
+      if (bal.status === 'fulfilled') setBalances(bal.value ?? null);
     });
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -159,6 +162,22 @@ export default function LandingPage() {
       busiest: busiest ? { date: busiest.date, total: Number(busiest.total) } : null,
     };
   }, [report, spent, count]);
+
+  // money that's out but coming back — the counterpart to share-only spending
+  const settle = useMemo(() => {
+    if (!balances) return null;
+    const owed = balances.totalOwedToYou || 0;
+    const youOwe = balances.totalYouOwe || 0;
+    if (owed <= 0 && youOwe <= 0) return null;
+    const people = (balances.balances || []).filter((b) => b.owed > 0);
+    const names = people.slice(0, 2).map((p) => p.name).join(', ');
+    const label = people.length === 0
+      ? (youOwe > 0 ? 'balances to settle' : '')
+      : people.length === 1
+        ? `from ${people[0].name}`
+        : `across ${people.length} people · ${names}${people.length > 2 ? '…' : ''}`;
+    return { owed, youOwe, label };
+  }, [balances]);
 
   const insightText = insight ? (insight.summary || insight.text || insight.body || insight.message || (typeof insight === 'string' ? insight : null)) : null;
 
@@ -281,9 +300,39 @@ export default function LandingPage() {
           </Reveal>
         )}
 
+        {/* ── owed to you — money that's out but coming back ── */}
+        {settle && (
+          <Reveal index={5}>
+            <Box
+              role="button" tabIndex={0} onClick={() => navigate('/splits')}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/splits'); } }}
+              aria-label={`Owed to you ${money(settle.owed)}${settle.youOwe > 0 ? `, you owe ${money(settle.youOwe)}` : ''}. Open splits.`}
+              sx={{ ...cardSx, mb: { xs: 2.5, md: 3 }, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2,
+                transition: 'border-color .12s ease', '&:hover': { borderColor: 'text.disabled' },
+                '&:focus-visible': { outline: `2px solid ${GREEN}`, outlineOffset: 2 } }}
+            >
+              <Box sx={{ minWidth: 0 }}>
+                <Eyebrow>Owed to you</Eyebrow>
+                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mt: 0.75, flexWrap: 'wrap' }}>
+                  <Typography sx={{ ...num, fontSize: { xs: 24, sm: 28 }, fontWeight: 640, letterSpacing: '-0.03em', color: GREEN, lineHeight: 1 }}>{money(settle.owed)}</Typography>
+                  {settle.youOwe > 0 && (
+                    <Typography sx={{ ...num, fontSize: 12.5, color: accents.amber }}>· you owe {money(settle.youOwe)}</Typography>
+                  )}
+                </Box>
+                {settle.label && (
+                  <Typography sx={{ fontSize: 11.5, color: 'text.disabled', mt: 0.5 }} noWrap>{settle.label}</Typography>
+                )}
+              </Box>
+              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.4, color: 'text.secondary', flexShrink: 0, fontSize: 12.5, fontWeight: 600 }}>
+                Settle up <ArrowForwardRoundedIcon sx={{ fontSize: 14 }} />
+              </Box>
+            </Box>
+          </Reveal>
+        )}
+
         {/* ── category breakdown | recent activity ── */}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
-          <Reveal index={5} sx={cardSx}>
+          <Reveal index={6} sx={cardSx}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
               <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Where it went</Typography>
               <Typography onClick={() => navigate('/reports')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', '&:hover': { color: 'text.primary' } }}>Insights</Typography>
@@ -291,7 +340,7 @@ export default function LandingPage() {
             <CategoryDonut cats={cats} />
           </Reveal>
 
-          <Reveal index={6} sx={cardSx}>
+          <Reveal index={7} sx={cardSx}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Recent</Typography>
               <Typography onClick={() => navigate('/expense-tracker')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 0.4, '&:hover': { color: 'text.primary' } }}>

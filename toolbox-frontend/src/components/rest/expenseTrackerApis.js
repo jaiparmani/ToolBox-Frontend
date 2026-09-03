@@ -436,12 +436,14 @@ export const getSplitBalances = async () => {
  * Record that the money moved. Either side can do it: pass person_id when
  * someone has paid you back, or owed_to_user_id when you have paid them.
  */
-export const settleUpWith = async ({ personId, owedToUserId }) => {
+export const settleUpWith = async ({ personId, owedToUserId, splitIds }) => {
     try {
+        const body = splitIds ? { split_ids: splitIds }
+                   : personId ? { person_id: personId }
+                   : { owed_to_user_id: owedToUserId };
         const response = await authenticatedFetch(`${API_BASE_URL}/splits/settle/`, {
             method: 'POST',
-            body: JSON.stringify(personId ? { person_id: personId }
-                                          : { owed_to_user_id: owedToUserId })
+            body: JSON.stringify(body)
         });
         const data = await response.json();
         return { count: data.settled_count || 0, total: parseFloat(data.settled_total || 0) };

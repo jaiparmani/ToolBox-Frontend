@@ -31,7 +31,8 @@ import {
   QuestionAnswer as QuestionAnswerIcon,
   CallSplit as CallSplitIcon,
   Person as PersonIcon,
-  DoneAll as DoneAllIcon
+  DoneAll as DoneAllIcon,
+  ExpandMore as ExpandMoreIcon
 } from '@mui/icons-material';
 
 // Import API functions and reusable components
@@ -227,6 +228,10 @@ export default function ExpenseTrackerPage() {
 
  // Split-only bills: tracked in Splits but not in expenses — can be flipped.
  const [splitOnlyBills, setSplitOnlyBills] = useState([]);
+
+ // Expanded balance cards — show individual splits for a person.
+ const [expandedPerson, setExpandedPerson] = useState(null);
+ const [personSplits, setPersonSplits] = useState([]);
 
  // Manual split: exact numbers, no model call and no quota spent
  const [splitForm, setSplitForm] = useState({
@@ -581,6 +586,36 @@ export default function ExpenseTrackerPage() {
      loadSummary();
    } catch (e) {
      setError(e.message || 'Could not update');
+   }
+ };
+
+ const togglePersonSplits = async (personId) => {
+   if (expandedPerson === personId) {
+     setExpandedPerson(null);
+     setPersonSplits([]);
+     return;
+   }
+   setExpandedPerson(personId);
+   try {
+     const all = await getSplits({ personId, settled: 'false' });
+     setPersonSplits(all);
+   } catch (e) {
+     setPersonSplits([]);
+   }
+ };
+
+ const handleSettleSingle = async (splitId, personName, amount) => {
+   if (!window.confirm(`Mark ${formatCurrency(amount)} from ${personName} as paid?`)) return;
+   setSplits(prev => ({ ...prev, settling: `s${splitId}` }));
+   try {
+     await settleUpWith({ splitIds: [splitId] });
+     setSuccess(`Settled ${formatCurrency(amount)}`);
+     setPersonSplits(prev => prev.filter(s => s.id !== splitId));
+     setSplits(prev => ({ ...prev, settling: null }));
+     loadBalances();
+   } catch (e) {
+     setSplits(prev => ({ ...prev, settling: null }));
+     setError(e.message || 'Could not settle');
    }
  };
 
@@ -1667,7 +1702,9 @@ export default function ExpenseTrackerPage() {
              </Paper>
            ) : (
              <Grid container spacing={2}>
-               {splits.balances.map((balance) => (
+               {splits.balances.map((balance) => {
+                 const isExpanded = expandedPerson === balance.personId;
+                 return (
                  <Grid item xs={12} sm={6} md={4} key={balance.personId}>
                    <Card
                      elevation={0}
@@ -1677,7 +1714,11 @@ export default function ExpenseTrackerPage() {
                      }}
                    >
                      <CardContent>
-                       <Box display="flex" alignItems="center" gap={2} mb={1.5}>
+                       <Box
+                         display="flex" alignItems="center" gap={2} mb={1.5}
+                         sx={{ cursor: balance.unsettledCount > 0 ? 'pointer' : 'default' }}
+                         onClick={() => balance.unsettledCount > 0 && togglePersonSplits(balance.personId)}
+                       >
                          <Box
                            sx={{
                              width: 38, height: 38, borderRadius: '50%',
@@ -1688,7 +1729,7 @@ export default function ExpenseTrackerPage() {
                          >
                            <PersonIcon sx={{ color: balance.owed > 0 ? accents.amber : accents.mint, fontSize: 19 }} />
                          </Box>
-                         <Box sx={{ minWidth: 0 }}>
+                         <Box sx={{ minWidth: 0, flex: 1 }}>
                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>
                              {balance.name}
                            </Typography>
@@ -1699,6 +1740,15 @@ export default function ExpenseTrackerPage() {
                              {balance.linkedUsername ? ' · has an account' : ''}
                            </Typography>
                          </Box>
+                         {balance.unsettledCount > 0 && (
+                           <ExpandMoreIcon
+                             sx={{
+                               fontSize: 20, color: 'text.disabled',
+                               transform: isExpanded ? 'rotate(180deg)' : 'none',
+                               transition: 'transform .2s ease',
+                             }}
+                           />
+                         )}
                        </Box>
                        <Typography
                          variant="h5"
@@ -1707,6 +1757,42 @@ export default function ExpenseTrackerPage() {
                        >
                          {formatCurrency(balance.owed)}
                        </Typography>
+
+                       <Collapse in={isExpanded}>
+                         <Box sx={{ mt: 1.5, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                           {personSplits.length === 0 ? (
+                             <Typography variant="caption" color="text.disabled">Loading…</Typography>
+                           ) : personSplits.map((s) => (
+                             <Box
+                               key={s.id}
+                               display="flex" alignItems="center" justifyContent="space-between"
+                               gap={1} sx={{ py: 0.75 }}
+                             >
+                               <Box sx={{ minWidth: 0, flex: 1 }}>
+                                 <Typography variant="body2" sx={{ fontWeight: 550, fontSize: 13 }} noWrap>
+                                   {s.description}
+                                 </Typography>
+                                 <Typography variant="caption" color="text.secondary" noWrap>
+                                   {s.date}{s.paidBy ? ` · paid by ${s.paidBy}` : ''}
+                                 </Typography>
+                               </Box>
+                               <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                 {formatCurrency(s.amount)}
+                               </Typography>
+                               <Button
+                                 size="small"
+                                 variant="text"
+                                 sx={{ minWidth: 0, px: 1, fontSize: 11 }}
+                                 onClick={() => handleSettleSingle(s.id, s.personName, s.amount)}
+                                 disabled={splits.settling === `s${s.id}`}
+                               >
+                                 {splits.settling === `s${s.id}` ? '…' : 'Paid'}
+                               </Button>
+                             </Box>
+                           ))}
+                         </Box>
+                       </Collapse>
+
                        {balance.owed > 0 && (
                          <Button
                            fullWidth
@@ -1717,13 +1803,14 @@ export default function ExpenseTrackerPage() {
                            onClick={() => handleSettle(balance)}
                            disabled={splits.settling === balance.personId}
                          >
-                           {splits.settling === balance.personId ? 'Settling...' : 'Settle up'}
+                           {splits.settling === balance.personId ? 'Settling...' : 'Settle all'}
                          </Button>
                        )}
                      </CardContent>
                    </Card>
                  </Grid>
-               ))}
+                 );
+               })}
              </Grid>
            )}
          </Box>

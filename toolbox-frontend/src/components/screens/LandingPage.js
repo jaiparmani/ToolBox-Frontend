@@ -15,6 +15,7 @@ import DashWeekdayPattern from '../ui/DashWeekdayPattern';
 import DashSpendCalendar from '../ui/DashSpendCalendar';
 import DashUpcomingBills from '../ui/DashUpcomingBills';
 import DashWeekCompare from '../ui/DashWeekCompare';
+import DashCategoryMovers from '../ui/DashCategoryMovers';
 import QuickAddExpense from '../ui/QuickAddExpense';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import CursorGlow from '../motion/CursorGlow';
@@ -412,14 +413,17 @@ export default function LandingPage() {
         </Box>
 
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: { xs: 2, md: 2.5 }, '&:not(:has(> *:not(:empty)))': { display: 'none' } }}>
-          <Reveal index={13} sx={{ flex: '1 1 400px', minWidth: 0, '&:empty': { display: 'none' } }}>
+          <Reveal index={13} sx={{ flex: '1 1 380px', minWidth: 0, '&:empty': { display: 'none' } }}>
             <DashWeekCompare dailyTotals={[...(report?.daily_totals || []), ...(lastReport?.daily_totals || [])]} />
+          </Reveal>
+          <Reveal index={14} sx={{ flex: '1 1 300px', minWidth: 0, '&:empty': { display: 'none' } }}>
+            <DashCategoryMovers current={report?.category_totals || []} previous={lastReport?.category_totals || []} />
           </Reveal>
         </Box>
 
         {/* ── recent activity ── */}
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 1.5 }}>
-          <Reveal index={14} sx={cardSx}>
+          <Reveal index={15} sx={cardSx}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Recent</Typography>
               <Typography onClick={() => navigate('/expense-tracker')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 0.4, '&:hover': { color: 'text.primary' } }}>

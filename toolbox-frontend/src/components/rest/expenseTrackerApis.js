@@ -472,7 +472,8 @@ export const searchSplitUsers = async (search = '') => {
  * without one; add `amount` to a participant to set their share explicitly.
  */
 export const createSplitManually = async ({ amount, description, categoryId, date,
-                                            splitWithMe = true, participants, paidBy }) => {
+                                            splitWithMe = true, participants, paidBy,
+                                            addToExpenses = true }) => {
     try {
         const response = await authenticatedFetch(`${API_BASE_URL}/expenses/create_split/`, {
             method: 'POST',
@@ -483,6 +484,7 @@ export const createSplitManually = async ({ amount, description, categoryId, dat
                 date: date || undefined,
                 split_with_me: splitWithMe,
                 paid_by: paidBy || undefined,
+                add_to_expenses: addToExpenses,
                 participants: participants.map(p => ({
                     user_id: p.userId || undefined,
                     name: p.userId ? undefined : p.name,
@@ -514,17 +516,27 @@ export const getSplits = async ({ personId, settled } = {}) => {
         const data = await response.json();
         return (data.results || data || []).map(s => ({
             id: s.id,
+            expenseId: s.expense,
             description: s.description,
             date: s.date,
             amount: parseFloat(s.amount),
             expenseTotal: parseFloat(s.expense_total || 0),
             personName: s.person_name,
             paidBy: s.paid_by,
-            isSettled: s.is_settled
+            isSettled: s.is_settled,
+            splitOnly: s.expense_split_only || false,
         }));
     } catch (error) {
         throw handleApiError(error, 'load the splits');
     }
+};
+
+export const addSplitToExpenses = async (expenseId) => {
+    const response = await authenticatedFetch(`${API_BASE_URL}/expenses/${expenseId}/`, {
+        method: 'PATCH',
+        body: JSON.stringify({ split_only: false })
+    });
+    return response.json();
 };
 
 /**

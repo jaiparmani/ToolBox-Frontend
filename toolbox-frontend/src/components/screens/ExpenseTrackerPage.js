@@ -42,7 +42,7 @@ import {
   getExpenseSummary, quickAddExpense, bulkAddExpenses,
   generateExpenseInsight, getLatestExpenseInsight, askExpenses,
   splitAddExpense, getSplitBalances, settleUpWith,
-  createSplitManually, searchSplitUsers
+  createSplitManually, searchSplitUsers, getSplits, addSplitToExpenses
 } from '../rest/expenseTrackerApis';
 
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
@@ -225,10 +225,14 @@ export default function ExpenseTrackerPage() {
    totalOwed: 0, totalYouOwe: 0, net: 0, loaded: false, settling: null
  });
 
+ // Split-only bills: tracked in Splits but not in expenses — can be flipped.
+ const [splitOnlyBills, setSplitOnlyBills] = useState([]);
+
  // Manual split: exact numbers, no model call and no quota spent
  const [splitForm, setSplitForm] = useState({
    open: false, saving: false, amount: '', description: '', categoryId: '',
-   splitWithMe: true, paidBy: '', people: [], userOptions: [], searching: false
+   splitWithMe: true, paidBy: '', addToExpenses: true,
+   people: [], userOptions: [], searching: false
  });
 
  // Load data when authenticated
@@ -457,7 +461,8 @@ export default function ExpenseTrackerPage() {
  const openSplitForm = () => {
    setSplitForm({
      open: true, saving: false, amount: '', description: '', categoryId: '',
-     splitWithMe: true, paidBy: '', people: [], userOptions: [], searching: false
+     splitWithMe: true, paidBy: '', addToExpenses: true,
+     people: [], userOptions: [], searching: false
    });
    // Seed the picker with people already split with, before any typing.
    searchSplitUsers('').then(userOptions =>
@@ -523,6 +528,7 @@ export default function ExpenseTrackerPage() {
        categoryId: splitForm.categoryId || undefined,
        splitWithMe: splitForm.splitWithMe,
        paidBy: splitForm.paidBy || undefined,
+       addToExpenses: splitForm.addToExpenses,
        participants: splitForm.people.map(p => ({
          userId: p.userId, name: p.label, amount: p.amount || undefined
        }))
@@ -556,6 +562,25 @@ export default function ExpenseTrackerPage() {
    } catch (error) {
      setSplits(prev => ({ ...prev, loaded: true }));
      setError(error.message || 'Could not load balances');
+   }
+ };
+
+ const loadSplitOnlyBills = async () => {
+   try {
+     const all = await getSplits({ settled: 'false' });
+     setSplitOnlyBills(all.filter(s => s.splitOnly));
+   } catch (e) { /* silent */ }
+ };
+
+ const handleAddToExpenses = async (expenseId) => {
+   try {
+     await addSplitToExpenses(expenseId);
+     setSuccess('Added to your expenses');
+     setSplitOnlyBills(prev => prev.filter(s => s.expenseId !== expenseId));
+     loadExpenses();
+     loadSummary();
+   } catch (e) {
+     setError(e.message || 'Could not update');
    }
  };
 
@@ -796,10 +821,10 @@ export default function ExpenseTrackerPage() {
    }
  }, [activeTab, insight.loaded, isAuthenticated]);
 
- // Balances are cheap to fetch (no model call), so load them with the tab.
  useEffect(() => {
    if (activeTab === 4 && !splits.loaded && isAuthenticated) {
      loadBalances();
+     loadSplitOnlyBills();
    }
  }, [activeTab, splits.loaded, isAuthenticated]);
 
@@ -1598,7 +1623,38 @@ export default function ExpenseTrackerPage() {
              </Paper>
            )}
 
-           {splits.balances.length === 0 && splits.youOwe.length === 0 ? (
+           {splitOnlyBills.length > 0 && (
+             <Paper
+               elevation={0}
+               sx={{ p: 2.5, mb: 3, borderRadius: '14px', border: '1px dashed', borderColor: 'divider', bgcolor: 'background.paper' }}
+             >
+               <Typography variant="overline" color="text.secondary">Split only — not in expenses</Typography>
+               {splitOnlyBills.map((s) => (
+                 <Box
+                   key={s.id}
+                   display="flex" alignItems="center" justifyContent="space-between"
+                   gap={2} flexWrap="wrap"
+                   sx={{ py: 1, borderTop: '1px solid', borderColor: 'divider' }}
+                 >
+                   <Box sx={{ minWidth: 0 }}>
+                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{s.description}</Typography>
+                     <Typography variant="caption" color="text.secondary">
+                       {s.personName} owes {formatCurrency(s.amount)}{s.paidBy ? ` · paid by ${s.paidBy}` : ''}
+                     </Typography>
+                   </Box>
+                   <Button
+                     size="small"
+                     variant="outlined"
+                     onClick={() => handleAddToExpenses(s.expenseId)}
+                   >
+                     Add to expenses
+                   </Button>
+                 </Box>
+               ))}
+             </Paper>
+           )}
+
+           {splits.balances.length === 0 && splits.youOwe.length === 0 && splitOnlyBills.length === 0 ? (
              <Paper
                elevation={0}
                sx={{ p: 4, borderRadius: '14px', textAlign: 'center', border: '1px dashed', borderColor: 'divider' }}
@@ -2027,6 +2083,15 @@ export default function ExpenseTrackerPage() {
                      />
                    }
                    label="I shared this too"
+                 />
+                 <FormControlLabel
+                   control={
+                     <Switch
+                       checked={splitForm.addToExpenses}
+                       onChange={(e) => setSplitForm(prev => ({ ...prev, addToExpenses: e.target.checked }))}
+                     />
+                   }
+                   label="Add to my expenses"
                  />
                </Box>
 

@@ -13,14 +13,13 @@ import DoneAllIcon from '@mui/icons-material/DoneAll';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
 import MoneyConstellation from '../ui/MoneyConstellation';
-import AnimatedNumber from '../ui/AnimatedNumber';
 import Reveal from '../ui/Reveal';
-import AuroraBackground from '../motion/AuroraBackground';
+import LendingAssistant from '../ui/LendingAssistant';
 import ErrorBanner from '../ui/ErrorBanner';
 import { BalanceSkeleton } from '../ui/Skeletons';
 import SwipeAction from '../ui/SwipeAction';
 import { AnimatePresence, motion, LayoutGroup } from 'framer-motion';
-import { money, relativeDay } from '../ui/money';
+import { money, moneySmart, relativeDay } from '../ui/money';
 import { accents, type } from '../../theme/tokens';
 import { feedback } from '../ui/feedback';
 import GroupStrip from '../ui/GroupStrip';
@@ -318,12 +317,14 @@ export default function SplitsPage() {
   }
 
   const netPositive = state.net >= 0;
+  // One mapping, used everywhere on this page: owed-to-you is the single green
+  // accent, owing is semantic red, settled is monochrome.
+  const posColor = accents.mint;
+  const negColor = accents.red;
 
   return (
     <>
       <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 12, position: 'relative' }}>
-        {/* Living backdrop — same premium climate as the money screens */}
-        <AuroraBackground />
         <Box sx={{ position: 'relative', zIndex: 1 }}>
         <ErrorBanner error={error} onClose={() => setError(null)} />
         {/* Financial weather now lives once in the app top bar, not per-screen. */}
@@ -334,54 +335,50 @@ export default function SplitsPage() {
             elevation={0}
             sx={{
               p: { xs: 2.5, sm: 3 }, mb: 2, borderRadius: 4, textAlign: 'center',
-              position: 'relative', overflow: 'hidden',
               border: '1px solid', borderColor: 'divider',
-              '&::before': {
-                content: '""', position: 'absolute', inset: 0,
-                background: netPositive
-                  ? 'radial-gradient(circle at 50% 0%, rgba(57,135,229,0.18), transparent 60%)'
-                  : 'radial-gradient(circle at 50% 0%, rgba(217,79,61,0.18), transparent 60%)',
-              },
-              '@keyframes splitAura': { to: { transform: 'translate(-50%,-50%) rotate(360deg)' } },
             }}
           >
-            {/* Slow reactor aura, blue when you're owed, red when you owe */}
-            <Box aria-hidden sx={{
-              position: 'absolute', top: '50%', left: '50%', width: 380, height: 380,
-              transform: 'translate(-50%,-50%)', pointerEvents: 'none', opacity: 0.5, borderRadius: '50%',
-              background: `conic-gradient(from 0deg, transparent, ${netPositive ? '#3987e5' : '#d94f3d'}66, transparent 42%)`,
-              filter: 'blur(30px)', animation: 'splitAura 18s linear infinite',
-              '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
-            }} />
-            <Box sx={{ position: 'relative' }}>
-              <Box display="flex" alignItems="center" justifyContent="center" gap={1} sx={{ mb: 0.5 }}>
-                <CallSplitIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                <Typography variant="overline" color="text.secondary">
-                  {netPositive ? 'You are owed, overall' : 'You owe, overall'}
-                </Typography>
-                <IconButton size="small" onClick={load} sx={{ ml: 0.5 }}>
-                  <RefreshIcon fontSize="small" />
-                </IconButton>
-              </Box>
-              <Typography
-                sx={{
-                  fontFamily: type.displayFamily, fontWeight: 700, letterSpacing: '-0.035em',
-                  fontSize: { xs: '2.5rem', sm: '3.1rem' }, fontVariantNumeric: 'tabular-nums',
-                  color: netPositive ? '#3987e5' : '#d94f3d',
-                  textShadow: `0 0 30px ${netPositive ? '#3987e5' : '#d94f3d'}44`,
-                }}
-              >
-                <AnimatedNumber value={Math.abs(state.net)} />
+            <Box display="flex" alignItems="center" justifyContent="center" gap={1} sx={{ mb: 0.75 }}>
+              <CallSplitIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.08em' }}>
+                {netPositive ? 'You are owed, overall' : 'You owe, overall'}
               </Typography>
-              <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 1 }}>
-                <Typography variant="caption" color="text.secondary">
-                  owed to you <b>{money(state.totalOwed)}</b>
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  you owe <b>{money(state.totalYouOwe)}</b>
-                </Typography>
-              </Stack>
+              <IconButton size="small" onClick={load} aria-label="Refresh balances" sx={{ ml: 0.25 }}>
+                <RefreshIcon fontSize="small" />
+              </IconButton>
             </Box>
+            <Typography
+              sx={{
+                fontFamily: type.displayFamily, fontWeight: 700, letterSpacing: '-0.035em',
+                fontSize: { xs: '2.6rem', sm: '3.2rem' }, lineHeight: 1.05,
+                fontVariantNumeric: 'tabular-nums',
+                color: netPositive ? posColor : negColor,
+              }}
+            >
+              {money(Math.abs(state.net))}
+            </Typography>
+            {/* Two directions, split evenly with a hairline between them */}
+            <Stack
+              direction="row"
+              sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}
+            >
+              <Box sx={{ flex: 1, borderRight: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="overline" color="text.secondary" sx={{ display: 'block', lineHeight: 1.4 }}>
+                  Owed to you
+                </Typography>
+                <Typography sx={{ fontWeight: 700, color: posColor, fontVariantNumeric: 'tabular-nums' }}>
+                  {money(state.totalOwed)}
+                </Typography>
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="overline" color="text.secondary" sx={{ display: 'block', lineHeight: 1.4 }}>
+                  You owe
+                </Typography>
+                <Typography sx={{ fontWeight: 700, color: state.totalYouOwe > 0 ? negColor : 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
+                  {money(state.totalYouOwe)}
+                </Typography>
+              </Box>
+            </Stack>
           </Paper>
         </Reveal>
 
@@ -436,8 +433,8 @@ export default function SplitsPage() {
                     sx={{ p: 2.5, mb: 2, borderRadius: 4, textAlign: 'center', border: '1px solid', borderColor: 'divider' }}
                   >
                     <Typography variant="overline" color="text.secondary">Spent in this group</Typography>
-                    <Typography sx={{ fontWeight: 700, fontSize: '2rem', letterSpacing: '-0.03em' }}>
-                      <AnimatedNumber value={groupView.data.totalSpent} />
+                    <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: '2rem', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
+                      {moneySmart(groupView.data.totalSpent)}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       {money(groupView.data.totalOutstanding)} still to come back to you
@@ -530,7 +527,7 @@ export default function SplitsPage() {
                                 {m.linkedUsername ? ' · has an account' : ''}
                               </Typography>
                             </Box>
-                            <Typography sx={{ fontWeight: 700, color: m.owed > 0 ? '#3987e5' : 'text.secondary' }}>
+                            <Typography sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: m.owed > 0 ? posColor : 'text.secondary' }}>
                               {m.owed > 0 ? '+' : ''}{money(m.owed)}
                             </Typography>
                           </Box>
@@ -596,6 +593,20 @@ export default function SplitsPage() {
               </Paper>
             </Reveal>
 
+            <Box
+              display="flex" alignItems="baseline" justifyContent="space-between"
+              sx={{ px: 0.5, mb: 1 }}
+            >
+              <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 650 }}>
+                {selected ? 'Balance' : 'Balances'}
+              </Typography>
+              {!selected && (
+                <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                  {people.length} {people.length === 1 ? 'person' : 'people'}
+                </Typography>
+              )}
+            </Box>
+
             {/* Selecting filters this list; the survivor magic-moves into place
                 and the person's detail expands under it (a shared-layout
                 transition rather than an instant swap). */}
@@ -623,7 +634,7 @@ export default function SplitsPage() {
                     elevation={0}
                     sx={{
                       borderRadius: 3, border: '1px solid',
-                      borderColor: selected?.id === person.id ? 'primary.main' : 'divider',
+                      borderColor: selected?.id === person.id ? accents.mint : 'divider',
                     }}
                   >
                     <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
@@ -644,7 +655,7 @@ export default function SplitsPage() {
                             sx={{
                               fontWeight: 700, fontVariantNumeric: 'tabular-nums',
                               color: person.net === 0 ? 'text.secondary'
-                                : person.net > 0 ? '#3987e5' : '#d94f3d',
+                                : person.net > 0 ? posColor : negColor,
                             }}
                           >
                             {person.net > 0 ? '+' : person.net < 0 ? '−' : ''}
@@ -698,6 +709,11 @@ export default function SplitsPage() {
             )}
           </>
         )}
+
+        {/* A distinct AI surface, scoped to lending only — kept apart from the
+            app's spending analysis. Lives on the everyone view, not inside a
+            group. */}
+        {!openGroup && !state.loading && <LendingAssistant />}
 
         <SettleConfirmSheet
           open={settle.open}

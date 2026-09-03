@@ -359,6 +359,29 @@ export const askExpenses = async (question) => {
 };
 
 /**
+ * Ask a question scoped to LENDING only — who owes whom, what's unsettled,
+ * settle-up history. Kept deliberately separate from askExpenses (spending
+ * analysis) so the two AI surfaces don't bleed into each other. Mirrors the
+ * `ask` endpoint's auth + base URL; the server returns a plain-language answer.
+ *
+ * Endpoint assumed: POST /api/expenses/expenses/ask_lending/ with { question },
+ * returning { answer }. If the backend path differs, keep THIS function name
+ * (askLending) stable and only adjust the URL below.
+ */
+export const askLending = async (question) => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/ask_lending/`, {
+            method: 'POST',
+            body: JSON.stringify({ question })
+        });
+        const data = await response.json();
+        return { answer: data.answer || '' };
+    } catch (error) {
+        throw handleApiError(error, 'answer that lending question');
+    }
+};
+
+/**
  * Splitting bills. The server records the expense in full against you and
  * stores what each other person owes, so your spending total stays truthful
  * while the balances track separately.

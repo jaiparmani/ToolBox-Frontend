@@ -228,7 +228,7 @@ export default function ExpenseTrackerPage() {
  // Manual split: exact numbers, no model call and no quota spent
  const [splitForm, setSplitForm] = useState({
    open: false, saving: false, amount: '', description: '', categoryId: '',
-   splitWithMe: true, people: [], userOptions: [], searching: false
+   splitWithMe: true, paidBy: '', people: [], userOptions: [], searching: false
  });
 
  // Load data when authenticated
@@ -457,7 +457,7 @@ export default function ExpenseTrackerPage() {
  const openSplitForm = () => {
    setSplitForm({
      open: true, saving: false, amount: '', description: '', categoryId: '',
-     splitWithMe: true, people: [], userOptions: [], searching: false
+     splitWithMe: true, paidBy: '', people: [], userOptions: [], searching: false
    });
    // Seed the picker with people already split with, before any typing.
    searchSplitUsers('').then(userOptions =>
@@ -522,6 +522,7 @@ export default function ExpenseTrackerPage() {
        description: splitForm.description.trim(),
        categoryId: splitForm.categoryId || undefined,
        splitWithMe: splitForm.splitWithMe,
+       paidBy: splitForm.paidBy || undefined,
        participants: splitForm.people.map(p => ({
          userId: p.userId, name: p.label, amount: p.amount || undefined
        }))
@@ -2028,6 +2029,32 @@ export default function ExpenseTrackerPage() {
                    label="I shared this too"
                  />
                </Box>
+
+               <Box sx={{ mt: 1.5, mb: 0.5 }}>
+                 <Typography variant="caption" color="text.secondary" sx={{ mb: 0.75, display: 'block' }}>
+                   Who paid?
+                 </Typography>
+                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                   <Chip
+                     label="I paid"
+                     size="small"
+                     variant={!splitForm.paidBy ? 'filled' : 'outlined'}
+                     color={!splitForm.paidBy ? 'primary' : 'default'}
+                     onClick={() => setSplitForm(prev => ({ ...prev, paidBy: '' }))}
+                   />
+                   {splitForm.people.map(p => (
+                     <Chip
+                       key={p.label}
+                       label={p.label}
+                       size="small"
+                       variant={splitForm.paidBy === p.label ? 'filled' : 'outlined'}
+                       color={splitForm.paidBy === p.label ? 'primary' : 'default'}
+                       onClick={() => setSplitForm(prev => ({ ...prev, paidBy: p.label }))}
+                     />
+                   ))}
+                 </Box>
+               </Box>
+
                <Typography variant="caption" color="text.secondary">
                  Leave amounts blank to divide evenly, or set one to fix that person's share
                </Typography>

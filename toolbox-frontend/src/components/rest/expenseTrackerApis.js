@@ -472,7 +472,7 @@ export const searchSplitUsers = async (search = '') => {
  * without one; add `amount` to a participant to set their share explicitly.
  */
 export const createSplitManually = async ({ amount, description, categoryId, date,
-                                            splitWithMe = true, participants }) => {
+                                            splitWithMe = true, participants, paidBy }) => {
     try {
         const response = await authenticatedFetch(`${API_BASE_URL}/expenses/create_split/`, {
             method: 'POST',
@@ -482,6 +482,7 @@ export const createSplitManually = async ({ amount, description, categoryId, dat
                 category_id: categoryId || undefined,
                 date: date || undefined,
                 split_with_me: splitWithMe,
+                paid_by: paidBy || undefined,
                 participants: participants.map(p => ({
                     user_id: p.userId || undefined,
                     name: p.userId ? undefined : p.name,

@@ -6,11 +6,12 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { getMonthlyReport, getRecentExpenses, getLatestExpenseInsight, getCategories, getSplitBalances, yourShareOf } from '../rest/expenseTrackerApis';
+import { getMonthlyReport, getRecentExpenses, getLatestExpenseInsight, getCategories, getSplitBalances, getExpenses, yourShareOf } from '../rest/expenseTrackerApis';
 import ProjectionChart from '../ui/ProjectionChart';
 import DashPace from '../ui/DashPace';
 import DashWeekdayPattern from '../ui/DashWeekdayPattern';
 import DashSpendCalendar from '../ui/DashSpendCalendar';
+import DashTopMerchants from '../ui/DashTopMerchants';
 import QuickAddExpense from '../ui/QuickAddExpense';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import CursorGlow from '../motion/CursorGlow';
@@ -83,11 +84,14 @@ export default function LandingPage() {
   const [insight, setInsight] = useState(null);
   const [categories, setCategories] = useState([]);
   const [balances, setBalances] = useState(null);
+  const [monthExpenses, setMonthExpenses] = useState([]);
   const [addOpen, setAddOpen] = useState(false);
 
   const load = useCallback(() => {
     const now = new Date();
     const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const monthStart = iso(new Date(now.getFullYear(), now.getMonth(), 1));
     Promise.allSettled([
       getMonthlyReport(now.getFullYear(), now.getMonth() + 1),
       getMonthlyReport(lm.getFullYear(), lm.getMonth() + 1),
@@ -95,13 +99,15 @@ export default function LandingPage() {
       getLatestExpenseInsight(),
       getCategories({ type: 'expense' }),
       getSplitBalances(),
-    ]).then(([r, l, rc, ins, cat, bal]) => {
+      getExpenses({ dateFrom: monthStart, dateTo: iso(now), transactionType: 'expense', pageSize: 500 }),
+    ]).then(([r, l, rc, ins, cat, bal, exp]) => {
       if (r.status === 'fulfilled') setReport(r.value);
       if (l.status === 'fulfilled') setLastReport(l.value ?? null);
       if (rc.status === 'fulfilled') setRecent(Array.isArray(rc.value) ? rc.value : []);
       if (ins.status === 'fulfilled') setInsight(ins.value);
       if (cat.status === 'fulfilled') setCategories(Array.isArray(cat.value) ? cat.value : (cat.value?.results || []));
       if (bal.status === 'fulfilled') setBalances(bal.value ?? null);
+      if (exp.status === 'fulfilled') setMonthExpenses(Array.isArray(exp.value) ? exp.value : (exp.value?.results || []));
     });
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -356,17 +362,25 @@ export default function LandingPage() {
           )}
         </Box>
 
-        {/* ── category breakdown | recent activity ── */}
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
-          <Reveal index={9} sx={cardSx}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-              <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Where it went</Typography>
-              <Typography onClick={() => navigate('/reports')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', '&:hover': { color: 'text.primary' } }}>Insights</Typography>
+        {/* ── where it went (categories) | top merchants ── */}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 1.5, '&:not(:has(> *:not(:empty)))': { display: 'none' } }}>
+          <Reveal index={9} sx={{ flex: '1 1 320px', minWidth: 0 }}>
+            <Box sx={cardSx}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Where it went</Typography>
+                <Typography onClick={() => navigate('/reports')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', '&:hover': { color: 'text.primary' } }}>Insights</Typography>
+              </Box>
+              <CategoryDonut cats={cats} />
             </Box>
-            <CategoryDonut cats={cats} />
           </Reveal>
+          <Reveal index={10} sx={{ flex: '1 1 300px', minWidth: 0, '&:empty': { display: 'none' } }}>
+            <DashTopMerchants expenses={monthExpenses} />
+          </Reveal>
+        </Box>
 
-          <Reveal index={10} sx={cardSx}>
+        {/* ── recent activity ── */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 1.5 }}>
+          <Reveal index={11} sx={cardSx}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Recent</Typography>
               <Typography onClick={() => navigate('/expense-tracker')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 0.4, '&:hover': { color: 'text.primary' } }}>

@@ -23,26 +23,24 @@ export default function InsightsMonthTrend({ months = [], count = 0 }) {
 
   return (
     <ChartContainer>
-      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Box>
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-            Spent in {selected?.label}
+      <Box sx={{ mb: 2.5 }}>
+        <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: '0.06em' }}>
+          Spent in {selected?.label}
+        </Typography>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
+          <Typography sx={{
+            fontFamily: type.displayFamily, fontWeight: 700, letterSpacing: '-0.03em',
+            fontSize: { xs: '2rem', sm: '2.3rem' }, lineHeight: 1, fontVariantNumeric: 'tabular-nums',
+          }}>
+            {money(selected?.value || 0)}
           </Typography>
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.25 }}>
-            <Typography sx={{
-              fontFamily: type.displayFamily, fontWeight: 700, letterSpacing: '-0.03em',
-              fontSize: { xs: '1.9rem', sm: '2.15rem' }, lineHeight: 1, fontVariantNumeric: 'tabular-nums',
-            }}>
-              {money(selected?.value || 0)}
-            </Typography>
-            {prev && <InsightsDelta value={selected?.value} prev={prev.value} size="md" />}
-          </Stack>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
-            {count} {count === 1 ? 'transaction' : 'transactions'}
-            {prev ? ` · vs ${moneySmart(prev.value)} last month` : ''}
-          </Typography>
-        </Box>
-      </Stack>
+          {prev && <InsightsDelta value={selected?.value} prev={prev.value} size="md" />}
+        </Stack>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+          {count} {count === 1 ? 'transaction' : 'transactions'}
+          {prev ? ` · vs ${moneySmart(prev.value)} last month` : ''}
+        </Typography>
+      </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: 1, sm: 1.5 }, height: 92 }}>
         {rows.map((m, i) => {

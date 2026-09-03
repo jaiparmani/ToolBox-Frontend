@@ -163,8 +163,8 @@ export default function ReportsPage() {
             </ChartContainer>
           </Reveal>
         ) : (
-          <Stack spacing={2.5}>
-            {/* 1. Spend trend across months */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, sm: 2.5 } }}>
+            {/* 1. Hero — spend trend across months */}
             <Reveal index={1}>
               <InsightsMonthTrend months={monthSeries} count={count} />
             </Reveal>
@@ -176,35 +176,42 @@ export default function ReportsPage() {
               </Reveal>
             )}
 
-            {/* 3. Daily rhythm */}
-            {dailyTotals.length > 0 && (
-              <Reveal index={3}>
-                <InsightsDailyRhythm
-                  daily={dailyTotals}
-                  avgPerDay={avgPerDay}
-                  avgPerTxn={avgPerTxn}
-                  perDayLabel={isThisMonth ? 'Avg / day so far' : 'Avg / day'}
-                />
-              </Reveal>
+            {/* 3. When it left — the daily and weekday rhythm, paired on wider
+                screens so the two "timing" reads sit together as one row. */}
+            {(dailyTotals.length > 0 || expenses.length > 0) && (
+              <Box sx={{
+                display: 'grid', gap: { xs: 2, sm: 2.5 }, alignItems: 'start',
+                gridTemplateColumns: { xs: '1fr', md: 'repeat(auto-fit, minmax(320px, 1fr))' },
+              }}>
+                {dailyTotals.length > 0 && (
+                  <Reveal index={3}>
+                    <InsightsDailyRhythm
+                      daily={dailyTotals}
+                      avgPerDay={avgPerDay}
+                      avgPerTxn={avgPerTxn}
+                      perDayLabel={isThisMonth ? 'Avg / day so far' : 'Avg / day'}
+                    />
+                  </Reveal>
+                )}
+
+                {expenses.length > 0 && (
+                  <Reveal index={4}>
+                    <InsightsWeekdayPattern expenses={expenses} />
+                  </Reveal>
+                )}
+              </Box>
             )}
 
-            {/* 4. Biggest expenses */}
+            {/* 4. What moved it — the biggest line items, full width to close. */}
             {expenses.length > 0 && (
-              <Reveal index={4}>
+              <Reveal index={5}>
                 <InsightsBiggestExpenses
                   expenses={expenses}
                   onSelect={(e) => navigate(`/expense-tracker${e.category?.id ? `?category=${e.category.id}` : ''}`)}
                 />
               </Reveal>
             )}
-
-            {/* 5. Day-of-week pattern — only when dated rows exist */}
-            {expenses.length > 0 && (
-              <Reveal index={5}>
-                <InsightsWeekdayPattern expenses={expenses} />
-              </Reveal>
-            )}
-          </Stack>
+          </Box>
         )}
       </Box>
     </Container>

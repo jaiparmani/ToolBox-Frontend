@@ -6,12 +6,12 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { getMonthlyReport, getRecentExpenses, getLatestExpenseInsight, getCategories, getSplitBalances, getExpenses, yourShareOf } from '../rest/expenseTrackerApis';
+import { getMonthlyReport, getRecentExpenses, getLatestExpenseInsight, getCategories, getSplitBalances, getRecurring, yourShareOf } from '../rest/expenseTrackerApis';
 import ProjectionChart from '../ui/ProjectionChart';
 import DashPace from '../ui/DashPace';
 import DashWeekdayPattern from '../ui/DashWeekdayPattern';
 import DashSpendCalendar from '../ui/DashSpendCalendar';
-import DashTopMerchants from '../ui/DashTopMerchants';
+import DashUpcomingBills from '../ui/DashUpcomingBills';
 import QuickAddExpense from '../ui/QuickAddExpense';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import CursorGlow from '../motion/CursorGlow';
@@ -84,14 +84,12 @@ export default function LandingPage() {
   const [insight, setInsight] = useState(null);
   const [categories, setCategories] = useState([]);
   const [balances, setBalances] = useState(null);
-  const [monthExpenses, setMonthExpenses] = useState([]);
+  const [recurring, setRecurring] = useState([]);
   const [addOpen, setAddOpen] = useState(false);
 
   const load = useCallback(() => {
     const now = new Date();
     const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const monthStart = iso(new Date(now.getFullYear(), now.getMonth(), 1));
     Promise.allSettled([
       getMonthlyReport(now.getFullYear(), now.getMonth() + 1),
       getMonthlyReport(lm.getFullYear(), lm.getMonth() + 1),
@@ -99,15 +97,15 @@ export default function LandingPage() {
       getLatestExpenseInsight(),
       getCategories({ type: 'expense' }),
       getSplitBalances(),
-      getExpenses({ dateFrom: monthStart, dateTo: iso(now), transactionType: 'expense', pageSize: 500 }),
-    ]).then(([r, l, rc, ins, cat, bal, exp]) => {
+      getRecurring(),
+    ]).then(([r, l, rc, ins, cat, bal, rec]) => {
       if (r.status === 'fulfilled') setReport(r.value);
       if (l.status === 'fulfilled') setLastReport(l.value ?? null);
       if (rc.status === 'fulfilled') setRecent(Array.isArray(rc.value) ? rc.value : []);
       if (ins.status === 'fulfilled') setInsight(ins.value);
       if (cat.status === 'fulfilled') setCategories(Array.isArray(cat.value) ? cat.value : (cat.value?.results || []));
       if (bal.status === 'fulfilled') setBalances(bal.value ?? null);
-      if (exp.status === 'fulfilled') setMonthExpenses(Array.isArray(exp.value) ? exp.value : (exp.value?.results || []));
+      if (rec.status === 'fulfilled') setRecurring(Array.isArray(rec.value) ? rec.value : (rec.value?.results || []));
     });
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -374,7 +372,7 @@ export default function LandingPage() {
             </Box>
           </Reveal>
           <Reveal index={10} sx={{ flex: '1 1 300px', minWidth: 0, '&:empty': { display: 'none' } }}>
-            <DashTopMerchants expenses={monthExpenses} />
+            <DashUpcomingBills rules={recurring} />
           </Reveal>
         </Box>
 

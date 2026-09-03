@@ -6,9 +6,11 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { getMonthlyReport, getRecentExpenses, getLatestExpenseInsight, getCategories, getSplitBalances, getRecurring, yourShareOf } from '../rest/expenseTrackerApis';
+import { getMonthlyReport, getRecentExpenses, getLatestExpenseInsight, getCategories, getSplitBalances, getRecurring, getExpenseSummary, yourShareOf } from '../rest/expenseTrackerApis';
 import ProjectionChart from '../ui/ProjectionChart';
 import DashPace from '../ui/DashPace';
+import DashMonthFlow from '../ui/DashMonthFlow';
+import DashSpendTrend from '../ui/DashSpendTrend';
 import DashWeekdayPattern from '../ui/DashWeekdayPattern';
 import DashSpendCalendar from '../ui/DashSpendCalendar';
 import DashUpcomingBills from '../ui/DashUpcomingBills';
@@ -85,6 +87,8 @@ export default function LandingPage() {
   const [categories, setCategories] = useState([]);
   const [balances, setBalances] = useState(null);
   const [recurring, setRecurring] = useState([]);
+  const [monthIncome, setMonthIncome] = useState(null);
+  const [history, setHistory] = useState([]);
   const [addOpen, setAddOpen] = useState(false);
 
   const load = useCallback(() => {
@@ -106,6 +110,26 @@ export default function LandingPage() {
       if (cat.status === 'fulfilled') setCategories(Array.isArray(cat.value) ? cat.value : (cat.value?.results || []));
       if (bal.status === 'fulfilled') setBalances(bal.value ?? null);
       if (rec.status === 'fulfilled') setRecurring(Array.isArray(rec.value) ? rec.value : (rec.value?.results || []));
+    });
+
+    // month-to-date income + 6-month spend history — kept in a separate pass so the
+    // main grid never waits on the extra monthly-report calls.
+    const pad2 = (n) => String(n).padStart(2, '0');
+    const iso = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const sixMonths = [];
+    for (let i = 5; i >= 0; i--) sixMonths.push(new Date(now.getFullYear(), now.getMonth() - i, 1));
+    Promise.allSettled([
+      getExpenseSummary({ dateFrom: iso(monthStart), dateTo: iso(now) }),
+      ...sixMonths.map((d) => getMonthlyReport(d.getFullYear(), d.getMonth() + 1)),
+    ]).then(([sum, ...mReports]) => {
+      if (sum.status === 'fulfilled') setMonthIncome(sum.value?.totalIncome ?? 0);
+      setHistory(mReports.map((m, i) => ({
+        label: sixMonths[i].toLocaleDateString('en-IN', { month: 'short' }),
+        total: m.status === 'fulfilled' ? (Number(m.value?.total_amount) || 0) : 0,
+        ok: m.status === 'fulfilled',
+        partial: i === sixMonths.length - 1,
+      })));
     });
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -281,9 +305,19 @@ export default function LandingPage() {
           </Box>
         </Box>
 
+        {/* ── money band ── income vs spend + 6-month context ── */}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: { xs: 2, md: 2.5 }, '&:not(:has(> *:not(:empty)))': { display: 'none' } }}>
+          <Reveal index={3} sx={{ flex: '1 1 320px', minWidth: 0, '&:empty': { display: 'none' } }}>
+            <DashMonthFlow income={monthIncome ?? 0} spent={spent} monthName={monthName} />
+          </Reveal>
+          <Reveal index={4} sx={{ flex: '1 1 320px', minWidth: 0, '&:empty': { display: 'none' } }}>
+            <DashSpendTrend months={history} />
+          </Reveal>
+        </Box>
+
         {/* ── insight ── */}
         {insightText && (
-          <Reveal index={3}>
+          <Reveal index={5}>
             <Box sx={{ ...cardSx, display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: { xs: 2, md: 2.5 } }}>
               <Box sx={{ width: 28, height: 28, flexShrink: 0, borderRadius: '8px', display: 'grid', placeItems: 'center', bgcolor: `${accents.violet}1f` }}>
                 <AutoAwesomeRoundedIcon sx={{ fontSize: 15, color: accents.violet }} />
@@ -298,7 +332,7 @@ export default function LandingPage() {
 
         {/* ── this month's rhythm — factual stats ── */}
         {spent > 0 && (
-          <Reveal index={4}>
+          <Reveal index={6}>
             <Box sx={{ ...cardSx, mb: { xs: 2, md: 2.5 }, display: 'flex', alignItems: 'stretch', p: { xs: 1.75, sm: 2.25 } }}>
               {[
                 { label: 'Transactions', value: String(count) },
@@ -317,21 +351,21 @@ export default function LandingPage() {
 
         {/* ── pace | weekday — two factual reads, side by side for density ── */}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: { xs: 2, md: 2.5 }, '&:not(:has(> *:not(:empty)))': { display: 'none' } }}>
-          <Reveal index={5} sx={{ flex: '1 1 300px', minWidth: 0, '&:empty': { display: 'none' } }}>
+          <Reveal index={7} sx={{ flex: '1 1 300px', minWidth: 0, '&:empty': { display: 'none' } }}>
             <DashPace spent={spent} dayOfMonth={new Date().getDate()} daysInMonth={daysInMonth} lastMonthTotal={lastReport?.total_amount ?? 0} monthName={monthName} />
           </Reveal>
-          <Reveal index={6} sx={{ flex: '1 1 300px', minWidth: 0, '&:empty': { display: 'none' } }}>
+          <Reveal index={8} sx={{ flex: '1 1 300px', minWidth: 0, '&:empty': { display: 'none' } }}>
             <DashWeekdayPattern dailyTotals={report?.daily_totals || []} />
           </Reveal>
         </Box>
 
         {/* ── daily-spend heatmap | owed to you ── */}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: { xs: 2, md: 2.5 }, '&:not(:has(> *:not(:empty)))': { display: 'none' } }}>
-          <Reveal index={7} sx={{ flex: '1 1 320px', minWidth: 0, '&:empty': { display: 'none' } }}>
+          <Reveal index={9} sx={{ flex: '1 1 320px', minWidth: 0, '&:empty': { display: 'none' } }}>
             <DashSpendCalendar dailyTotals={report?.daily_totals || []} />
           </Reveal>
           {settle && (
-            <Reveal index={8} sx={{ flex: '1 1 300px', minWidth: 0 }}>
+            <Reveal index={10} sx={{ flex: '1 1 300px', minWidth: 0 }}>
               <Box
                 role="button" tabIndex={0} onClick={() => navigate('/splits')}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/splits'); } }}
@@ -362,7 +396,7 @@ export default function LandingPage() {
 
         {/* ── where it went (categories) | top merchants ── */}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 1.5, '&:not(:has(> *:not(:empty)))': { display: 'none' } }}>
-          <Reveal index={9} sx={{ flex: '1 1 320px', minWidth: 0 }}>
+          <Reveal index={11} sx={{ flex: '1 1 320px', minWidth: 0 }}>
             <Box sx={cardSx}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
                 <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Where it went</Typography>
@@ -371,14 +405,14 @@ export default function LandingPage() {
               <CategoryDonut cats={cats} />
             </Box>
           </Reveal>
-          <Reveal index={10} sx={{ flex: '1 1 300px', minWidth: 0, '&:empty': { display: 'none' } }}>
+          <Reveal index={12} sx={{ flex: '1 1 300px', minWidth: 0, '&:empty': { display: 'none' } }}>
             <DashUpcomingBills rules={recurring} />
           </Reveal>
         </Box>
 
         {/* ── recent activity ── */}
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 1.5 }}>
-          <Reveal index={11} sx={cardSx}>
+          <Reveal index={13} sx={cardSx}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Typography sx={{ fontSize: 13, fontWeight: 600 }}>Recent</Typography>
               <Typography onClick={() => navigate('/expense-tracker')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 0.4, '&:hover': { color: 'text.primary' } }}>

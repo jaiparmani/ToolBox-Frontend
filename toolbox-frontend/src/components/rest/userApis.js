@@ -424,6 +424,34 @@ export const setMpin = async (mpin, currentMpin) => {
     return await response.json();
 };
 
+// ── Telegram bot linking (Settings → Connect Telegram) ───────────────────────
+// The telegram endpoints live under /api/telegram/, a sibling of /api/users/.
+const TELEGRAM_BASE_URL = API_BASE_URL.replace(/\/users$/, '/telegram');
+
+/** Current Telegram link state: { linked, telegram_id, username }. */
+export const getTelegramLink = async () => {
+    const response = await authenticatedFetch(`${TELEGRAM_BASE_URL}/link/`);
+    return await response.json();
+};
+
+/**
+ * Link the signed-in account to a Telegram id. The user gets their id by
+ * messaging the bot, which replies with it. Throws with a readable message on
+ * a clash (id already linked to another account) or a non-numeric id.
+ */
+export const linkTelegram = async (telegramId) => {
+    const response = await authenticatedFetch(`${TELEGRAM_BASE_URL}/link/`, {
+        method: 'POST', body: JSON.stringify({ telegram_id: telegramId }),
+    });
+    return await response.json();
+};
+
+/** Unlink Telegram from the signed-in account. */
+export const unlinkTelegram = async () => {
+    const response = await authenticatedFetch(`${TELEGRAM_BASE_URL}/link/`, { method: 'DELETE' });
+    return await response.json();
+};
+
 /**
  * Forgot password — request a reset link (sent to the email out-of-band).
  * Always resolves the same way, so it can't reveal which emails have accounts.

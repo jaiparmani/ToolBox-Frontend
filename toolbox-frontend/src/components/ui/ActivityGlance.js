@@ -64,7 +64,7 @@ export default function ActivityGlance({ expenses = [] }) {
   return (
     <Box
       sx={{
-        display: 'flex', mb: 2, borderRadius: '14px', overflow: 'hidden',
+        display: 'flex', mb: 1.5, borderRadius: '14px', overflow: 'hidden',
         border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper',
         '& > *:not(:last-of-type)': { borderRight: '1px solid', borderColor: 'divider' },
       }}

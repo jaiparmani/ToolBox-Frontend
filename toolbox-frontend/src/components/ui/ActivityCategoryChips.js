@@ -49,7 +49,7 @@ export default function ActivityCategoryChips({ categories = [], selected = '', 
   return (
     <Box
       sx={{
-        display: 'flex', gap: 0.75, alignItems: 'center', mb: 2,
+        display: 'flex', gap: 0.75, alignItems: 'center', mb: 2.25,
         overflowX: 'auto', pb: 0.5,
         // A calm, no-chrome horizontal scroller.
         scrollbarWidth: 'none', msOverflowStyle: 'none',

@@ -7,7 +7,6 @@ import { useMoney } from '../../contexts/MoneyContext';
 import { getExpenseSummary } from '../rest/expenseTrackerApis';
 import { PageHeader, EmptyState, MoneyUniverse } from '../ui';
 import Reveal from '../ui/Reveal';
-import { accents } from '../../theme/tokens';
 
 /**
  * Money Universe — the immersive, opt-in view of your month as a spatial scene:
@@ -41,8 +40,6 @@ export default function MoneyUniversePage() {
       <Reveal>
         <PageHeader
           icon={BubbleChartRoundedIcon}
-          gradient={`linear-gradient(135deg, ${accents.violet}, ${accents.blue})`}
-          glow={`${accents.violet}55`}
           title="Money Universe"
           subtitle="Your month as a spatial scene — every body a real figure"
         />

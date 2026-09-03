@@ -294,7 +294,7 @@ export default function UserRegistrationPage() {
           <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1 }}>
             Your Name
           </Typography>
-          <Grid container spacing={3} sx={{ mt: 0, mb: 1 }}>
+          <Grid container spacing={2.5} sx={{ mt: 0, mb: 1 }}>
             {/* First Name Field */}
             <Grid item xs={12} md={6}>
               <TextField
@@ -336,10 +336,10 @@ export default function UserRegistrationPage() {
             </Grid>
           </Grid>
 
-          <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1 }}>
+          <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1, display: 'block', mt: 2 }}>
             Account Details
           </Typography>
-          <Grid container spacing={3} sx={{ mt: 0, mb: 1 }}>
+          <Grid container spacing={2.5} sx={{ mt: 0, mb: 1 }}>
             {/* Username Field */}
             <Grid item xs={12}>
               <TextField
@@ -470,15 +470,15 @@ export default function UserRegistrationPage() {
 
           {/* Password Requirements Info */}
           <Card
+            elevation={0}
             variant="outlined"
             sx={{
-              mt: 3,
+              mt: 2.5,
               mb: 3,
+              borderRadius: 2.5,
               border: '1px solid',
               borderColor: 'divider',
-              backgroundColor: (theme) =>
-                theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
-              backdropFilter: 'blur(20px)',
+              backgroundColor: 'action.hover',
             }}
           >
             <CardContent sx={{ py: 2 }}>
@@ -503,7 +503,7 @@ export default function UserRegistrationPage() {
           </Card>
 
           {/* MPIN setup — a 6-digit PIN for fast sign-in */}
-          <Box display="flex" alignItems="center" gap={1} sx={{ mt: 1 }}>
+          <Box display="flex" alignItems="center" gap={1} sx={{ mt: 2.5 }}>
             <Pin sx={{ fontSize: 18, color: 'text.secondary' }} />
             <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1 }}>
               Set your MPIN
@@ -512,7 +512,7 @@ export default function UserRegistrationPage() {
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
             A 6-digit PIN you'll use to unlock the app quickly next time.
           </Typography>
-          <Grid container spacing={3} sx={{ mt: 0, mb: 1 }}>
+          <Grid container spacing={2.5} sx={{ mt: 0, mb: 1 }}>
             <Grid item xs={12} md={6}>
               <Typography component="label" htmlFor="reg-mpin" variant="body2" sx={{ fontWeight: 600, display: 'block', mb: 1 }}>
                 Enter MPIN

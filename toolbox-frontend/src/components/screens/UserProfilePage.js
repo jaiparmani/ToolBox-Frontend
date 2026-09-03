@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Alert, Box, Button, Card, CardContent, Container, IconButton, InputAdornment,
   LinearProgress, Link, Paper, Snackbar, Stack, Switch, TextField, Typography,
@@ -43,12 +42,11 @@ function scorePassword(pw) {
   if (/[^A-Za-z0-9]/.test(pw)) s++;
   const score = Math.min(s, 4);
   const label = ['Too short', 'Weak', 'Fair', 'Good', 'Strong'][score];
-  const color = [accents.red, accents.red, accents.amber, accents.blue, accents.green][score];
+  const color = [accents.red, accents.red, accents.amber, accents.mint, accents.green][score];
   return { score, label, color };
 }
 
 export default function UserProfilePage() {
-  const navigate = useNavigate();
   const { user, isAuthenticated, isLoading, updateProfile, changePassword, logout, refreshUserProfile } = useAuth();
 
   const [details, setDetails] = useState({ username: '', email: '', first_name: '', last_name: '', phone: '' });
@@ -185,9 +183,9 @@ export default function UserProfilePage() {
   if (isLoading) return null;
   if (!isAuthenticated) {
     return (
-      <Container maxWidth="sm" sx={{ mt: 8 }}>
-        <Paper elevation={3} sx={{ p: 4 }}>
-          <Typography variant="h5" align="center">Authentication Required</Typography>
+      <Container maxWidth="sm" sx={{ mt: 8, px: { xs: 2, sm: 3 } }}>
+        <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
+          <Typography variant="h6" align="center" sx={{ fontWeight: 650 }}>Authentication required</Typography>
         </Paper>
       </Container>
     );
@@ -199,40 +197,38 @@ export default function UserProfilePage() {
   return (
     <>
       <Container maxWidth="sm" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 6 }}>
-        {/* Identity hero */}
+        {/* Identity hero — flat hairline surface, one mint accent on the monogram */}
         <Reveal>
           <Paper
             elevation={0}
             sx={{
-              p: 3, mb: 2.5, borderRadius: 5, textAlign: 'center', position: 'relative', overflow: 'hidden',
+              p: { xs: 2.5, sm: 3 }, mb: 2.5, borderRadius: 4,
+              display: 'flex', alignItems: 'center', gap: 2,
               border: '1px solid', borderColor: 'divider',
-              '&::before': {
-                content: '""', position: 'absolute', inset: 0, pointerEvents: 'none',
-                background: 'radial-gradient(circle at 50% -20%, rgba(10,132,255,0.22), transparent 60%)',
-              },
             }}
           >
-            <Box sx={{ position: 'relative' }}>
-              <Box
-                sx={{
-                  width: 84, height: 84, borderRadius: '50%', mx: 'auto', mb: 1.5,
-                  background: `linear-gradient(135deg, ${accents.blue}, ${accents.purple})`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '2.2rem', fontWeight: 700, color: '#fff',
-                  boxShadow: `0 12px 30px ${accents.blue}55`,
-                }}
-              >
-                {initial}
-              </Box>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>{fullName || details.username}</Typography>
-              <Typography variant="body2" color="text.secondary">{details.email || 'No email set'}</Typography>
+            <Box
+              sx={{
+                width: 60, height: 60, borderRadius: '50%', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '1.6rem', fontWeight: 700, color: accents.mint,
+                bgcolor: `${accents.mint}1f`, border: '1px solid', borderColor: `${accents.mint}55`,
+              }}
+            >
+              {initial}
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.01em' }} noWrap>
+                {fullName || details.username || 'Your account'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" noWrap>{details.email || 'No email set'}</Typography>
             </Box>
           </Paper>
         </Reveal>
 
         {/* Your details */}
         <Reveal index={1}>
-          <SectionCard icon={<PersonIcon />} color={accents.blue} title="Your details"
+          <SectionCard icon={<PersonIcon />} title="Your details"
             action={
               <Button size="small" startIcon={editing ? <CheckIcon /> : <EditIcon />}
                 onClick={() => (editing ? saveDetails() : setEditing(true))} disabled={savingDetails}>
@@ -259,7 +255,7 @@ export default function UserProfilePage() {
 
         {/* Feel — tactile finish, mutable and remembered */}
         <Reveal index={2}>
-          <SectionCard icon={<TouchAppIcon />} color={accents.violet} title="Feel">
+          <SectionCard icon={<TouchAppIcon />} title="Feel">
             <Stack spacing={0.5} sx={{ mt: 0.5 }}>
               <FeelRow label="Haptics" hint="A gentle buzz on key actions (supported phones)"
                 checked={!!feel.haptics} onChange={() => toggleFeel('haptics')} />
@@ -276,7 +272,7 @@ export default function UserProfilePage() {
 
         {/* Password */}
         <Reveal index={4}>
-          <SectionCard icon={<LockIcon />} color={accents.amber} title="Password">
+          <SectionCard icon={<LockIcon />} title="Password">
             <Stack spacing={1.75} sx={{ mt: 1 }}>
               <TextField size="small" fullWidth label="Current password" type={showPw ? 'text' : 'password'}
                 value={pw.old_password} onChange={(e) => setPw(p => ({ ...p, old_password: e.target.value }))}
@@ -311,7 +307,7 @@ export default function UserProfilePage() {
 
         {/* Security / MPIN */}
         <Reveal index={5}>
-          <SectionCard icon={<PinIcon />} color={accents.mint} title="Security · MPIN">
+          <SectionCard icon={<PinIcon />} title="Security · MPIN">
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
               {hasMpin
                 ? 'Change the 6-digit PIN you use to unlock the app.'
@@ -398,7 +394,7 @@ export default function UserProfilePage() {
         </Reveal>
 
         {/* Danger zone */}
-        <Reveal index={3}>
+        <Reveal index={6}>
           <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'rgba(255,69,58,0.4)' }}>
             <CardContent>
               <Box display="flex" alignItems="center" gap={1.5} sx={{ mb: 1 }}>
@@ -446,16 +442,18 @@ export default function UserProfilePage() {
   );
 }
 
-function SectionCard({ icon, color, title, action, children }) {
+function SectionCard({ icon, title, action, children }) {
+  // Monochrome hairline icon chip — matches the app's PageHeader treatment so
+  // every section header reads from one system rather than a rainbow of tints.
   return (
     <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', mb: 2.5 }}>
       <CardContent>
-        <Box display="flex" alignItems="center" justifyContent="space-between">
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Box sx={{ width: 30, height: 30, borderRadius: '9px', backgroundColor: `${color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', color }}>
+        <Box display="flex" alignItems="center" justifyContent="space-between" gap={1.5}>
+          <Box display="flex" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
+            <Box sx={{ width: 32, height: 32, borderRadius: '9px', flexShrink: 0, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.secondary' }}>
               {React.cloneElement(icon, { sx: { fontSize: 18 } })}
             </Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{title}</Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>{title}</Typography>
           </Box>
           {action}
         </Box>

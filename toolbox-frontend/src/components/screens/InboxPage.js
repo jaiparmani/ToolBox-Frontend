@@ -12,8 +12,7 @@ import { useMoney } from '../../contexts/MoneyContext';
 import { getSplitBalances, getCopilotCards, dismissCopilotCard } from '../rest/expenseTrackerApis';
 import Reveal from '../ui/Reveal';
 import { BalanceSkeleton } from '../ui/Skeletons';
-import { money } from '../ui/money';
-import { PageHeader, SectionHeader, EmptyState, copilotIcon, copilotTone } from '../ui';
+import { PageHeader, SectionHeader, EmptyState, Panel, AmountDisplay, copilotIcon, copilotTone } from '../ui';
 import { accents } from '../../theme/tokens';
 
 /**
@@ -35,7 +34,7 @@ export default function InboxPage() {
     const next = [];
     if (b.status === 'fulfilled') {
       (b.value.balances || []).filter(p => p.owed > 0).forEach(p => next.push({
-        id: `owed-${p.personId}`, icon: CallSplitIcon, tone: accents.blue,
+        id: `owed-${p.personId}`, icon: CallSplitIcon, tone: accents.mint,
         title: `${p.name} owes you`, amount: p.owed,
         detail: `${p.unsettledCount} unsettled`, to: '/splits',
       }));
@@ -68,8 +67,6 @@ export default function InboxPage() {
       <Reveal>
         <PageHeader
           icon={InboxIcon}
-          gradient={`linear-gradient(135deg, ${accents.violet}, ${accents.blue})`}
-          glow={`${accents.violet}55`}
           title="Inbox"
           subtitle="What needs your attention"
         />
@@ -117,11 +114,7 @@ export default function InboxPage() {
                   <Reveal key={item.id} index={3 + i}>
                     <EventRow icon={item.icon} tone={item.tone} title={item.title} detail={item.detail}
                       onClick={() => navigate(item.to)}
-                      right={
-                        <Typography sx={{ fontWeight: 700, color: item.amount >= 0 ? accents.blue : accents.red, fontVariantNumeric: 'tabular-nums' }}>
-                          {item.amount >= 0 ? '+' : '−'}{money(Math.abs(item.amount))}
-                        </Typography>
-                      } />
+                      right={<AmountDisplay value={item.amount} tone="auto" showSign size="md" />} />
                   </Reveal>
                 ))}
               </Stack>
@@ -137,17 +130,16 @@ export default function InboxPage() {
  *  action, and an optional dismiss. */
 function EventRow({ icon: Icon, tone, title, detail, right, onClick, onDismiss }) {
   return (
-    <Box
+    <Panel
+      interactive
+      tint={tone}
       role="button"
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(); } }}
       aria-label={`${title}. ${detail}`}
       sx={{
-        display: 'flex', alignItems: 'center', gap: 1.75, p: 2, borderRadius: 3.5, cursor: 'pointer',
-        border: '1px solid', borderColor: 'divider', backgroundColor: 'transparent',
-        transition: 'transform 0.2s ease, border-color 0.2s ease',
-        '&:hover': { transform: 'translateY(-2px)', borderColor: `${tone}88` },
+        display: 'flex', alignItems: 'center', gap: 1.5, p: 1.75,
         '&:focus-visible': { outline: `2px solid ${tone}`, outlineOffset: 2 },
       }}
     >
@@ -156,18 +148,19 @@ function EventRow({ icon: Icon, tone, title, detail, right, onClick, onDismiss }
       </Box>
       <Box sx={{ minWidth: 0, flex: 1 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>{title}</Typography>
-        <Typography variant="caption" color="text.secondary">{detail}</Typography>
+        <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>{detail}</Typography>
       </Box>
       {right}
       {onDismiss ? (
-        <Box role="button" aria-label="Dismiss"
+        <Box role="button" aria-label="Dismiss" tabIndex={0}
           onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onDismiss(); } }}
           sx={{ flexShrink: 0, display: 'flex', p: 0.5, borderRadius: 1, color: 'text.disabled', '&:hover': { color: 'text.primary' } }}>
           <CloseRoundedIcon sx={{ fontSize: 18 }} />
         </Box>
       ) : (
         <ChevronRightIcon sx={{ color: 'text.disabled', flexShrink: 0 }} />
       )}
-    </Box>
+    </Panel>
   );
 }

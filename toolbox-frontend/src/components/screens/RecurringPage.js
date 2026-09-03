@@ -12,7 +12,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useMoney } from '../../contexts/MoneyContext';
 import { getRecurring, createRecurring, deleteRecurring, getCategories } from '../rest/expenseTrackerApis';
 import Reveal from '../ui/Reveal';
-import AuroraBackground from '../motion/AuroraBackground';
 import {
   PageHeader, SectionHeader, Panel, EmptyState, AmountDisplay, SegmentedControl,
   BottomSheet, ConfirmDialog, ErrorBanner,
@@ -118,16 +117,11 @@ export default function RecurringPage() {
   const tone = isIncome ? accents.mint : accents.blue;
 
   return (
-    <Container maxWidth="sm" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 10, position: 'relative' }}>
-      {/* Living backdrop — same premium climate as the money screens */}
-      <AuroraBackground />
-      <Box sx={{ position: 'relative', zIndex: 1 }}>
+    <Container maxWidth="sm" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 10 }}>
       <ErrorBanner error={error} onClose={() => setError(null)} />
       <Reveal>
         <PageHeader
           icon={AutorenewRoundedIcon}
-          gradient={`linear-gradient(135deg, ${accents.violet}, ${accents.cyan})`}
-          glow={`${accents.violet}55`}
           title="Recurring"
           subtitle="The income & bills behind your forecast"
           actions={
@@ -250,28 +244,34 @@ export default function RecurringPage() {
         onConfirm={doDelete}
         onCancel={() => setConfirmDel(null)}
       />
-      </Box>
     </Container>
   );
 }
 
 function RuleRow({ rule, onDelete }) {
   const isIncome = rule.transaction_type === 'income';
-  const tone = isIncome ? accents.mint : accents.blue;
   const Icon = isIncome ? NorthEastRoundedIcon : SouthWestRoundedIcon;
   return (
     <Panel sx={{ p: 1.75, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-      <Box sx={{ width: 40, height: 40, borderRadius: '12px', flexShrink: 0, backgroundColor: `${tone}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Icon sx={{ color: tone, fontSize: 20 }} />
+      <Box sx={{
+        width: 40, height: 40, borderRadius: '12px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: isIncome ? `${accents.mint}1f` : 'action.hover',
+        border: isIncome ? 'none' : '1px solid', borderColor: 'divider',
+      }}>
+        <Icon sx={{ color: isIncome ? accents.mint : 'text.secondary', fontSize: 20 }} />
       </Box>
       <Box sx={{ minWidth: 0, flex: 1 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>{rule.description}</Typography>
-        <Typography variant="caption" color="text.secondary" noWrap>
+        <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
           {cadenceLabel(rule)} · next {fmtDate(rule.next_date)}
           {rule.category_name ? ` · ${rule.category_name}` : ''}
         </Typography>
       </Box>
-      <AmountDisplay value={isIncome ? Number(rule.amount) : -Number(rule.amount)} tone="auto" showSign size="md" />
+      <AmountDisplay
+        value={isIncome ? Number(rule.amount) : -Number(rule.amount)}
+        tone="default" showSign size="md"
+        sx={isIncome ? { color: accents.mint } : undefined}
+      />
       <IconButton size="small" aria-label={`Remove ${rule.description}`} onClick={onDelete} sx={{ color: 'text.disabled', '&:hover': { color: accents.red } }}>
         <DeleteOutlineRoundedIcon fontSize="small" />
       </IconButton>

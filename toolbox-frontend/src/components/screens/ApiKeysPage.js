@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   Box, Typography, Button, TextField, Snackbar, Alert,
   IconButton, Tooltip, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, LinearProgress, Chip, Grid,
+  TableHead, TableRow, LinearProgress, Chip, Grid, Stack,
 } from '@mui/material';
 import {
   VpnKey as VpnKeyIcon,
@@ -105,8 +105,6 @@ export default function ApiKeysPage() {
       <PageHeader
         icon={VpnKeyIcon} title="API Keys"
         subtitle="OpenRouter keys powering Quick Add, Bulk Import and Spending Reviews"
-        gradient={`linear-gradient(135deg, ${accents.purple}, ${accents.blue})`}
-        glow={`${accents.purple}66`}
         actions={
           <Tooltip title="Refresh">
             <span>
@@ -163,58 +161,93 @@ export default function ApiKeysPage() {
               description="AI features fall back to the server's environment variable until you add one." dense />
           </Box>
         ) : (
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Order</TableCell>
-                  <TableCell>Key</TableCell>
-                  <TableCell>Label</TableCell>
-                  <TableCell>Added</TableCell>
-                  <TableCell align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {keys.map((record, index) => (
-                  <TableRow key={record.id} hover>
-                    <TableCell>
+          <>
+            {/* Table on tablet/desktop */}
+            <TableContainer sx={{ display: { xs: 'none', sm: 'block' } }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Order</TableCell>
+                    <TableCell>Key</TableCell>
+                    <TableCell>Label</TableCell>
+                    <TableCell>Added</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {keys.map((record, index) => (
+                    <TableRow key={record.id} hover>
+                      <TableCell>
+                        {index === 0
+                          ? <Chip label="next" size="small" color="primary" />
+                          : <Typography variant="body2" color="text.secondary">{index + 1}</Typography>}
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{record.masked}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">{record.label || '—'}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">{new Date(record.created_at).toLocaleDateString()}</Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Box display="flex" gap={0.5} justifyContent="flex-end">
+                          <Tooltip title="Send to back of queue">
+                            <span>
+                              <IconButton size="small" onClick={() => handleMoveToBack(record)}
+                                disabled={keys.length < 2 || index === keys.length - 1}
+                                sx={{ '&:hover': { backgroundColor: `${accents.blue}1f`, color: accents.blue } }}>
+                                <ArrowDownwardIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title="Remove key">
+                            <IconButton size="small" onClick={() => setPendingDelete(record)}
+                              sx={{ color: accents.red, '&:hover': { backgroundColor: `${accents.red}1f` } }}>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {/* Stacked cards on phones — the 5-column table would overflow at 375px */}
+            <Stack sx={{ display: { xs: 'flex', sm: 'none' } }} divider={<Box sx={{ borderTop: '1px solid', borderColor: 'divider' }} />}>
+              {keys.map((record, index) => (
+                <Box key={record.id} sx={{ px: 2.5, py: 1.75 }}>
+                  <Box display="flex" alignItems="center" justifyContent="space-between" gap={1}>
+                    <Box display="flex" alignItems="center" gap={1} sx={{ minWidth: 0 }}>
                       {index === 0
                         ? <Chip label="next" size="small" color="primary" />
-                        : <Typography variant="body2" color="text.secondary">{index + 1}</Typography>}
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{record.masked}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">{record.label || '—'}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">{new Date(record.created_at).toLocaleDateString()}</Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Box display="flex" gap={0.5} justifyContent="flex-end">
-                        <Tooltip title="Send to back of queue">
-                          <span>
-                            <IconButton size="small" onClick={() => handleMoveToBack(record)}
-                              disabled={keys.length < 2 || index === keys.length - 1}
-                              sx={{ '&:hover': { backgroundColor: `${accents.blue}1f`, color: accents.blue } }}>
-                              <ArrowDownwardIcon fontSize="small" />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                        <Tooltip title="Remove key">
-                          <IconButton size="small" onClick={() => setPendingDelete(record)}
-                            sx={{ color: accents.red, '&:hover': { backgroundColor: `${accents.red}1f` } }}>
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                        : <Typography variant="caption" color="text.secondary" sx={{ minWidth: 18 }}>#{index + 1}</Typography>}
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }} noWrap>{record.masked}</Typography>
+                    </Box>
+                    <Box display="flex" gap={0.5} sx={{ flexShrink: 0 }}>
+                      <IconButton size="small" onClick={() => handleMoveToBack(record)}
+                        aria-label="Send to back of queue"
+                        disabled={keys.length < 2 || index === keys.length - 1}
+                        sx={{ '&:hover': { backgroundColor: `${accents.blue}1f`, color: accents.blue } }}>
+                        <ArrowDownwardIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" onClick={() => setPendingDelete(record)}
+                        aria-label="Remove key"
+                        sx={{ color: accents.red, '&:hover': { backgroundColor: `${accents.red}1f` } }}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                    {(record.label || 'No label')} · added {new Date(record.created_at).toLocaleDateString()}
+                  </Typography>
+                </Box>
+              ))}
+            </Stack>
+          </>
         )}
       </Panel>
 

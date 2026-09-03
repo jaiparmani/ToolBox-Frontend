@@ -21,9 +21,6 @@ import {
   Dashboard as DashboardIcon,
   Category as CategoryIcon,
   Tag as TagIcon,
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  AccountBalance as BalanceIcon,
   Refresh as RefreshIcon,
   Close as CloseIcon,
   AutoAwesome as AutoAwesomeIcon,
@@ -62,6 +59,7 @@ import ThinkingHint from '../ui/ThinkingHint';
 import ErrorBanner from '../ui/ErrorBanner';
 import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { money } from '../ui/money';
+import Reveal from '../ui/Reveal';
 import { feedback } from '../ui/feedback';
 import { TransactionStoryDrawer, buildStoryFromExpense, PageHeader } from '../ui';
 import CursorGlow from '../motion/CursorGlow';
@@ -85,7 +83,7 @@ function AssistantNudge({ label }) {
      aria-label="Open the ToolBox assistant"
      onClick={open}
      sx={{
-       display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1.15, borderRadius: 2.5, cursor: 'pointer',
+       display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1.15, borderRadius: '14px', cursor: 'pointer',
        border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper',
        transition: 'border-color 0.15s ease',
        '&:hover': { borderColor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(17,17,20,0.22)' },
@@ -976,10 +974,10 @@ export default function ExpenseTrackerPage() {
        ) : summary ? (
          <SummaryStrip
            stats={[
-             { label: 'Spent', raw: summary.totalExpenses, icon: TrendingUpIcon, color: '#FF453A' },
-             { label: 'Income', raw: summary.totalIncome, icon: TrendingDownIcon, color: '#30D158' },
-             { label: 'Balance', raw: summary.netBalance, icon: BalanceIcon, color: '#0A84FF' },
-             { label: 'Transactions', value: summary.transactionCount, icon: DashboardIcon, color: '#BF5AF2' },
+             { label: 'Spent', raw: summary.totalExpenses, tone: accents.red },
+             { label: 'Income', raw: summary.totalIncome, tone: accents.green },
+             { label: 'Balance', raw: summary.netBalance },
+             { label: 'Transactions', value: summary.transactionCount },
            ]}
          />
        ) : null}
@@ -991,7 +989,7 @@ export default function ExpenseTrackerPage() {
        sx={{
          border: '1px solid',
          borderColor: 'divider',
-         borderRadius: 3,
+         borderRadius: '18px',
          overflow: 'hidden',
          bgcolor: 'background.paper',
        }}
@@ -1011,84 +1009,81 @@ export default function ExpenseTrackerPage() {
        {/* Expenses Tab */}
        {activeTab === 0 && (
          <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
-           {/* Ask: same pill as capture, so the two read as one idea */}
-           <Paper
-             elevation={0}
-             sx={{
-               p: { xs: 1.5, sm: 2.5 }, mb: { xs: 2, sm: 3 }, borderRadius: 3,
-               border: '1px solid', borderColor: 'divider',
-               bgcolor: 'background.paper',
-             }}
-           >
-             <AssistantNudge label="Ask about your spending — e.g. “how much on food this month?”" />
-             {ask.answer && (
-               <Box display="flex" justifyContent="flex-end" sx={{ mt: 1 }}>
-                 <Button size="small" onClick={clearAsk} color="inherit">Clear</Button>
-               </Box>
-             )}
-
-             {ask.answer && (
-               <Box sx={{ mt: 2.5 }}>
-                 <Box display="flex" alignItems="baseline" gap={2} flexWrap="wrap">
-                   <Typography variant="h5" sx={{ fontWeight: 600 }}>
+           {/* Ask result — the question is asked from the one Assistant (⌘K);
+               when it answers, the reading lands here as its own card. */}
+           {ask.answer && (
+             <Reveal>
+             <Paper
+               elevation={0}
+               sx={{
+                 p: { xs: 2, sm: 2.5 }, mb: { xs: 2, sm: 3 }, borderRadius: '14px',
+                 border: '1px solid', borderColor: 'divider',
+                 bgcolor: 'background.paper',
+               }}
+             >
+               <Box display="flex" alignItems="baseline" justifyContent="space-between" gap={1.5} flexWrap="wrap">
+                 <Box display="flex" alignItems="baseline" gap={1.5} flexWrap="wrap">
+                   <Typography variant="h5" sx={{ fontWeight: 650, fontFamily: 'inherit' }}>
                      {formatCurrency(ask.answer.total)}
                    </Typography>
                    <Typography variant="body2" color="text.secondary">
                      across {ask.answer.count} {ask.answer.count === 1 ? 'transaction' : 'transactions'}
                    </Typography>
                  </Box>
-                 {ask.answer.interpretation && (
-                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                     {ask.answer.interpretation}
-                   </Typography>
-                 )}
-                 {Object.keys(ask.answer.filters).length > 0 && (
-                   <Box display="flex" gap={0.5} flexWrap="wrap" sx={{ mt: 1.5 }}>
-                     {Object.entries(ask.answer.filters).map(([key, value]) => (
-                       <Chip key={key} size="small" variant="outlined" label={`${key}: ${value}`} />
-                     ))}
-                   </Box>
-                 )}
-                 {ask.answer.results.length > 0 && (
-                   <TableContainer sx={{ mt: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-                     <Table size="small">
-                       <TableBody>
-                         {ask.answer.results.slice(0, 10).map((row) => (
-                           <TableRow key={row.id} hover>
-                             <TableCell sx={{ width: 110 }}>
-                               <Typography variant="body2" color="text.secondary">
-                                 {formatDate(row.date)}
-                               </Typography>
-                             </TableCell>
-                             <TableCell>{row.description}</TableCell>
-                             <TableCell sx={{ width: 150 }}>
-                               {row.category && (
-                                 <Chip
-                                   label={row.category.name}
-                                   size="small"
-                                   sx={{ backgroundColor: row.category.color, color: '#fff', fontSize: '0.7rem' }}
-                                 />
-                               )}
-                             </TableCell>
-                             <TableCell align="right" sx={{ width: 120 }}>
-                               <Typography variant="body2" fontWeight={600}>
-                                 {row.displayAmount || formatCurrency(row.amount)}
-                               </Typography>
-                             </TableCell>
-                           </TableRow>
-                         ))}
-                       </TableBody>
-                     </Table>
-                   </TableContainer>
-                 )}
-                 {ask.answer.count > 10 && (
-                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                     Showing the 10 most recent of {ask.answer.count}.
-                   </Typography>
-                 )}
+                 <Button size="small" onClick={clearAsk} color="inherit">Clear</Button>
                </Box>
-             )}
-           </Paper>
+               {ask.answer.interpretation && (
+                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                   {ask.answer.interpretation}
+                 </Typography>
+               )}
+               {Object.keys(ask.answer.filters).length > 0 && (
+                 <Box display="flex" gap={0.5} flexWrap="wrap" sx={{ mt: 1.5 }}>
+                   {Object.entries(ask.answer.filters).map(([key, value]) => (
+                     <Chip key={key} size="small" variant="outlined" label={`${key}: ${value}`} />
+                   ))}
+                 </Box>
+               )}
+               {ask.answer.results.length > 0 && (
+                 <TableContainer sx={{ mt: 2, borderRadius: '10px', border: '1px solid', borderColor: 'divider' }}>
+                   <Table size="small">
+                     <TableBody>
+                       {ask.answer.results.slice(0, 10).map((row) => (
+                         <TableRow key={row.id} hover>
+                           <TableCell sx={{ width: 110 }}>
+                             <Typography variant="body2" color="text.secondary">
+                               {formatDate(row.date)}
+                             </Typography>
+                           </TableCell>
+                           <TableCell>{row.description}</TableCell>
+                           <TableCell sx={{ width: 150 }}>
+                             {row.category && (
+                               <Chip
+                                 label={row.category.name}
+                                 size="small"
+                                 sx={{ backgroundColor: row.category.color, color: '#fff', fontSize: '0.7rem' }}
+                               />
+                             )}
+                           </TableCell>
+                           <TableCell align="right" sx={{ width: 120 }}>
+                             <Typography variant="body2" fontWeight={600}>
+                               {row.displayAmount || formatCurrency(row.amount)}
+                             </Typography>
+                           </TableCell>
+                         </TableRow>
+                       ))}
+                     </TableBody>
+                   </Table>
+                 </TableContainer>
+               )}
+               {ask.answer.count > 10 && (
+                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                   Showing the 10 most recent of {ask.answer.count}.
+                 </Typography>
+               )}
+             </Paper>
+             </Reveal>
+           )}
 
            {/* Filters */}
            <Paper
@@ -1096,7 +1091,7 @@ export default function ExpenseTrackerPage() {
              sx={{
                p: 2.5,
                mb: 3,
-               borderRadius: 3,
+               borderRadius: '14px',
                border: '1px solid',
                borderColor: 'divider',
                bgcolor: 'background.paper',
@@ -1400,7 +1395,7 @@ export default function ExpenseTrackerPage() {
              <Paper
                elevation={0}
                sx={{
-                 p: 4, borderRadius: 3, textAlign: 'center',
+                 p: 4, borderRadius: '14px', textAlign: 'center',
                  border: '1px dashed', borderColor: 'divider',
                }}
              >
@@ -1451,7 +1446,7 @@ export default function ExpenseTrackerPage() {
                        <Card
                          elevation={0}
                          sx={{
-                           height: '100%', borderRadius: 3,
+                           height: '100%', borderRadius: '14px',
                            border: '1px solid', borderColor: 'divider',
                          }}
                        >
@@ -1502,7 +1497,7 @@ export default function ExpenseTrackerPage() {
            <Paper
              elevation={0}
              sx={{
-               p: 2.5, mb: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider',
+               p: 2.5, mb: 3, borderRadius: '14px', border: '1px solid', borderColor: 'divider',
                bgcolor: 'background.paper',
              }}
            >
@@ -1551,7 +1546,7 @@ export default function ExpenseTrackerPage() {
                }}
              >
                <Typography variant="overline" color="text.secondary">You owe</Typography>
-               <Typography variant="h4" sx={{ fontWeight: 600, color: '#FF453A', mb: 1.5 }}>
+               <Typography variant="h4" sx={{ fontWeight: 600, color: accents.red, mb: 1.5 }}>
                  {formatCurrency(splits.totalYouOwe)}
                </Typography>
                {splits.youOwe.map((debt) => (
@@ -1605,7 +1600,7 @@ export default function ExpenseTrackerPage() {
            {splits.balances.length === 0 && splits.youOwe.length === 0 ? (
              <Paper
                elevation={0}
-               sx={{ p: 4, borderRadius: 3, textAlign: 'center', border: '1px dashed', borderColor: 'divider' }}
+               sx={{ p: 4, borderRadius: '14px', textAlign: 'center', border: '1px dashed', borderColor: 'divider' }}
              >
                <CallSplitIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
                <Typography variant="body1" sx={{ fontWeight: 500 }}>No shared expenses yet</Typography>
@@ -1620,8 +1615,8 @@ export default function ExpenseTrackerPage() {
                    <Card
                      elevation={0}
                      sx={{
-                       borderRadius: 3, border: '1px solid',
-                       borderColor: balance.owed > 0 ? 'rgba(255,159,10,0.4)' : 'divider',
+                       borderRadius: '14px', border: '1px solid',
+                       borderColor: balance.owed > 0 ? `${accents.amber}66` : 'divider',
                      }}
                    >
                      <CardContent>

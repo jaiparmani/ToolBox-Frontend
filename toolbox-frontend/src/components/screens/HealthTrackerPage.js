@@ -1,32 +1,31 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  Alert, Box, Button, Card, CardContent, Container, Dialog, DialogActions,
-  DialogContent, DialogTitle, Fab, Paper, Snackbar, Stack, TextField, Typography,
+  Alert, Box, Button, Container, Dialog, DialogActions,
+  DialogContent, DialogTitle, Snackbar, Stack, TextField, Typography,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MonitorWeightIcon from '@mui/icons-material/MonitorWeight';
 import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import BedtimeIcon from '@mui/icons-material/Bedtime';
 import DirectionsWalkIcon from '@mui/icons-material/DirectionsWalk';
-import FavoriteIcon from '@mui/icons-material/Favorite';
+import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
 
 import { getMetrics, getMetricsSummary, addMetric, deleteMetric } from '../rest/healthApis';
 import Reveal from '../ui/Reveal';
-import AnimatedNumber from '../ui/AnimatedNumber';
 import TrendBars from '../ui/TrendBars';
 import SwipeAction from '../ui/SwipeAction';
 import { ExpenseListSkeleton } from '../ui/Skeletons';
 import { relativeDay } from '../ui/money';
-import AuroraBackground from '../motion/AuroraBackground';
+import { PageHeader, SectionHeader, Panel, EmptyState } from '../ui';
 import { accents, type as tokenType } from '../../theme/tokens';
 
 const METRICS = {
-  weight: { label: 'Weight', unit: 'kg', icon: MonitorWeightIcon, color: accents.blue },
-  water: { label: 'Water', unit: 'ml', icon: WaterDropIcon, color: accents.cyan },
-  sleep: { label: 'Sleep', unit: 'hours', icon: BedtimeIcon, color: accents.purple },
-  steps: { label: 'Steps', unit: 'steps', icon: DirectionsWalkIcon, color: accents.green },
+  weight: { label: 'Weight', unit: 'kg', icon: MonitorWeightIcon },
+  water: { label: 'Water', unit: 'ml', icon: WaterDropIcon },
+  sleep: { label: 'Sleep', unit: 'hours', icon: BedtimeIcon },
+  steps: { label: 'Steps', unit: 'steps', icon: DirectionsWalkIcon },
 };
 const TYPES = Object.keys(METRICS);
 
@@ -34,6 +33,9 @@ const TYPES = Object.keys(METRICS);
  * Health, rebuilt around one metric at a time: pick it from a pill row, see the
  * latest reading big and its recent trend as a chart, and log a new one. Entries
  * swipe away to delete, the same gesture as everywhere else in the app.
+ *
+ * Restrained by design: hairline surfaces, a single mint accent for the active
+ * metric, monochrome everywhere else. No glows, gradients or count-ups.
  */
 export default function HealthTrackerPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -85,167 +87,133 @@ export default function HealthTrackerPage() {
       .map(e => ({ date: e.date, total: Number(e.value) || 0 })),
     [entries]);
 
-  if (isLoading) return null;
-  if (!isAuthenticated) {
-    return (
-      <Container maxWidth="sm" sx={{ mt: 8 }}>
-        <Paper elevation={3} sx={{ p: 4 }}>
-          <Typography variant="h5" align="center">Authentication Required</Typography>
-        </Paper>
-      </Container>
-    );
-  }
+  if (isLoading || !isAuthenticated) return null;
 
   return (
-    <>
-      <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 12, position: 'relative' }}>
-        {/* Living backdrop — same premium climate as the money screens */}
-        <AuroraBackground />
-        <Box sx={{ position: 'relative', zIndex: 1 }}>
-        <Reveal>
-          <Box display="flex" alignItems="center" gap={1.5} sx={{ mb: 2 }}>
-            <Box sx={{ width: 44, height: 44, borderRadius: '13px', background: `linear-gradient(135deg, ${accents.red}, ${accents.amber})`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 20px ${accents.red}55` }}>
-              <FavoriteIcon sx={{ color: '#fff', fontSize: 22 }} />
-            </Box>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontFamily: tokenType.displayFamily, fontWeight: 700, fontSize: '1.15rem', lineHeight: 1.15 }}>Health</Typography>
-              <Typography variant="caption" color="text.secondary" noWrap>Your body, tracked</Typography>
-            </Box>
-          </Box>
-        </Reveal>
-
-        {/* Metric pills */}
-        <Reveal index={1}>
-          <Stack direction="row" spacing={1} sx={{ mb: 2.5, overflowX: 'auto', pb: 0.5, '&::-webkit-scrollbar': { display: 'none' } }}>
-            {TYPES.map((t) => {
-              const m = METRICS[t]; const active = t === type;
-              return (
-                <Card key={t} elevation={0} onClick={() => setType(t)}
-                  sx={{ flex: '1 0 auto', minWidth: 82, p: 1.25, cursor: 'pointer', borderRadius: 3, textAlign: 'center',
-                    border: '1.5px solid', borderColor: active ? m.color : 'divider',
-                    backgroundColor: active ? `${m.color}1a` : 'transparent', transition: 'all 0.2s ease' }}>
-                  <m.icon sx={{ color: m.color, fontSize: 22 }} />
-                  <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, mt: 0.25 }}>{m.label}</Typography>
-                </Card>
-              );
-            })}
-          </Stack>
-        </Reveal>
-
-        {/* Hero reading */}
-        <Reveal index={2}>
-          <Paper elevation={0} sx={{ p: 3, mb: 2.5, borderRadius: 4, border: '1px solid', borderColor: 'divider',
-            position: 'relative', overflow: 'hidden',
-            '@keyframes healthAura': { to: { transform: 'rotate(360deg)' } },
-            '@keyframes healthSheen': { '0%': { transform: 'translateX(-140%) skewX(-12deg)' }, '60%,100%': { transform: 'translateX(320%) skewX(-12deg)' } },
-            '&::before': { content: '""', position: 'absolute', inset: 0, pointerEvents: 'none',
-              background: `radial-gradient(circle at 50% -20%, ${cfg.color}33, transparent 60%)` } }}>
-            {/* Slow-turning reactor aura, keyed to the metric's colour */}
-            <Box aria-hidden sx={{ position: 'absolute', top: '50%', left: '50%', width: 360, height: 360,
-              mt: '-180px', ml: '-180px', pointerEvents: 'none', opacity: 0.55, borderRadius: '50%',
-              background: `conic-gradient(from 0deg, transparent, ${cfg.color}66, transparent 42%)`,
-              filter: 'blur(26px)', animation: 'healthAura 16s linear infinite',
-              '@media (prefers-reduced-motion: reduce)': { animation: 'none' } }} />
-            {/* Light sheen sweeping across the reading */}
-            <Box aria-hidden sx={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '32%', pointerEvents: 'none',
-              background: 'linear-gradient(105deg, transparent, rgba(255,255,255,0.16), transparent)',
-              animation: 'healthSheen 6.5s ease-in-out infinite',
-              '@media (prefers-reduced-motion: reduce)': { animation: 'none' } }} />
-            <Box sx={{ position: 'relative' }}>
-              <Typography variant="overline" color="text.secondary">Latest {cfg.label.toLowerCase()}</Typography>
-              <Box display="flex" alignItems="baseline" gap={1}>
-                <Typography sx={{ fontFamily: tokenType.displayFamily, fontWeight: 700, fontSize: '2.8rem', letterSpacing: '-0.03em', color: cfg.color,
-                  textShadow: `0 0 26px ${cfg.color}44` }}>
-                  {stat?.latest_value != null ? <AnimatedNumber value={Number(stat.latest_value)} format="plain" /> : '—'}
-                </Typography>
-                <Typography variant="h6" color="text.secondary">{cfg.unit}</Typography>
-              </Box>
-              {stat?.week_avg != null && (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                  {Number(stat.week_avg).toFixed(1)} {cfg.unit} avg this week
-                </Typography>
-              )}
-            </Box>
-          </Paper>
-        </Reveal>
-
-        {/* Trend */}
-        {trend.length > 1 && (
-          <Reveal index={3}>
-            <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, mb: 2.5, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}>
-              <TrendBars data={trend} title={`${cfg.label} over time`} formatValue={(v) => `${v} ${cfg.unit}`} formatFull={(v) => `${v} ${cfg.unit}`} />
-            </Paper>
-          </Reveal>
-        )}
-
-        {/* Entries */}
-        <Reveal index={4}>
-          <Paper elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
-            {loading ? <Box sx={{ p: 1.5 }}><ExpenseListSkeleton rows={4} /></Box>
-              : entries.length === 0 ? (
-                <Box sx={{ p: 5, textAlign: 'center' }}>
-                  <cfg.icon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
-                  <Typography variant="body1" sx={{ fontWeight: 500 }}>No {cfg.label.toLowerCase()} logged yet</Typography>
-                  <Typography variant="body2" color="text.secondary">Tap + to add your first reading.</Typography>
-                </Box>
-              ) : entries.map((e) => (
-                <SwipeAction key={e.id} onAction={() => remove(e.id)} color={accents.red}
-                  icon={<DeleteIcon sx={{ color: '#fff' }} />} label="Delete" borderRadius={0}>
-                  <Box display="flex" alignItems="center" justifyContent="space-between"
-                    sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', '&:last-of-type': { borderBottom: 'none' } }}>
-                    <Box>
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>{e.value} {e.unit}</Typography>
-                      {e.notes && <Typography variant="caption" color="text.secondary">{e.notes}</Typography>}
-                    </Box>
-                    <Typography variant="body2" color="text.secondary">{relativeDay(e.date)}</Typography>
-                  </Box>
-                </SwipeAction>
-              ))}
-          </Paper>
-        </Reveal>
-
-        <Fab color="primary" onClick={() => setDialog(true)}
-          sx={{ position: 'fixed', right: 16, bottom: { xs: 'calc(24px + env(safe-area-inset-bottom))', md: 24 } }}
-          aria-label={`Log ${cfg.label}`}>
-          <AddIcon />
-        </Fab>
-
-        {/* Add dialog */}
-        <Dialog open={dialog} onClose={() => setDialog(false)} maxWidth="xs" fullWidth>
-          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box sx={{ width: 36, height: 36, borderRadius: '11px', background: `linear-gradient(135deg, ${cfg.color}, ${cfg.color}bb)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <cfg.icon sx={{ color: '#fff', fontSize: 20 }} />
-            </Box>
-            <Typography variant="h6" sx={{ fontWeight: 650 }}>Log {cfg.label}</Typography>
-          </DialogTitle>
-          <DialogContent>
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <TextField autoFocus fullWidth type="number" label={`Value (${cfg.unit})`}
-                value={form.value} onChange={(e) => setForm(f => ({ ...f, value: e.target.value }))} />
-              <TextField fullWidth type="date" label="Date" InputLabelProps={{ shrink: true }}
-                value={form.date} onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))} />
-              <TextField fullWidth label="Notes (optional)" value={form.notes}
-                onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} />
-            </Stack>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDialog(false)} color="inherit">Cancel</Button>
-            <Button onClick={save} variant="contained" disabled={saving || !form.value}>
-              {saving ? 'Saving…' : 'Log it'}
+    <Container maxWidth="sm" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 10 }}>
+      <Reveal>
+        <PageHeader
+          icon={FavoriteRoundedIcon}
+          title="Health"
+          subtitle="Your body, tracked"
+          actions={
+            <Button variant="contained" size="small" startIcon={<AddRoundedIcon />} onClick={() => setDialog(true)}>
+              Log
             </Button>
-          </DialogActions>
-        </Dialog>
+          }
+        />
+      </Reveal>
 
-        <Snackbar open={!!toast} autoHideDuration={3000} onClose={() => setToast(null)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} sx={{ bottom: { xs: 90, md: 24 } }}>
-          <Alert severity="success" onClose={() => setToast(null)} sx={{ borderRadius: 3 }}>{toast}</Alert>
-        </Snackbar>
-        <Snackbar open={!!error} autoHideDuration={5000} onClose={() => setError(null)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} sx={{ bottom: { xs: 90, md: 24 } }}>
-          <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 3 }}>{error}</Alert>
-        </Snackbar>
-        </Box>
-      </Container>
-    </>
+      {/* Metric selector */}
+      <Reveal index={1}>
+        <Stack direction="row" spacing={1} sx={{ mb: 2.5, overflowX: 'auto', pb: 0.5, '&::-webkit-scrollbar': { display: 'none' } }}>
+          {TYPES.map((t) => {
+            const m = METRICS[t]; const active = t === type;
+            return (
+              <Box key={t} role="button" tabIndex={0} aria-pressed={active} aria-label={m.label}
+                onClick={() => setType(t)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setType(t); } }}
+                sx={{
+                  flex: '1 0 auto', minWidth: 78, px: 1.5, py: 1, cursor: 'pointer', borderRadius: 2.5, textAlign: 'center',
+                  border: '1px solid', borderColor: active ? accents.mint : 'divider',
+                  backgroundColor: active ? `${accents.mint}1a` : 'transparent',
+                  transition: 'border-color 0.2s ease, background-color 0.2s ease',
+                  '&:focus-visible': { outline: `2px solid ${accents.mint}`, outlineOffset: 2 },
+                }}>
+                <m.icon sx={{ color: active ? accents.mint : 'text.secondary', fontSize: 22 }} />
+                <Typography variant="caption" sx={{ display: 'block', fontWeight: 600, mt: 0.25, color: active ? 'text.primary' : 'text.secondary' }}>
+                  {m.label}
+                </Typography>
+              </Box>
+            );
+          })}
+        </Stack>
+      </Reveal>
+
+      {/* Hero reading */}
+      <Reveal index={2}>
+        <Panel sx={{ p: 3, mb: 2.5 }}>
+          <Typography variant="overline" color="text.secondary">Latest {cfg.label.toLowerCase()}</Typography>
+          <Box display="flex" alignItems="baseline" gap={1}>
+            <Typography sx={{ fontFamily: tokenType.displayFamily, fontWeight: 700, fontSize: '2.8rem', letterSpacing: '-0.03em', lineHeight: 1.05, fontVariantNumeric: 'tabular-nums' }}>
+              {stat?.latest_value != null ? Number(stat.latest_value).toLocaleString('en-IN') : '—'}
+            </Typography>
+            <Typography variant="h6" color="text.secondary">{cfg.unit}</Typography>
+          </Box>
+          {stat?.week_avg != null && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {Number(stat.week_avg).toFixed(1)} {cfg.unit} avg this week
+            </Typography>
+          )}
+        </Panel>
+      </Reveal>
+
+      {/* Trend */}
+      {trend.length > 1 && (
+        <Reveal index={3}>
+          <Panel sx={{ p: { xs: 2, sm: 2.5 }, mb: 2.5 }}>
+            <TrendBars data={trend} title={`${cfg.label} over time`} formatValue={(v) => `${v} ${cfg.unit}`} formatFull={(v) => `${v} ${cfg.unit}`} />
+          </Panel>
+        </Reveal>
+      )}
+
+      {/* Entries */}
+      <Reveal index={4}>
+        <SectionHeader title="History" count={entries.length || undefined} />
+        <Panel sx={{ overflow: 'hidden' }}>
+          {loading ? <Box sx={{ p: 1.5 }}><ExpenseListSkeleton rows={4} /></Box>
+            : entries.length === 0 ? (
+              <EmptyState dense icon={cfg.icon} title={`No ${cfg.label.toLowerCase()} logged yet`} description="Tap Log to add your first reading." />
+            ) : entries.map((e) => (
+              <SwipeAction key={e.id} onAction={() => remove(e.id)} color={accents.red}
+                icon={<DeleteIcon sx={{ color: '#fff' }} />} label="Delete" borderRadius={0}>
+                <Box display="flex" alignItems="center" justifyContent="space-between" gap={1}
+                  sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', '&:last-of-type': { borderBottom: 'none' } }}>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body1" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{e.value} {e.unit}</Typography>
+                    {e.notes && <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>{e.notes}</Typography>}
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>{relativeDay(e.date)}</Typography>
+                </Box>
+              </SwipeAction>
+            ))}
+        </Panel>
+      </Reveal>
+
+      {/* Add dialog */}
+      <Dialog open={dialog} onClose={() => setDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ width: 36, height: 36, borderRadius: '11px', bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <cfg.icon sx={{ color: 'text.secondary', fontSize: 20 }} />
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 650 }}>Log {cfg.label}</Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField autoFocus fullWidth type="number" label={`Value (${cfg.unit})`}
+              value={form.value} onChange={(e) => setForm(f => ({ ...f, value: e.target.value }))} />
+            <TextField fullWidth type="date" label="Date" InputLabelProps={{ shrink: true }}
+              value={form.date} onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))} />
+            <TextField fullWidth label="Notes (optional)" value={form.notes}
+              onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))} />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialog(false)} color="inherit">Cancel</Button>
+          <Button onClick={save} variant="contained" disabled={saving || !form.value}>
+            {saving ? 'Saving…' : 'Log it'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={!!toast} autoHideDuration={3000} onClose={() => setToast(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} sx={{ bottom: { xs: 90, md: 24 } }}>
+        <Alert severity="success" onClose={() => setToast(null)} sx={{ borderRadius: 3 }}>{toast}</Alert>
+      </Snackbar>
+      <Snackbar open={!!error} autoHideDuration={5000} onClose={() => setError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} sx={{ bottom: { xs: 90, md: 24 } }}>
+        <Alert severity="error" onClose={() => setError(null)} sx={{ borderRadius: 3 }}>{error}</Alert>
+      </Snackbar>
+    </Container>
   );
 }

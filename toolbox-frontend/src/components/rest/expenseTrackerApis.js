@@ -542,6 +542,44 @@ export const addSplitToExpenses = async (expenseId) => {
 };
 
 /**
+ * Update a split's amount. Only the amount field is editable; the server
+ * adjusts the parent expense total and notifies all parties.
+ */
+export const updateSplit = async (splitId, { amount }) => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/splits/${splitId}/`, {
+            method: 'PATCH',
+            body: JSON.stringify({ amount })
+        });
+        const data = await response.json();
+        return {
+            id: data.id,
+            amount: parseFloat(data.amount),
+            expenseTotal: parseFloat(data.expense_total || 0),
+            personName: data.person_name,
+            description: data.description,
+        };
+    } catch (error) {
+        throw handleApiError(error, 'update the split');
+    }
+};
+
+/**
+ * Delete a split. The server adjusts the parent expense total (or deletes the
+ * expense entirely if it was the last split) and notifies all parties.
+ */
+export const deleteSplit = async (splitId) => {
+    try {
+        await authenticatedFetch(`${API_BASE_URL}/splits/${splitId}/`, {
+            method: 'DELETE'
+        });
+        return true;
+    } catch (error) {
+        throw handleApiError(error, 'remove the split');
+    }
+};
+
+/**
  * Groups you split within. A group is a filter over the same splits the
  * person view uses, so nothing here is a separate set of numbers.
  */

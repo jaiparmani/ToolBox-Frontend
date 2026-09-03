@@ -43,7 +43,8 @@ import {
   getExpenseSummary, quickAddExpense, bulkAddExpenses,
   generateExpenseInsight, getLatestExpenseInsight, askExpenses,
   splitAddExpense, getSplitBalances, settleUpWith,
-  createSplitManually, searchSplitUsers, getSplits, addSplitToExpenses
+  createSplitManually, searchSplitUsers, getSplits, addSplitToExpenses,
+  updateSplit, deleteSplit
 } from '../rest/expenseTrackerApis';
 
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
@@ -232,6 +233,8 @@ export default function ExpenseTrackerPage() {
  // Expanded balance cards — show individual splits for a person.
  const [expandedPerson, setExpandedPerson] = useState(null);
  const [personSplits, setPersonSplits] = useState([]);
+ // Inline editing of a split amount.
+ const [editingSplit, setEditingSplit] = useState(null); // { id, amount }
 
  // Manual split: exact numbers, no model call and no quota spent
  const [splitForm, setSplitForm] = useState({
@@ -616,6 +619,42 @@ export default function ExpenseTrackerPage() {
    } catch (e) {
      setSplits(prev => ({ ...prev, settling: null }));
      setError(e.message || 'Could not settle');
+   }
+ };
+
+ const handleEditSplit = async (splitId, newAmount) => {
+   const parsed = parseFloat(newAmount);
+   if (!parsed || parsed <= 0) {
+     setError('Amount must be greater than zero');
+     return;
+   }
+   try {
+     await updateSplit(splitId, { amount: parsed });
+     setSuccess(`Split updated to ${formatCurrency(parsed)}`);
+     feedback('success');
+     window.dispatchEvent(new Event('toolbox:notify-refresh'));
+     setEditingSplit(null);
+     if (expandedPerson) {
+       const all = await getSplits({ personId: expandedPerson, settled: 'false' });
+       setPersonSplits(all);
+     }
+     loadBalances();
+   } catch (e) {
+     setError(e.message || 'Could not update split');
+   }
+ };
+
+ const handleDeleteSplit = async (splitId, personName, amount) => {
+   if (!window.confirm(`Remove ${personName}'s ${formatCurrency(amount)} split?`)) return;
+   try {
+     await deleteSplit(splitId);
+     setSuccess('Split removed');
+     feedback('success');
+     window.dispatchEvent(new Event('toolbox:notify-refresh'));
+     setPersonSplits(prev => prev.filter(s => s.id !== splitId));
+     loadBalances();
+   } catch (e) {
+     setError(e.message || 'Could not remove split');
    }
  };
 
@@ -1776,18 +1815,70 @@ export default function ExpenseTrackerPage() {
                                    {s.date}{s.paidBy ? ` · paid by ${s.paidBy}` : ''}
                                  </Typography>
                                </Box>
-                               <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                 {formatCurrency(s.amount)}
-                               </Typography>
-                               <Button
-                                 size="small"
-                                 variant="text"
-                                 sx={{ minWidth: 0, px: 1, fontSize: 11 }}
-                                 onClick={() => handleSettleSingle(s.id, s.personName, s.amount)}
-                                 disabled={splits.settling === `s${s.id}`}
-                               >
-                                 {splits.settling === `s${s.id}` ? '…' : 'Paid'}
-                               </Button>
+                               {editingSplit?.id === s.id ? (
+                                 <>
+                                   <TextField
+                                     size="small"
+                                     type="number"
+                                     value={editingSplit.amount}
+                                     onChange={(e) => setEditingSplit(prev => ({ ...prev, amount: e.target.value }))}
+                                     onKeyDown={(e) => {
+                                       if (e.key === 'Enter') handleEditSplit(s.id, editingSplit.amount);
+                                       if (e.key === 'Escape') setEditingSplit(null);
+                                     }}
+                                     autoFocus
+                                     InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+                                     sx={{ width: 110 }}
+                                   />
+                                   <IconButton
+                                     size="small"
+                                     onClick={() => handleEditSplit(s.id, editingSplit.amount)}
+                                     sx={{ color: accents.mint, p: 0.5 }}
+                                   >
+                                     <DoneAllIcon sx={{ fontSize: 16 }} />
+                                   </IconButton>
+                                   <IconButton
+                                     size="small"
+                                     onClick={() => setEditingSplit(null)}
+                                     sx={{ color: 'text.disabled', p: 0.5 }}
+                                   >
+                                     <CloseIcon sx={{ fontSize: 16 }} />
+                                   </IconButton>
+                                 </>
+                               ) : (
+                                 <>
+                                   <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                     {formatCurrency(s.amount)}
+                                   </Typography>
+                                   <Tooltip title="Edit amount">
+                                     <IconButton
+                                       size="small"
+                                       onClick={() => setEditingSplit({ id: s.id, amount: s.amount })}
+                                       sx={{ color: 'text.disabled', p: 0.5, '&:hover': { color: 'text.primary' } }}
+                                     >
+                                       <EditIcon sx={{ fontSize: 14 }} />
+                                     </IconButton>
+                                   </Tooltip>
+                                   <Tooltip title="Remove split">
+                                     <IconButton
+                                       size="small"
+                                       onClick={() => handleDeleteSplit(s.id, s.personName, s.amount)}
+                                       sx={{ color: 'text.disabled', p: 0.5, '&:hover': { color: accents.red } }}
+                                     >
+                                       <DeleteIcon sx={{ fontSize: 14 }} />
+                                     </IconButton>
+                                   </Tooltip>
+                                   <Button
+                                     size="small"
+                                     variant="text"
+                                     sx={{ minWidth: 0, px: 1, fontSize: 11 }}
+                                     onClick={() => handleSettleSingle(s.id, s.personName, s.amount)}
+                                     disabled={splits.settling === `s${s.id}`}
+                                   >
+                                     {splits.settling === `s${s.id}` ? '…' : 'Paid'}
+                                   </Button>
+                                 </>
+                               )}
                              </Box>
                            ))}
                          </Box>

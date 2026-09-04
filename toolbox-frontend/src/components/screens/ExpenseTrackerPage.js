@@ -9,7 +9,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, TablePagination, InputAdornment, Menu, MenuItem,
   ListItemIcon, ListItemText, LinearProgress, Autocomplete,
-  useMediaQuery, Collapse
+  useMediaQuery, Collapse, Slide, Stack, InputBase
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -66,7 +66,9 @@ import { feedback } from '../ui/feedback';
 import { TransactionStoryDrawer, buildStoryFromExpense, PageHeader } from '../ui';
 import CursorGlow from '../motion/CursorGlow';
 import AssistantOrb from '../ui/AssistantOrb';
-import { accents } from '../../theme/tokens';
+import { accents, color, motion, radius, type } from '../../theme/tokens';
+import { useTheme } from '@mui/material/styles';
+import { AnimatePresence, motion as framerMotion } from 'framer-motion';
 
 // Color palette for categories
 const categoryColors = [
@@ -75,6 +77,15 @@ const categoryColors = [
  '#009688', '#4caf50', '#8bc34a', '#cddc39',
  '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'
 ];
+
+/* SlideUp transition for full-screen mobile dialogs */
+const SlideUp = React.forwardRef((props, ref) => <Slide direction="up" ref={ref} {...props} />);
+
+/* framer-motion wrapper for animated rows */
+const MotionBox = framerMotion.create(Box);
+
+/* Shared number style — tabular, display face, tight tracking */
+const splitNumSx = { fontFamily: type.displayFamily, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.03em' };
 
 /** Opens the one ToolBox Assistant — the scattered AI boxes now live there. */
 function AssistantNudge({ label }) {
@@ -106,6 +117,8 @@ function AssistantNudge({ label }) {
 export default function ExpenseTrackerPage() {
   // Use global authentication state
   const { isAuthenticated, isLoading, user } = useAuth();
+  const theme = useTheme();
+  const splitFullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
  // Main data state
  const [expenses, setExpenses] = useState([]);
@@ -1185,114 +1198,169 @@ export default function ExpenseTrackerPage() {
              </Reveal>
            )}
 
-           {/* Filters */}
+           {/* Filters — a collapsible tray with a sunken inset feel */}
            <Paper
              elevation={0}
              sx={{
-               p: 2.5,
+               p: { xs: 1.75, sm: 2.5 },
                mb: 3,
-               borderRadius: '14px',
+               borderRadius: `${radius.lg}px`,
                border: '1px solid',
                borderColor: 'divider',
-               bgcolor: 'background.paper',
+               bgcolor: (t) => t.palette.mode === 'dark' ? color.sunken.dark : color.sunken.light,
+               backdropFilter: 'blur(12px)',
              }}
            >
              <Box
                display="flex" alignItems="center" gap={1}
                onClick={() => setFiltersOpen(prev => !prev)}
-               sx={{ mb: filtersOpen ? 2 : 0, cursor: { xs: 'pointer', md: 'default' } }}
+               sx={{ mb: filtersOpen ? 1.5 : 0, cursor: { xs: 'pointer', md: 'default' } }}
              >
                <Box
                  sx={{
-                   width: 26, height: 26, borderRadius: '8px',
-                   border: '1px solid', borderColor: 'divider',
+                   width: 28, height: 28, borderRadius: `${radius.sm}px`,
+                   bgcolor: (t) => t.palette.mode === 'dark'
+                     ? `${accents.violet}18`
+                     : `${accents.violet}12`,
                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                  }}
                >
-                 <FilterIcon sx={{ color: 'text.secondary', fontSize: 15 }} />
+                 <FilterIcon sx={{ color: accents.violet, fontSize: 15 }} />
                </Box>
-               <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600, flexGrow: 1 }}>
-                 Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+               <Typography variant="subtitle2" sx={{ fontWeight: 600, flexGrow: 1, color: 'text.secondary', fontSize: 13 }}>
+                 Filters
                </Typography>
-               {/* Four filter fields ate most of a phone screen before you saw a
-                   single expense, so they fold away until asked for. */}
-               <IconButton size="small" sx={{ display: { xs: 'inline-flex', md: 'none' } }}>
-                 {filtersOpen ? <CloseIcon fontSize="small" /> : <FilterIcon fontSize="small" />}
+               {activeFilterCount > 0 && (
+                 <Box
+                   sx={{
+                     px: 0.85, py: 0.15, borderRadius: `${radius.sm}px`, minWidth: 20,
+                     textAlign: 'center', fontSize: 11, fontWeight: 700,
+                     bgcolor: (t) => t.palette.mode === 'dark'
+                       ? `${accents.mint}22`
+                       : `${accents.mint}18`,
+                     color: accents.mint,
+                     letterSpacing: '0.02em',
+                   }}
+                 >
+                   {activeFilterCount}
+                 </Box>
+               )}
+               {/* Fold away on mobile so filters don't eat the viewport */}
+               <IconButton
+                 size="small"
+                 sx={{
+                   display: { xs: 'inline-flex', md: 'none' },
+                   transition: `transform ${motion.fast}ms ${motion.ease}`,
+                   transform: filtersOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                 }}
+               >
+                 <ExpandMoreIcon fontSize="small" />
                </IconButton>
              </Box>
              <Collapse in={filtersOpen}>
-             <Grid container spacing={2} alignItems="center">
-               <Grid item xs={12} md={4}>
-                 <TextField
-                   id="search-input"
-                   fullWidth
-                   size="small"
-                   label="Search expenses"
-                   value={filters.search}
-                   onChange={(e) => handleFilterChange('search', e.target.value)}
-                   InputProps={{
-                     startAdornment: (
-                       <InputAdornment position="start">
-                         <SearchIcon fontSize="small" />
-                       </InputAdornment>
-                     ),
+               {/* Compact 2-col on mobile, fluid row on desktop */}
+               <Box
+                 sx={{
+                   display: 'grid',
+                   gridTemplateColumns: { xs: '1fr 1fr', md: '2fr 1fr 1fr 1fr auto' },
+                   gap: { xs: 1.25, sm: 2 },
+                   alignItems: 'start',
+                 }}
+               >
+                 {/* Search — full width on mobile */}
+                 <Box sx={{ gridColumn: { xs: '1 / -1', md: 'auto' } }}>
+                   <TextField
+                     id="search-input"
+                     fullWidth
+                     size="small"
+                     label="Search expenses"
+                     value={filters.search}
+                     onChange={(e) => handleFilterChange('search', e.target.value)}
+                     InputProps={{
+                       startAdornment: (
+                         <InputAdornment position="start">
+                           <SearchIcon fontSize="small" />
+                         </InputAdornment>
+                       ),
+                     }}
+                     placeholder="Description, location..."
+                   />
+                 </Box>
+                 {/* Category — half width on mobile */}
+                 <Box>
+                   <AutocompleteComponent
+                     options={categories.map(cat => ({ label: cat.name, id: cat.id }))}
+                     label="Category"
+                     value={filters.category}
+                     onChange={(value) => handleFilterChange('category', value)}
+                   />
+                 </Box>
+                 {/* From date — half width on mobile */}
+                 <Box>
+                   <TextField
+                     fullWidth
+                     size="small"
+                     type="date"
+                     label="From"
+                     value={filters.dateFrom}
+                     onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                     InputLabelProps={{ shrink: true }}
+                   />
+                 </Box>
+                 {/* To date — half width on mobile */}
+                 <Box>
+                   <TextField
+                     fullWidth
+                     size="small"
+                     type="date"
+                     label="To"
+                     value={filters.dateTo}
+                     onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                     InputLabelProps={{ shrink: true }}
+                   />
+                 </Box>
+                 {/* Action buttons — inline row */}
+                 <Box
+                   sx={{
+                     display: 'flex', gap: 0.5, alignItems: 'center',
+                     gridColumn: { xs: '1 / -1', md: 'auto' },
+                     justifyContent: { xs: 'flex-end', md: 'flex-end' },
                    }}
-                   placeholder="Search by description, location..."
-                 />
-               </Grid>
-               <Grid item xs={12} md={2}>
-                 <AutocompleteComponent
-                   options={categories.map(cat => ({ label: cat.name, id: cat.id }))}
-                   label="Category"
-                   value={filters.category}
-                   onChange={(value) => handleFilterChange('category', value)}
-                 />
-               </Grid>
-               <Grid item xs={12} md={2}>
-                 <TextField
-                   fullWidth
-                   size="small"
-                   type="date"
-                   label="From Date"
-                   value={filters.dateFrom}
-                   onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-                   InputLabelProps={{ shrink: true }}
-                 />
-               </Grid>
-               <Grid item xs={12} md={2}>
-                 <TextField
-                   fullWidth
-                   size="small"
-                   type="date"
-                   label="To Date"
-                   value={filters.dateTo}
-                   onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-                   InputLabelProps={{ shrink: true }}
-                 />
-               </Grid>
-               <Grid item xs={12} md={2}>
-                 <Box display="flex" gap={1} justifyContent={{ xs: 'flex-start', md: 'flex-end' }}>
+                 >
                    <Tooltip title="Clear filters">
                      <IconButton
                        onClick={clearFilters}
                        size="small"
-                       sx={{ '&:hover': { color: accents.red } }}
+                       sx={{
+                         width: 32, height: 32, borderRadius: `${radius.sm}px`,
+                         bgcolor: (t) => t.palette.mode === 'dark'
+                           ? 'rgba(255,255,255,0.04)'
+                           : 'rgba(0,0,0,0.03)',
+                         '&:hover': { color: accents.red, bgcolor: `${accents.red}14` },
+                         transition: `color ${motion.fast}ms ${motion.ease}, background-color ${motion.fast}ms ${motion.ease}`,
+                       }}
                      >
-                       <CloseIcon fontSize="small" />
+                       <CloseIcon sx={{ fontSize: 16 }} />
                      </IconButton>
                    </Tooltip>
                    <Tooltip title="More filters">
                      <IconButton
                        onClick={(e) => handleMenuOpen(e, 'filter', null)}
                        size="small"
-                       sx={{ '&:hover': { color: 'text.primary' } }}
+                       sx={{
+                         width: 32, height: 32, borderRadius: `${radius.sm}px`,
+                         bgcolor: (t) => t.palette.mode === 'dark'
+                           ? 'rgba(255,255,255,0.04)'
+                           : 'rgba(0,0,0,0.03)',
+                         '&:hover': { color: 'text.primary' },
+                         transition: `color ${motion.fast}ms ${motion.ease}`,
+                       }}
                      >
-                       <FilterIcon fontSize="small" />
+                       <FilterIcon sx={{ fontSize: 16 }} />
                      </IconButton>
                    </Tooltip>
                  </Box>
-               </Grid>
-             </Grid>
+               </Box>
              </Collapse>
            </Paper>
 
@@ -2163,216 +2231,460 @@ export default function ExpenseTrackerPage() {
 
 
      {/* Manual split - exact numbers, no model call */}
-     <Dialog open={splitForm.open} onClose={closeSplitForm} maxWidth="sm" fullWidth>
-       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+     <Dialog
+       open={splitForm.open}
+       onClose={closeSplitForm}
+       maxWidth="sm"
+       fullWidth
+       fullScreen={splitFullScreen}
+       TransitionComponent={splitFullScreen ? SlideUp : undefined}
+       PaperProps={{
+         sx: {
+           borderRadius: splitFullScreen ? 0 : `${radius.xl}px`,
+           overflow: 'hidden',
+           bgcolor: 'background.default',
+           backgroundImage: 'none',
+         },
+       }}
+     >
+       {/* ── Hero header ─────────────────────────────────────────────── */}
+       <Box
+         sx={{
+           position: 'relative', px: 2.5,
+           pt: splitFullScreen ? 'calc(env(safe-area-inset-top) + 12px)' : 2.5,
+           pb: 3,
+           background: `linear-gradient(168deg, ${accents.amber}14 0%, transparent 60%)`,
+         }}
+       >
+         {/* ── Title bar ── */}
+         <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ mb: 2.5 }}>
+           <IconButton
+             onClick={closeSplitForm} size="small"
+             aria-label="Close split dialog"
+             sx={{
+               ml: -0.5, width: 36, height: 36,
+               borderRadius: `${radius.md}px`,
+               bgcolor: color.sunken.dark, border: '1px solid', borderColor: color.hairline.dark,
+               color: 'text.secondary',
+               '&:hover': { bgcolor: color.raised.dark },
+             }}
+           >
+             <CloseIcon sx={{ fontSize: 18 }} />
+           </IconButton>
+           <Stack direction="row" alignItems="center" spacing={1}>
+             <Box
+               sx={{
+                 width: 28, height: 28, borderRadius: `${radius.sm}px`,
+                 bgcolor: `${accents.amber}22`,
+                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+               }}
+             >
+               <CallSplitIcon sx={{ color: accents.amber, fontSize: 16 }} />
+             </Box>
+             <Typography
+               sx={{
+                 fontSize: 13, fontWeight: 650, letterSpacing: '-0.01em',
+                 color: 'text.secondary',
+               }}
+             >
+               Split a bill
+             </Typography>
+           </Stack>
+           <Box sx={{ width: 36 }} />
+         </Box>
+
+         {/* ── Hero amount ── */}
          <Box
            sx={{
-             width: 40, height: 40, borderRadius: '12px',
-             bgcolor: `${accents.amber}1f`,
-             display: 'flex', alignItems: 'center', justifyContent: 'center',
-             flexShrink: 0,
+             cursor: 'text', textAlign: 'center', py: 1,
+             display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.25,
            }}
          >
-           <CallSplitIcon sx={{ color: accents.amber, fontSize: 20 }} />
-         </Box>
-         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-           <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>Split a bill</Typography>
-           <Typography variant="body2" color="text.secondary">
-             Exact amounts, no AI involved
+           <Typography
+             sx={{
+               ...splitNumSx, fontWeight: 600,
+               fontSize: 'clamp(1.8rem, 6vw, 2.6rem)',
+               color: accents.amber, opacity: 0.45,
+               lineHeight: 1,
+             }}
+           >
+             {'₹'}
            </Typography>
+           <InputBase
+             type="number" placeholder="0" value={splitForm.amount}
+             onChange={(e) => setSplitForm(prev => ({ ...prev, amount: e.target.value }))}
+             inputProps={{ inputMode: 'decimal', style: { textAlign: 'center' }, 'aria-label': 'Total amount' }}
+             sx={{
+               '& input': {
+                 ...splitNumSx,
+                 fontSize: 'clamp(2.8rem, 10vw, 4rem)', fontWeight: 700,
+                 lineHeight: 1,
+                 color: accents.amber,
+                 width: `${Math.max((String(splitForm.amount).length || 1), 1) + 1}ch`,
+                 minWidth: '2ch', maxWidth: '8ch', padding: 0,
+                 MozAppearance: 'textfield',
+               },
+               '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
+                 WebkitAppearance: 'none', margin: 0,
+               },
+               '& input::placeholder': { color: `${accents.amber}33` },
+             }}
+           />
          </Box>
-         <IconButton onClick={closeSplitForm} size="small"><CloseIcon fontSize="small" /></IconButton>
-       </DialogTitle>
-       <DialogContent>
-         <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
-           <Grid item xs={12} sm={5}>
-             <TextField
-               fullWidth label="Amount *" type="number"
-               value={splitForm.amount}
-               onChange={(e) => setSplitForm(prev => ({ ...prev, amount: e.target.value }))}
-               InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
-             />
-           </Grid>
-           <Grid item xs={12} sm={7}>
-             <TextField
-               fullWidth label="What for? *"
-               value={splitForm.description}
-               onChange={(e) => setSplitForm(prev => ({ ...prev, description: e.target.value }))}
-             />
-           </Grid>
+       </Box>
 
-           <Grid item xs={12}>
-             <AutocompleteComponent
-               options={categories.map(cat => ({ label: cat.name, id: cat.id }))}
-               label="Category"
-               value={splitForm.categoryId}
-               onChange={(value) => setSplitForm(prev => ({ ...prev, categoryId: value }))}
-             />
-           </Grid>
+       {/* ── Hairline separator ── */}
+       <Box sx={{ height: '1px', bgcolor: color.hairline.dark }} />
 
-           <Grid item xs={12}>
-             <Autocomplete
-               multiple
-               freeSolo
-               options={splitForm.userOptions}
-               getOptionLabel={(option) =>
-                 typeof option === 'string' ? option : option.username}
-               filterSelectedOptions
-               loading={splitForm.searching}
-               onInputChange={(e, value, reason) => {
-                 if (reason === 'input' && value.length >= 2) searchUsers(value);
-               }}
-               onChange={(e, values) => {
-                 setSplitForm(prev => ({
-                   ...prev,
-                   // An option from the list carries a userId, so the split
-                   // reaches that account's panel; free text is a name only.
-                   people: values.map(v => {
-                     const existing = prev.people.find(p =>
-                       p.label === (typeof v === 'string' ? v : v.username));
-                     if (existing) return existing;
-                     return typeof v === 'string'
-                       ? { label: v, userId: null, amount: '' }
-                       : { label: v.username, userId: v.userId, amount: '' };
-                   })
-                 }));
-               }}
-               renderInput={(params) => (
-                 <TextField
-                   {...params}
-                   label="Split with *"
-                   placeholder="Search accounts, or type a name"
-                   helperText="People with an account see the split in their own panel"
-                 />
-               )}
-             />
-           </Grid>
+       {/* ── Body ─────────────────────────────────────────────────────── */}
+       <Box sx={{ px: 2.5, pt: 2.5, pb: 2, overflowY: 'auto', flex: 1 }}>
+         <Stack spacing={2.5}>
+           {/* ── Description field ── */}
+           <TextField
+             fullWidth label="What for? *"
+             value={splitForm.description}
+             onChange={(e) => setSplitForm(prev => ({ ...prev, description: e.target.value }))}
+             sx={{
+               '& .MuiOutlinedInput-root': {
+                 borderRadius: `${radius.md}px`,
+                 '& fieldset': { borderColor: color.hairline.dark },
+                 '&:hover fieldset': { borderColor: 'text.disabled' },
+                 '&.Mui-focused fieldset': { borderColor: `${accents.amber}66`, borderWidth: 1 },
+               },
+             }}
+           />
 
-           {splitForm.people.length > 0 && (
-             <Grid item xs={12}>
-               <Box
-                 sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider', px: 2, py: 0.5, mb: 1.5 }}
+           {/* ── Category ── */}
+           <AutocompleteComponent
+             options={categories.map(cat => ({ label: cat.name, id: cat.id }))}
+             label="Category"
+             value={splitForm.categoryId}
+             onChange={(value) => setSplitForm(prev => ({ ...prev, categoryId: value }))}
+           />
+
+           {/* ── People search ── */}
+           <Autocomplete
+             multiple
+             freeSolo
+             options={splitForm.userOptions}
+             getOptionLabel={(option) =>
+               typeof option === 'string' ? option : option.username}
+             filterSelectedOptions
+             loading={splitForm.searching}
+             onInputChange={(e, value, reason) => {
+               if (reason === 'input' && value.length >= 2) searchUsers(value);
+             }}
+             onChange={(e, values) => {
+               setSplitForm(prev => ({
+                 ...prev,
+                 // An option from the list carries a userId, so the split
+                 // reaches that account's panel; free text is a name only.
+                 people: values.map(v => {
+                   const existing = prev.people.find(p =>
+                     p.label === (typeof v === 'string' ? v : v.username));
+                   if (existing) return existing;
+                   return typeof v === 'string'
+                     ? { label: v, userId: null, amount: '' }
+                     : { label: v.username, userId: v.userId, amount: '' };
+                 })
+               }));
+             }}
+             renderInput={(params) => (
+               <TextField
+                 {...params}
+                 label="Split with *"
+                 placeholder="Search accounts, or type a name"
+                 helperText="People with an account see the split in their own panel"
+                 sx={{
+                   '& .MuiOutlinedInput-root': {
+                     borderRadius: `${radius.md}px`,
+                     '& fieldset': { borderColor: color.hairline.dark },
+                     '&:hover fieldset': { borderColor: 'text.disabled' },
+                     '&.Mui-focused fieldset': { borderColor: `${accents.amber}66`, borderWidth: 1 },
+                   },
+                 }}
+               />
+             )}
+           />
+
+           {/* ── People details (animated in) ── */}
+           <AnimatePresence initial={false}>
+             {splitForm.people.length > 0 && (
+               <MotionBox
+                 initial={{ opacity: 0, y: 12 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 exit={{ opacity: 0, y: -8 }}
+                 transition={{ duration: motion.normal / 1000, ease: [0.32, 0.72, 0, 1] }}
                >
-                 <FormControlLabel
-                   control={
-                     <Switch
-                       checked={splitForm.splitWithMe}
-                       onChange={(e) => setSplitForm(prev => ({ ...prev, splitWithMe: e.target.checked }))}
+                 <Stack spacing={2}>
+                   {/* ── Toggles ── */}
+                   <Box
+                     sx={{
+                       borderRadius: `${radius.lg}px`,
+                       bgcolor: color.sunken.dark,
+                       border: '1px solid', borderColor: color.hairline.dark,
+                       px: 2, py: 0.75,
+                       display: 'flex', flexWrap: 'wrap', gap: 1,
+                     }}
+                   >
+                     <FormControlLabel
+                       control={
+                         <Switch
+                           checked={splitForm.splitWithMe}
+                           onChange={(e) => setSplitForm(prev => ({ ...prev, splitWithMe: e.target.checked }))}
+                           size="small"
+                         />
+                       }
+                       label={<Typography sx={{ fontSize: 13, fontWeight: 500 }}>I shared this too</Typography>}
                      />
-                   }
-                   label="I shared this too"
-                 />
-                 <FormControlLabel
-                   control={
-                     <Switch
-                       checked={splitForm.addToExpenses}
-                       onChange={(e) => setSplitForm(prev => ({ ...prev, addToExpenses: e.target.checked }))}
+                     <FormControlLabel
+                       control={
+                         <Switch
+                           checked={splitForm.addToExpenses}
+                           onChange={(e) => setSplitForm(prev => ({ ...prev, addToExpenses: e.target.checked }))}
+                           size="small"
+                         />
+                       }
+                       label={<Typography sx={{ fontSize: 13, fontWeight: 500 }}>Add to my expenses</Typography>}
                      />
-                   }
-                   label="Add to my expenses"
-                 />
-               </Box>
-
-               <Box sx={{ mt: 1.5, mb: 0.5 }}>
-                 <Typography variant="caption" color="text.secondary" sx={{ mb: 0.75, display: 'block' }}>
-                   Who paid?
-                 </Typography>
-                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                   <Chip
-                     label="I paid"
-                     size="small"
-                     variant={!splitForm.paidBy ? 'filled' : 'outlined'}
-                     color={!splitForm.paidBy ? 'primary' : 'default'}
-                     onClick={() => setSplitForm(prev => ({ ...prev, paidBy: '' }))}
-                   />
-                   {splitForm.people.map(p => (
-                     <Chip
-                       key={p.label}
-                       label={p.label}
-                       size="small"
-                       variant={splitForm.paidBy === p.label ? 'filled' : 'outlined'}
-                       color={splitForm.paidBy === p.label ? 'primary' : 'default'}
-                       onClick={() => setSplitForm(prev => ({ ...prev, paidBy: p.label }))}
-                     />
-                   ))}
-                 </Box>
-               </Box>
-
-               <Typography variant="caption" color="text.secondary">
-                 Leave amounts blank to divide evenly, or set one to fix that person's share
-               </Typography>
-               {splitForm.people.map((person, index) => (
-                 <Box key={person.label} display="flex" alignItems="center" gap={2} sx={{ mt: 1.5 }}>
-                   <Chip
-                     label={person.label}
-                     size="small"
-                     color={person.userId ? 'primary' : 'default'}
-                     variant={person.userId ? 'filled' : 'outlined'}
-                     sx={{ minWidth: 110 }}
-                   />
-                   <TextField
-                     size="small" type="number" placeholder="even"
-                     value={person.amount}
-                     onChange={(e) => setSplitForm(prev => {
-                       const people = [...prev.people];
-                       people[index] = { ...people[index], amount: e.target.value };
-                       return { ...prev, people };
-                     })}
-                     InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
-                     sx={{ width: 150 }}
-                   />
-                 </Box>
-               ))}
-             </Grid>
-           )}
-
-           {(() => {
-             const preview = previewShares();
-             if (!preview) return null;
-             if (preview.error) {
-               return (
-                 <Grid item xs={12}>
-                   <Alert severity="warning">{preview.error}</Alert>
-                 </Grid>
-               );
-             }
-             return (
-               <Grid item xs={12}>
-                 <Paper
-                   elevation={0}
-                   sx={{ p: 2, borderRadius: 2, border: '1px dashed', borderColor: 'divider' }}
-                 >
-                   <Typography variant="caption" color="text.secondary">Who owes what</Typography>
-                   {preview.shares.map((share) => (
-                     <Box key={share.label} display="flex" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                       <Typography variant="body2">{share.label}</Typography>
-                       <Typography variant="body2" fontWeight={600}>
-                         {formatCurrency(share.amount)}
-                       </Typography>
-                     </Box>
-                   ))}
-                   <Box display="flex" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                     <Typography variant="body2" color="text.secondary">you</Typography>
-                     <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                       {formatCurrency(preview.yours)}
-                     </Typography>
                    </Box>
-                 </Paper>
-               </Grid>
-             );
-           })()}
-         </Grid>
-       </DialogContent>
-       <DialogActions>
-         <Button onClick={closeSplitForm} color="inherit">Cancel</Button>
+
+                   {/* ── Who paid? toggle group ── */}
+                   <Box>
+                     <Typography
+                       sx={{
+                         fontSize: 11, fontWeight: 650, letterSpacing: '0.08em', textTransform: 'uppercase',
+                         color: 'text.secondary', mb: 1,
+                       }}
+                     >
+                       Who paid?
+                     </Typography>
+                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                       {[{ label: 'I paid', value: '' }, ...splitForm.people.map(p => ({ label: p.label, value: p.label }))].map(opt => {
+                         const selected = splitForm.paidBy === opt.value;
+                         return (
+                           <Box
+                             key={opt.value || '__me'}
+                             onClick={() => setSplitForm(prev => ({ ...prev, paidBy: opt.value }))}
+                             role="radio"
+                             aria-checked={selected}
+                             tabIndex={0}
+                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSplitForm(prev => ({ ...prev, paidBy: opt.value })); }}}
+                             sx={{
+                               px: 1.5, py: 0.625,
+                               borderRadius: `${radius.pill}px`,
+                               border: '1.5px solid',
+                               borderColor: selected ? accents.amber : color.hairline.dark,
+                               bgcolor: selected ? `${accents.amber}18` : 'transparent',
+                               color: selected ? accents.amber : 'text.secondary',
+                               fontSize: 13, fontWeight: selected ? 650 : 500,
+                               cursor: 'pointer', userSelect: 'none',
+                               transition: `all ${motion.fast}ms ${motion.ease}`,
+                               '&:hover': {
+                                 borderColor: selected ? accents.amber : 'text.disabled',
+                                 bgcolor: selected ? `${accents.amber}22` : color.sunken.dark,
+                               },
+                             }}
+                           >
+                             {opt.label}
+                           </Box>
+                         );
+                       })}
+                     </Box>
+                   </Box>
+
+                   {/* ── Per-person share rows ── */}
+                   <Box>
+                     <Typography
+                       sx={{
+                         fontSize: 11, fontWeight: 650, letterSpacing: '0.08em', textTransform: 'uppercase',
+                         color: 'text.secondary', mb: 1,
+                       }}
+                     >
+                       Individual shares
+                     </Typography>
+                     <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1.5 }}>
+                       Leave blank to divide evenly, or set a fixed share
+                     </Typography>
+                     <Stack spacing={1}>
+                       <AnimatePresence initial={false}>
+                         {splitForm.people.map((person, index) => (
+                           <MotionBox
+                             key={person.label}
+                             initial={{ opacity: 0, x: -16 }}
+                             animate={{ opacity: 1, x: 0 }}
+                             exit={{ opacity: 0, x: 16 }}
+                             transition={{ duration: motion.fast / 1000, ease: [0.32, 0.72, 0, 1] }}
+                             sx={{
+                               display: 'flex', alignItems: 'center', gap: 1.5,
+                               px: 1.5, py: 1,
+                               borderRadius: `${radius.md}px`,
+                               bgcolor: color.sunken.dark,
+                               border: '1px solid', borderColor: color.hairline.dark,
+                             }}
+                           >
+                             {/* Person avatar circle */}
+                             <Box
+                               sx={{
+                                 width: 32, height: 32, borderRadius: '50%',
+                                 bgcolor: person.userId ? `${accents.blue}22` : `${accents.violet}18`,
+                                 border: '1.5px solid',
+                                 borderColor: person.userId ? `${accents.blue}44` : `${accents.violet}33`,
+                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                 flexShrink: 0,
+                               }}
+                             >
+                               <PersonIcon sx={{
+                                 fontSize: 16,
+                                 color: person.userId ? accents.blue : accents.violet,
+                               }} />
+                             </Box>
+                             {/* Name */}
+                             <Typography
+                               sx={{
+                                 flex: 1, fontSize: 14, fontWeight: 550,
+                                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                               }}
+                             >
+                               {person.label}
+                             </Typography>
+                             {/* Amount input */}
+                             <Box
+                               sx={{
+                                 display: 'flex', alignItems: 'center', gap: 0.5,
+                                 px: 1, py: 0.25,
+                                 borderRadius: `${radius.sm}px`,
+                                 bgcolor: 'background.default',
+                                 border: '1px solid', borderColor: color.hairline.dark,
+                                 width: 120,
+                                 transition: `border-color ${motion.fast}ms ${motion.ease}`,
+                                 '&:focus-within': { borderColor: `${accents.amber}55` },
+                               }}
+                             >
+                               <Typography sx={{ fontSize: 13, color: 'text.disabled', fontWeight: 500, flexShrink: 0 }}>₹</Typography>
+                               <InputBase
+                                 type="number" placeholder="even"
+                                 value={person.amount}
+                                 onChange={(e) => setSplitForm(prev => {
+                                   const people = [...prev.people];
+                                   people[index] = { ...people[index], amount: e.target.value };
+                                   return { ...prev, people };
+                                 })}
+                                 inputProps={{ inputMode: 'decimal', 'aria-label': `Share for ${person.label}` }}
+                                 sx={{
+                                   flex: 1,
+                                   '& input': {
+                                     ...splitNumSx, fontSize: 14, fontWeight: 600,
+                                     py: 0.5, px: 0, color: 'text.primary',
+                                     MozAppearance: 'textfield',
+                                   },
+                                   '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
+                                     WebkitAppearance: 'none', margin: 0,
+                                   },
+                                   '& input::placeholder': { fontWeight: 400, color: 'text.disabled' },
+                                 }}
+                               />
+                             </Box>
+                           </MotionBox>
+                         ))}
+                       </AnimatePresence>
+                     </Stack>
+                   </Box>
+
+                   {/* ── Preview: Who owes what ── */}
+                   {(() => {
+                     const preview = previewShares();
+                     if (!preview) return null;
+                     if (preview.error) {
+                       return <Alert severity="warning" sx={{ borderRadius: `${radius.md}px` }}>{preview.error}</Alert>;
+                     }
+                     return (
+                       <MotionBox
+                         initial={{ opacity: 0, y: 10 }}
+                         animate={{ opacity: 1, y: 0 }}
+                         transition={{ duration: motion.normal / 1000, ease: [0.32, 0.72, 0, 1] }}
+                       >
+                         <Box
+                           sx={{
+                             p: 2, borderRadius: `${radius.lg}px`,
+                             background: `linear-gradient(135deg, ${accents.amber}0a 0%, ${accents.violet}08 100%)`,
+                             border: '1px solid', borderColor: `${accents.amber}22`,
+                           }}
+                         >
+                           <Typography
+                             sx={{
+                               fontSize: 11, fontWeight: 650, letterSpacing: '0.08em', textTransform: 'uppercase',
+                               color: 'text.secondary', mb: 1.25,
+                             }}
+                           >
+                             Who owes what
+                           </Typography>
+                           <Stack spacing={0.75}>
+                             {preview.shares.map((share) => (
+                               <Box key={share.label} display="flex" justifyContent="space-between" alignItems="center">
+                                 <Typography sx={{ fontSize: 14, fontWeight: 500 }}>{share.label}</Typography>
+                                 <Typography sx={{ ...splitNumSx, fontSize: 14, fontWeight: 650, color: accents.amber }}>
+                                   {formatCurrency(share.amount)}
+                                 </Typography>
+                               </Box>
+                             ))}
+                             <Box sx={{ height: '1px', bgcolor: color.hairline.dark, my: 0.25 }} />
+                             <Box display="flex" justifyContent="space-between" alignItems="center">
+                               <Typography sx={{ fontSize: 14, fontWeight: 500, color: 'text.secondary' }}>you</Typography>
+                               <Typography sx={{ ...splitNumSx, fontSize: 14, fontWeight: 650, color: 'text.secondary' }}>
+                                 {formatCurrency(preview.yours)}
+                               </Typography>
+                             </Box>
+                           </Stack>
+                         </Box>
+                       </MotionBox>
+                     );
+                   })()}
+                 </Stack>
+               </MotionBox>
+             )}
+           </AnimatePresence>
+         </Stack>
+       </Box>
+
+       {/* ── Footer ── */}
+       <Box
+         sx={{
+           px: 2.5, pt: 1.5,
+           pb: splitFullScreen ? 'calc(env(safe-area-inset-bottom) + 16px)' : 2,
+           borderTop: '1px solid', borderColor: color.hairline.dark,
+           display: 'flex', justifyContent: 'flex-end', gap: 1.5,
+         }}
+       >
+         <Button
+           onClick={closeSplitForm}
+           sx={{
+             color: 'text.secondary', fontWeight: 600,
+             borderRadius: `${radius.md}px`,
+             '&:hover': { bgcolor: color.sunken.dark },
+           }}
+         >
+           Cancel
+         </Button>
          <Button
            onClick={saveManualSplit}
            variant="contained"
            disabled={splitForm.saving || !splitForm.amount || splitForm.people.length === 0}
+           sx={{
+             borderRadius: `${radius.md}px`,
+             bgcolor: accents.amber,
+             color: '#000',
+             fontWeight: 650,
+             px: 3,
+             textTransform: 'none',
+             boxShadow: `0 4px 14px -4px ${accents.amber}66`,
+             '&:hover': { bgcolor: accents.amber, filter: 'brightness(1.08)' },
+             '&.Mui-disabled': { bgcolor: `${accents.amber}33`, color: 'rgba(0,0,0,0.3)' },
+           }}
          >
            {splitForm.saving ? 'Saving...' : 'Create split'}
          </Button>
-       </DialogActions>
+       </Box>
      </Dialog>
 
      {/* Floating Action Button for mobile */}

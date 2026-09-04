@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Typography, IconButton } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { accents, type } from '../../theme/tokens';
+import { accents, type, motion, radius, color } from '../../theme/tokens';
 
 const num = { fontFamily: type.displayFamily, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' };
 const pad = (n) => String(n).padStart(2, '0');
@@ -65,13 +65,14 @@ export default function ActivityScopeBar({ scope, onScope }) {
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1.5 }}>
-      {/* segmented pill */}
+      {/* segmented pill — taller touch targets, distinct active state */}
       <Box
         role="tablist"
         aria-label="Date scope"
         sx={{
-          display: 'inline-flex', p: '3px', borderRadius: 999,
-          border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper',
+          display: 'inline-flex', p: '3px', borderRadius: radius.pill,
+          border: '1px solid', borderColor: 'divider',
+          bgcolor: (t) => t.palette.mode === 'dark' ? color.sunken.dark : color.sunken.light,
         }}
       >
         {SEGMENTS.map((seg) => {
@@ -85,14 +86,28 @@ export default function ActivityScopeBar({ scope, onScope }) {
               onClick={() => pick(seg.id)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(seg.id); } }}
               sx={{
-                px: { xs: 1.25, sm: 1.75 }, py: 0.6, borderRadius: 999, cursor: 'pointer',
-                fontSize: 12.5, fontWeight: active ? 650 : 500,
+                position: 'relative',
+                px: { xs: 1.5, sm: 2 }, py: { xs: 0.85, sm: 0.85 },
+                borderRadius: radius.pill, cursor: 'pointer',
+                fontSize: { xs: 12.5, sm: 13 }, fontWeight: active ? 650 : 500,
                 letterSpacing: '-0.01em', whiteSpace: 'nowrap', userSelect: 'none',
                 color: active ? 'text.primary' : 'text.secondary',
-                bgcolor: active ? 'action.selected' : 'transparent',
-                transition: 'color 140ms ease, background-color 140ms ease',
+                bgcolor: active ? 'background.paper' : 'transparent',
+                boxShadow: active
+                  ? (t) => t.palette.mode === 'dark'
+                    ? '0 1px 3px rgba(0,0,0,0.4)'
+                    : '0 1px 3px rgba(0,0,0,0.08)'
+                  : 'none',
+                transition: `color ${motion.fast}ms ${motion.ease}, background-color ${motion.fast}ms ${motion.ease}, box-shadow ${motion.fast}ms ${motion.ease}`,
                 '&:hover': { color: 'text.primary' },
                 '&:focus-visible': { outline: `2px solid ${accents.mint}`, outlineOffset: 2 },
+                /* thin accent underline on the active segment */
+                '&::after': active ? {
+                  content: '""', position: 'absolute',
+                  bottom: 4, left: '25%', right: '25%', height: 2,
+                  borderRadius: 1, bgcolor: accents.blue,
+                  opacity: 0.7,
+                } : {},
               }}
             >
               {seg.label}
@@ -101,19 +116,25 @@ export default function ActivityScopeBar({ scope, onScope }) {
         })}
       </Box>
 
-      {/* month stepper — only meaningful when a month is in view */}
+      {/* month stepper — wraps gracefully on narrow screens */}
       {inMonth && (
         <Box
           sx={{
             display: 'inline-flex', alignItems: 'center', gap: 0.25,
-            border: '1px solid', borderColor: 'divider', borderRadius: 999,
-            bgcolor: 'background.paper', pl: 0.25, pr: 0.25,
+            border: '1px solid', borderColor: 'divider', borderRadius: radius.pill,
+            bgcolor: 'background.paper', pl: 0.5, pr: 0.5,
+            flexShrink: 0, minWidth: 0,
           }}
         >
-          <IconButton size="small" onClick={() => stepMonth(-1)} aria-label="Previous month" sx={{ width: 30, height: 30 }}>
+          <IconButton
+            size="small"
+            onClick={() => stepMonth(-1)}
+            aria-label="Previous month"
+            sx={{ width: 32, height: 32 }}
+          >
             <ChevronLeftIcon fontSize="small" />
           </IconButton>
-          <Typography sx={{ ...num, fontSize: 12.5, fontWeight: 600, minWidth: 74, textAlign: 'center', color: 'text.primary' }}>
+          <Typography sx={{ ...num, fontSize: 13, fontWeight: 600, minWidth: 76, textAlign: 'center', color: 'text.primary' }}>
             {MONTHS[scope.month]} {scope.year}
           </Typography>
           <IconButton
@@ -121,7 +142,7 @@ export default function ActivityScopeBar({ scope, onScope }) {
             onClick={() => stepMonth(1)}
             disabled={atCurrentMonth}
             aria-label="Next month"
-            sx={{ width: 30, height: 30 }}
+            sx={{ width: 32, height: 32 }}
           >
             <ChevronRightIcon fontSize="small" />
           </IconButton>

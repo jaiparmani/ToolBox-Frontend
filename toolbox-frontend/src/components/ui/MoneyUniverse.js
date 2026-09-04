@@ -38,7 +38,7 @@ export default function MoneyUniverse({
   const hoverRef = useRef(hover); hoverRef.current = hover; // read live in the loop (no restart)
   const [reduce, setReduce] = useState(false);
 
-  const H = height || (compact ? 300 : 380);
+  const H = height || (compact ? 340 : 420);
   const key = weatherKey || deriveWeather({ projection, pulse }).key || 'clear';
   const baseAura = { clear: accents.mint, tailwind: accents.cyan, pressure: accents.amber, storm: accents.red }[key] || accents.mint;
   const auraSpeed = { clear: 1, tailwind: 1.15, pressure: 1.3, storm: 1.6 }[key] || 1;
@@ -94,6 +94,9 @@ export default function MoneyUniverse({
     });
   }, [categories, income, bills, compact, dark]);
 
+  // Total spending across categories — used for the hover tooltip percentage.
+  const totalSpent = useMemo(() => (categories || []).filter(c => c.amount > 0).reduce((s, c) => s + c.amount, 0), [categories]);
+
   const hasData = bodies.length > 0 || Math.abs(net) > 0;
 
   // ── Render loop ──────────────────────────────────────────────────────────
@@ -141,6 +144,7 @@ export default function MoneyUniverse({
         { hue: baseAura, ox: 0.32, oy: 0.36, r: 0.52, sp: 0.05, ph: 0 },
         { hue: accents.violet, ox: 0.7, oy: 0.62, r: 0.6, sp: 0.04, ph: 2.1 },
         { hue: accents.blue, ox: 0.52, oy: 0.44, r: 0.5, sp: 0.03, ph: 4.3 },
+        { hue: accents.cyan, ox: 0.24, oy: 0.68, r: 0.44, sp: 0.035, ph: 5.6 },
       ];
       ctx.globalCompositeOperation = 'lighter';
       for (const n of clouds) {
@@ -148,7 +152,7 @@ export default function MoneyUniverse({
         const ny = Hh * n.oy + Math.cos(dt * n.sp * 0.8 + n.ph) * Hh * 0.13;
         const rad = Math.min(W, Hh) * n.r;
         const g = ctx.createRadialGradient(nx, ny, 0, nx, ny, rad);
-        g.addColorStop(0, hexA(n.hue, dark ? 0.10 : 0.06));
+        g.addColorStop(0, hexA(n.hue, dark ? 0.13 : 0.08));
         g.addColorStop(1, hexA(n.hue, 0));
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(nx, ny, rad, 0, 7); ctx.fill();
       }
@@ -181,6 +185,36 @@ export default function MoneyUniverse({
         }
         ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
       }
+
+      // Orbit ring outlines — faint dashed circles at each orbital distance,
+      // so the spatial structure reads even without bodies.
+      ctx.save();
+      ctx.setLineDash([3, 7]);
+      ctx.lineWidth = 0.75;
+      ctx.strokeStyle = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+      for (const ringVal of [RING.income, RING.category, RING.bill]) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, oMax * ringVal, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Ring labels — faint uppercase markers along the orbits, like a star chart.
+      ctx.save();
+      ctx.font = `600 ${compact ? 7.5 : 9}px -apple-system, "SF Pro Display", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = dark ? 'rgba(140,148,180,0.22)' : 'rgba(80,90,120,0.25)';
+      const labelAngle = Math.PI * 0.62;
+      [
+        { text: 'INCOME', ring: RING.income },
+        { text: 'SPENDING', ring: RING.category },
+        { text: 'BILLS', ring: RING.bill },
+      ].forEach(l => {
+        const rl = oMax * l.ring;
+        ctx.fillText(l.text, cx + Math.cos(labelAngle) * rl, cy + Math.sin(labelAngle) * rl);
+      });
+      ctx.restore();
 
       // Positions
       const pts = bodies.map((b, i) => {
@@ -350,10 +384,10 @@ export default function MoneyUniverse({
       <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
         {/* The number sits on the coloured star core, so it reads white with a
             dark halo (legible on mint or red); the star itself carries the +/- signal. */}
-        <Typography sx={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: overrideActive ? accents.cyan : 'rgba(255,255,255,0.9)', textTransform: 'uppercase', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
+        <Typography sx={{ fontSize: { xs: 11, sm: 13 }, fontWeight: 700, letterSpacing: '0.16em', color: overrideActive ? accents.cyan : 'rgba(255,255,255,0.92)', textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.85)' }}>
           {overrideActive ? (overrideLabel || 'Projected') : 'Net'}
         </Typography>
-        <Typography component="div" sx={{ fontSize: { xs: '1rem', sm: '1.2rem' }, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums', textShadow: '0 0 6px rgba(0,0,0,0.85), 0 1px 2px rgba(0,0,0,0.9)' }}>
+        <Typography component="div" sx={{ fontSize: { xs: '1.15rem', sm: '1.45rem' }, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff', fontVariantNumeric: 'tabular-nums', textShadow: '0 0 8px rgba(0,0,0,0.9), 0 1px 3px rgba(0,0,0,0.95)' }}>
           <AnimatedNumber value={targetNet} format="smart" />
         </Typography>
       </Box>
@@ -361,18 +395,25 @@ export default function MoneyUniverse({
       {/* Hover / focus readout */}
       {active && (
         <Box sx={{ position: 'absolute', left: 12, bottom: 12, right: 12, display: 'flex', alignItems: 'center', gap: 1,
-          px: 1.5, py: 1, borderRadius: 3, backdropFilter: 'blur(8px)',
-          bgcolor: dark ? 'rgba(20,22,32,0.72)' : 'rgba(255,255,255,0.82)', border: '1px solid', borderColor: 'divider', pointerEvents: 'none' }}>
-          <Box sx={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, background: active.color }} />
+          px: 1.5, py: 1, borderRadius: 3, backdropFilter: 'blur(10px)',
+          bgcolor: dark ? 'rgba(20,22,32,0.78)' : 'rgba(255,255,255,0.85)', border: '1px solid', borderColor: 'divider', pointerEvents: 'none' }}>
+          <Box sx={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, background: active.color, boxShadow: `0 0 8px ${active.color}` }} />
           <Typography sx={{ fontSize: 13, fontWeight: 600 }} noWrap>{active.name}</Typography>
-          <Typography sx={{ ml: 'auto', fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: active.color }}>{moneySmart(active.amount)}</Typography>
+          <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'baseline', gap: 0.75, flexShrink: 0 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: active.color }}>{moneySmart(active.amount)}</Typography>
+            {active.kind === 'category' && totalSpent > 0 && (
+              <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.disabled' }}>
+                {Math.round(active.amount / totalSpent * 100)}%
+              </Typography>
+            )}
+          </Box>
         </Box>
       )}
 
       {/* Hint (fades where a body is active) */}
       {!active && (
         <Typography sx={{ position: 'absolute', left: 0, right: 0, bottom: 10, textAlign: 'center', fontSize: 11, color: 'text.secondary', pointerEvents: 'none', opacity: 0.8 }}>
-          {reduce ? 'Every body is real money — hover to read it' : 'Hover a world to read it · bigger means it cost more'}
+          {reduce ? 'Every body is real money — hover to read it' : 'Hover a world to read it · bigger means more · centre is your net'}
         </Typography>
       )}
 

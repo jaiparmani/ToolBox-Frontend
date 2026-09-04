@@ -37,6 +37,7 @@ export { default as CashFlowRiver } from './CashFlowRiver';
 export { default as MoneyUniverse } from './MoneyUniverse';
 export { default as NotificationBell } from './NotificationBell';
 export { default as TelegramConnect } from './TelegramConnect';
+export { default as ShortcutConnect } from './ShortcutConnect';
 export { default as TransactionStoryDrawer, buildStoryFromEvent, buildStoryFromExpense } from './TransactionStoryDrawer';
 
 // Money helpers

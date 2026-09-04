@@ -452,6 +452,30 @@ export const unlinkTelegram = async () => {
     return await response.json();
 };
 
+// ── Shortcut API Keys (for Apple Shortcuts / headless clients) ──────────────
+
+/** List all of the signed-in user's shortcut API keys (masked). */
+export const getShortcutKeys = async () => {
+    const response = await authenticatedFetch(`${API_BASE_URL}/api-keys/`);
+    return await response.json();
+};
+
+/** Create a new shortcut API key. Returns the full key once — copy it now. */
+export const createShortcutKey = async (label = '') => {
+    const response = await authenticatedFetch(`${API_BASE_URL}/api-keys/`, {
+        method: 'POST', body: JSON.stringify({ label }),
+    });
+    return await response.json();
+};
+
+/** Revoke (delete) a shortcut API key by id. */
+export const deleteShortcutKey = async (id) => {
+    const response = await authenticatedFetch(`${API_BASE_URL}/api-keys/${id}/`, {
+        method: 'DELETE',
+    });
+    return await response.json();
+};
+
 /**
  * Forgot password — request a reset link (sent to the email out-of-band).
  * Always resolves the same way, so it can't reveal which emails have accounts.

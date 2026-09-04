@@ -21,7 +21,7 @@ import { ConfirmDialog } from '../ui';
 import MpinInput from '../ui/MpinInput';
 import { accents } from '../../theme/tokens';
 import { getFeedbackPrefs, setFeedbackPrefs, feedback } from '../ui/feedback';
-import { TelegramConnect } from '../ui';
+import { TelegramConnect, ShortcutConnect } from '../ui';
 
 /**
  * Profile, rebuilt as a single scrollable column of glass cards rather than a
@@ -270,8 +270,13 @@ export default function UserProfilePage() {
           <TelegramConnect />
         </Reveal>
 
-        {/* Password */}
+        {/* Apple Shortcuts — API key generation */}
         <Reveal index={4}>
+          <ShortcutConnect />
+        </Reveal>
+
+        {/* Password */}
+        <Reveal index={5}>
           <SectionCard icon={<LockIcon />} title="Password">
             <Stack spacing={1.75} sx={{ mt: 1 }}>
               <TextField size="small" fullWidth label="Current password" type={showPw ? 'text' : 'password'}
@@ -306,7 +311,7 @@ export default function UserProfilePage() {
         </Reveal>
 
         {/* Security / MPIN */}
-        <Reveal index={5}>
+        <Reveal index={6}>
           <SectionCard icon={<PinIcon />} title="Security · MPIN">
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
               {hasMpin
@@ -394,7 +399,7 @@ export default function UserProfilePage() {
         </Reveal>
 
         {/* Danger zone */}
-        <Reveal index={6}>
+        <Reveal index={7}>
           <Card elevation={0} sx={{ borderRadius: 4, border: '1px solid', borderColor: 'rgba(255,69,58,0.4)' }}>
             <CardContent>
               <Box display="flex" alignItems="center" gap={1.5} sx={{ mb: 1 }}>

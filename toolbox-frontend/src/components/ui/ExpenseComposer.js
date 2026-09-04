@@ -375,7 +375,7 @@ export default function ExpenseComposer({
       <Box sx={{ height: '1px', bgcolor: color.hairline.dark }} />
 
       {/* ── Body ─────────────────────────────────────────────────────── */}
-      <Box sx={{ px: 2.5, pt: 2.5, pb: 2, overflowY: 'auto', flex: 1 }}>
+      <Box sx={{ px: 2.5, pt: 2.5, pb: 2, overflowY: 'auto', overflowX: 'hidden', flex: 1, minWidth: 0 }}>
         {batchMode ? (
           /* ── Batch review list ── */
           <>
@@ -570,7 +570,7 @@ export default function ExpenseComposer({
                 />
               </Box>
               <Collapse in={showMore}>
-                <Stack spacing={2} sx={{ px: 2, pt: 0.5, pb: 2 }}>
+                <Stack spacing={2} sx={{ px: 2, pt: 0.5, pb: 2, minWidth: 0, overflow: 'hidden' }}>
                   {/* Hairline between toggle and content */}
                   <Box sx={{ height: '1px', bgcolor: color.hairline.dark, mx: -2, width: 'calc(100% + 32px)' }} />
 
@@ -578,7 +578,15 @@ export default function ExpenseComposer({
                     fullWidth size="small" type="date" label="Date"
                     InputLabelProps={{ shrink: true }}
                     value={dateValue} onChange={(e) => set({ date: e.target.value })}
-                    sx={fieldSx(heroColor)}
+                    sx={{
+                      ...fieldSx(heroColor),
+                      minWidth: 0,
+                      '& .MuiInputBase-input': {
+                        minWidth: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      },
+                    }}
                   />
 
                   {tags.length > 0 && (
@@ -614,18 +622,18 @@ export default function ExpenseComposer({
                     </Box>
                   )}
 
-                  <Stack direction="row" spacing={1.5}>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                     <TextField
                       fullWidth size="small" label="Location"
                       value={data.location || ''}
                       onChange={(e) => set({ location: e.target.value })}
-                      sx={fieldSx(heroColor)}
+                      sx={{ ...fieldSx(heroColor), minWidth: 0 }}
                     />
                     <TextField
                       fullWidth size="small" label="Payment"
                       value={data.paymentMethod || ''}
                       onChange={(e) => set({ paymentMethod: e.target.value })}
-                      sx={fieldSx(heroColor)}
+                      sx={{ ...fieldSx(heroColor), minWidth: 0 }}
                     />
                   </Stack>
 

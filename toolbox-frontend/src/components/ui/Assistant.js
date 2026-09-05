@@ -8,8 +8,9 @@ import CallSplitRoundedIcon from '@mui/icons-material/CallSplitRounded';
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import SellRoundedIcon from '@mui/icons-material/SellRounded';
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import { accents, motion as motionTokens, type } from '../../theme/tokens';
-import { askAssistant, commitAssistant } from '../rest/expenseTrackerApis';
+import { askAssistant, commitAssistant, deleteExpense } from '../rest/expenseTrackerApis';
 import { useMoney } from '../../contexts/MoneyContext';
 import ThinkingHint from './ThinkingHint';
 import AssistantOrb from './AssistantOrb';
@@ -17,16 +18,6 @@ import TypedLight from './TypedLight';
 import { feedback } from './feedback';
 import { money, moneySmart } from './money';
 
-/**
- * ToolBox Assistant — the single conversational surface for all of the app's
- * AI. ⌘K (or the toolbar button) opens it; type anything and it does the right
- * thing: "20 aamras" adds an expense, "how much on food this month?" searches,
- * "split 1200 dinner with Raj and Mira" previews a split, "did I overspend?"
- * returns an insight. One box, one brain.
- *
- * Writes always come back as a preview to confirm; reads are instant. Motion is
- * gated on prefers-reduced-motion. Plain "go to <screen>" navigates with no AI.
- */
 const EXAMPLES = [
   '20 aamras',
   'How much on food this month?',
@@ -51,25 +42,18 @@ export default function Assistant() {
   const [input, setInput] = React.useState('');
   const [turns, setTurns] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
-  const [speaking, setSpeaking] = React.useState(0); // # of replies currently streaming in
+  const [speaking, setSpeaking] = React.useState(0);
   const bodyRef = React.useRef(null);
   const convId = React.useRef(null);
 
-  // The orb's mood follows what the assistant is actually doing.
   const orbState = loading ? 'thinking' : speaking > 0 ? 'speaking' : 'idle';
   const onSpeakStart = React.useCallback(() => setSpeaking(s => s + 1), []);
   const onSpeakEnd = React.useCallback(() => setSpeaking(s => Math.max(0, s - 1)), []);
 
-  // The panel is a modal, but the work isn't. You can dismiss it, browse the
-  // app, and come back — the conversation and any in-flight reply live on here
-  // in the shell, not in the dialog. A minimized orb keeps it one tap away and
-  // lights up when a reply lands while you were away.
   const [unseen, setUnseen] = React.useState(false);
   const openRef = React.useRef(false);
   React.useEffect(() => { openRef.current = open; if (open) setUnseen(false); }, [open]);
 
-  // While it thinks, show something true instead of a dead spinner — only
-  // facts we actually know from the live projection, never a made-up number.
   const facts = React.useMemo(() => {
     const p = projection || {};
     const out = [];
@@ -89,7 +73,6 @@ export default function Assistant() {
   }, [loading, facts.length]);
   const thinkingText = loading && facts.length ? facts[factIdx % facts.length] : null;
 
-  // Global hotkey + a decoupled open event (toolbar button dispatches it).
   React.useEffect(() => {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); setOpen(o => !o); }
@@ -107,7 +90,6 @@ export default function Assistant() {
   const send = async (text) => {
     const q = (text ?? input).trim();
     if (!q || loading) return;
-    // Plain navigation, no AI needed.
     const m = q.toLowerCase().match(/^(?:go to|open|show me|show)\s+([a-z]+)/);
     if (m && NAV[m[1]]) { navigate(NAV[m[1]]); setOpen(false); return; }
 
@@ -121,6 +103,11 @@ export default function Assistant() {
       if (r.conversation_id) convId.current = r.conversation_id;
       setTurns(t => [...t, { id: uid + 1, role: 'assistant', card: r }]);
       if (!openRef.current) { setUnseen(true); feedback('success'); }
+      // Refresh balances when the assistant saved something.
+      if (r.type === 'expense_added' || r.type === 'batch_added' || r.type === 'split_added') {
+        refreshMoney();
+        if (r.type === 'split_added') window.dispatchEvent(new Event('toolbox:notify-refresh'));
+      }
     } catch (e) {
       feedback('error');
       setTurns(t => [...t, { id: uid + 1, role: 'assistant', card: { type: 'error', error: e.message } }]);
@@ -130,12 +117,12 @@ export default function Assistant() {
     }
   };
 
+  // Legacy confirm path (for tags which still use the two-step flow).
   const confirm = async (turnId, payload) => {
     setTurns(t => t.map(x => x.id === turnId ? { ...x, committing: true } : x));
     try {
       const res = await commitAssistant(payload);
       feedback('success');
-      // A split commit creates notifications server-side — nudge the bell now.
       if (payload?.commit === 'split') window.dispatchEvent(new Event('toolbox:notify-refresh'));
       setTurns(t => t.map(x => x.id === turnId ? { ...x, committing: false, committed: res } : x));
       refreshMoney();
@@ -144,14 +131,24 @@ export default function Assistant() {
     }
   };
 
-  const discard = (turnId) => setTurns(t => t.map(x => x.id === turnId ? { ...x, discarded: true } : x));
+  const handleDelete = async (turnId, expenseIds) => {
+    setTurns(t => t.map(x => x.id === turnId ? { ...x, deleting: true } : x));
+    try {
+      for (const id of expenseIds) {
+        await deleteExpense(id);
+      }
+      feedback('success');
+      setTurns(t => t.map(x => x.id === turnId ? { ...x, deleting: false, deleted: true } : x));
+      refreshMoney();
+    } catch (e) {
+      setTurns(t => t.map(x => x.id === turnId ? { ...x, deleting: false, card: { ...x.card, error: e.message } } : x));
+    }
+  };
 
-  // Shown only when the panel is dismissed but there's live context to return to.
   const showDock = !open && (loading || turns.length > 0);
 
   return (
     <>
-    {/* Minimized dock — dismiss the panel, keep browsing, come back to the reply */}
     {showDock && (
       <Box
         role="button"
@@ -189,14 +186,10 @@ export default function Assistant() {
           borderRadius: 4, overflow: 'hidden', display: 'flex', flexDirection: 'column',
           backgroundImage: `radial-gradient(120% 120% at 0% 0%, ${accents.violet}22, transparent 52%), radial-gradient(90% 90% at 100% 100%, ${accents.cyan}14, transparent 55%)`,
           backdropFilter: 'blur(34px) saturate(1.6)',
-          // The console's outer glow swells while it's working — the whole panel
-          // breathes with the orb rather than sitting inert around it.
           boxShadow: orbState === 'idle'
             ? `0 30px 90px rgba(0,0,0,0.6), 0 0 60px -20px ${accents.violet}66`
             : `0 30px 90px rgba(0,0,0,0.6), 0 0 100px -14px ${orbState === 'thinking' ? accents.violet : accents.cyan}b0`,
           transition: 'box-shadow 600ms ease',
-          // A colour-cycling gradient hairline — the AI console glow. It brightens
-          // and spins up when thinking/speaking.
           '&::before': {
             content: '""', position: 'absolute', inset: 0, borderRadius: 'inherit', padding: '1px', pointerEvents: 'none',
             background: `conic-gradient(from 0deg, ${accents.violet}, ${accents.cyan}, ${accents.blue}, ${accents.violet})`,
@@ -210,7 +203,6 @@ export default function Assistant() {
         },
       }}
     >
-      {/* The presence — a compact orb header during a conversation */}
       {turns.length > 0 && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2.5, pt: 2.25, pb: 1.5, flexShrink: 0 }}>
           <AssistantOrb state={orbState} size={44} reduce={reduce} />
@@ -223,24 +215,21 @@ export default function Assistant() {
         </Box>
       )}
 
-      {/* Conversation */}
       {turns.length > 0 && (
         <Box ref={bodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', px: 2, pb: 2, pt: 0.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           {turns.map((turn) => (
             <Turn key={turn.id} turn={turn} reduce={reduce} theme={theme} navigate={navigate}
-              onConfirm={confirm} onDiscard={discard} onClose={() => setOpen(false)}
+              onConfirm={confirm} onDelete={handleDelete} onClose={() => setOpen(false)}
               onSpeakStart={onSpeakStart} onSpeakEnd={onSpeakEnd} />
           ))}
           {loading && <ThinkingHint show label={thinkingText || 'Working that out…'} />}
         </Box>
       )}
 
-      {/* Empty state — the orb as the star, big and breathing */}
       {turns.length === 0 && (
         <Box sx={{ textAlign: 'center', px: 3, pt: { xs: 3.5, sm: 4.5 }, pb: 2, position: 'relative',
           '@keyframes assistRise': { from: { opacity: 0, transform: 'translateY(8px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
           '@keyframes assistAura': { '0%,100%': { opacity: 0.55, transform: 'translate(-50%,-50%) scale(1)' }, '50%': { opacity: 0.9, transform: 'translate(-50%,-50%) scale(1.12)' } } }}>
-          {/* Ambient aura pooling behind the orb */}
           <Box aria-hidden sx={{ position: 'absolute', top: 78, left: '50%', width: 260, height: 260,
             transform: 'translate(-50%,-50%)', pointerEvents: 'none', borderRadius: '50%',
             background: `radial-gradient(circle, ${accents.violet}3a, ${accents.blue}1c 45%, transparent 70%)`,
@@ -272,7 +261,6 @@ export default function Assistant() {
         </Box>
       )}
 
-      {/* Input — a glass pill that glows when you focus it */}
       <Box sx={{ px: 2, pt: 1.25, pb: 2, flexShrink: 0 }}>
         <Box sx={{
           display: 'flex', alignItems: 'center', gap: 1.25, px: 1.75, py: 0.75, borderRadius: 999,
@@ -307,13 +295,9 @@ export default function Assistant() {
   );
 }
 
-/** One conversation turn — a user bubble, or an assistant response card. */
-function Turn({ turn, reduce, theme, navigate, onConfirm, onDiscard, onClose, onSpeakStart, onSpeakEnd }) {
+function Turn({ turn, reduce, theme, navigate, onConfirm, onDelete, onClose, onSpeakStart, onSpeakEnd }) {
   const c = turn.card || {};
-  const hasReply = turn.role === 'assistant' && !!c.reply && !turn.committed;
-  // The card is "emitted" only after the words finish arriving, so the reply
-  // streams first and the result then blooms out of it. (Hook stays above the
-  // user-bubble early return so hook order is stable.)
+  const hasReply = turn.role === 'assistant' && !!c.reply && !turn.committed && !turn.deleted;
   const [streamed, setStreamed] = React.useState(reduce || !hasReply);
 
   const revealSx = reduce ? {} : {
@@ -346,33 +330,92 @@ function Turn({ turn, reduce, theme, navigate, onConfirm, onDiscard, onClose, on
         </Typography>
       )}
 
-      {turn.committed ? (
+      {turn.deleted ? (
+        <Typography variant="caption" color="text.disabled">Deleted.</Typography>
+      ) : turn.committed ? (
         <Box sx={emitSx}><SuccessCard result={turn.committed} onClose={onClose} navigate={navigate} /></Box>
-      ) : turn.discarded ? (
-        <Typography variant="caption" color="text.disabled">Discarded.</Typography>
       ) : streamed ? (
         <Box sx={emitSx}>
-          <CardBody card={c} turn={turn} onConfirm={onConfirm} onDiscard={onDiscard} onClose={onClose} navigate={navigate} theme={theme} />
+          <CardBody card={c} turn={turn} onConfirm={onConfirm} onDelete={onDelete} onClose={onClose} navigate={navigate} theme={theme} />
         </Box>
       ) : null}
     </Box>
   );
 }
 
-function CardBody({ card, turn, onConfirm, onDiscard, onClose, navigate, theme }) {
-  const busy = turn.committing;
+function CardBody({ card, turn, onConfirm, onDelete, onClose, navigate, theme }) {
+  const busy = turn.committing || turn.deleting;
 
   if (card.error) {
     const noKey = /openrouter|ai features are unavailable/i.test(card.error);
     return (
       <Panel tone={accents.amber}>
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>{noKey ? 'AI isn’t set up yet' : 'Something went wrong'}</Typography>
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>{noKey ? "AI isn't set up yet" : 'Something went wrong'}</Typography>
         <Typography variant="caption" color="text.secondary">{noKey ? 'Add an OpenRouter key to enable the assistant.' : card.error}</Typography>
       </Panel>
     );
   }
 
   switch (card.type) {
+    case 'expense_added': {
+      const e = card.expense;
+      return (
+        <Panel tone={accents.mint}>
+          <Row icon={ReceiptLongRoundedIcon} tone={accents.mint}
+            title={e.description} amount={parseFloat(e.amount)} type={e.transaction_type}
+            category={e.category_name || e.category?.name} tags={e.tags?.map(t => t.name || t)} />
+          <SavedActions busy={busy} deleting={turn.deleting}
+            onDelete={() => onDelete(turn.id, [e.id])}
+            onView={() => { onClose(); navigate('/expense-tracker'); }} />
+        </Panel>
+      );
+    }
+    case 'batch_added': {
+      const expenses = card.expenses || [];
+      return (
+        <Panel tone={accents.mint}>
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+            <CheckCircleRoundedIcon sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'text-bottom', color: accents.mint }} />
+            {expenses.length} transactions saved
+          </Typography>
+          <Box sx={{ mt: 0.75, display: 'flex', flexDirection: 'column', gap: 0.5, maxHeight: 180, overflowY: 'auto' }}>
+            {expenses.map((e) => (
+              <Box key={e.id} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                <Typography variant="body2" noWrap>{e.description}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{money(parseFloat(e.amount))}</Typography>
+              </Box>
+            ))}
+          </Box>
+          <SavedActions busy={busy} deleting={turn.deleting}
+            deleteLabel={`Delete all ${expenses.length}`}
+            onDelete={() => onDelete(turn.id, expenses.map(e => e.id))}
+            onView={() => { onClose(); navigate('/expense-tracker'); }} />
+        </Panel>
+      );
+    }
+    case 'split_added': {
+      const e = card.expense;
+      const splits = card.splits || [];
+      return (
+        <Panel tone={accents.mint}>
+          <Row icon={CallSplitRoundedIcon} tone={accents.mint}
+            title={e?.description} amount={parseFloat(e?.amount || 0)} type="expense"
+            category={e?.category_name || e?.category?.name} />
+          <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 0.4 }}>
+            {splits.map((s, i) => (
+              <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="body2" color="text.secondary">{s.person_name || s.person?.name}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: accents.blue }}>{money(parseFloat(s.amount))}</Typography>
+              </Box>
+            ))}
+          </Box>
+          <SavedActions busy={busy} deleting={turn.deleting}
+            onDelete={() => onDelete(turn.id, [e.id])}
+            onView={() => { onClose(); navigate('/splits'); }} />
+        </Panel>
+      );
+    }
+    // Legacy preview types — kept for backward compatibility with cached responses
     case 'expense_preview': {
       const d = card.draft;
       return (
@@ -380,49 +423,7 @@ function CardBody({ card, turn, onConfirm, onDiscard, onClose, navigate, theme }
           <Row icon={ReceiptLongRoundedIcon} tone={accents.blue}
             title={d.description} amount={d.amount} type={d.transaction_type} category={d.category_name} tags={d.tags} />
           <Actions busy={busy} confirmLabel="Add expense" tone={accents.blue}
-            onConfirm={() => onConfirm(turn.id, { commit: 'expense', draft: d })} onDiscard={() => onDiscard(turn.id)} />
-        </Panel>
-      );
-    }
-    case 'batch_preview': {
-      const drafts = card.drafts || [];
-      return (
-        <Panel tone={accents.blue}>
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{drafts.length} transactions</Typography>
-          <Box sx={{ mt: 0.75, display: 'flex', flexDirection: 'column', gap: 0.5, maxHeight: 180, overflowY: 'auto' }}>
-            {drafts.map((d, i) => (
-              <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-                <Typography variant="body2" noWrap>{d.description}</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>{money(d.amount)}</Typography>
-              </Box>
-            ))}
-          </Box>
-          <Actions busy={busy} confirmLabel={`Add all ${drafts.length}`} tone={accents.blue}
-            onConfirm={() => onConfirm(turn.id, { commit: 'batch', drafts })} onDiscard={() => onDiscard(turn.id)} />
-        </Panel>
-      );
-    }
-    case 'split_preview': {
-      const s = card.split;
-      return (
-        <Panel tone={accents.amber}>
-          <Row icon={CallSplitRoundedIcon} tone={accents.amber} title={s.description} amount={s.amount} type="expense" category={s.category_name} />
-          <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 0.4 }}>
-            {s.split_with_me && (
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="body2">You</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>{money(s.your_share)}</Typography>
-              </Box>
-            )}
-            {(s.owed || []).map((o, i) => (
-              <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="body2" color="text.secondary">{o.name}</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: accents.blue }}>{money(o.amount)}</Typography>
-              </Box>
-            ))}
-          </Box>
-          <Actions busy={busy} confirmLabel="Create split" tone={accents.amber}
-            onConfirm={() => onConfirm(turn.id, { commit: 'split', split: s })} onDiscard={() => onDiscard(turn.id)} />
+            onConfirm={() => onConfirm(turn.id, { commit: 'expense', draft: d })} onDiscard={() => {}} />
         </Panel>
       );
     }
@@ -474,13 +475,13 @@ function CardBody({ card, turn, onConfirm, onDiscard, onClose, navigate, theme }
             {(card.tags || []).map(t => <Chip key={t} label={t} size="small" icon={<SellRoundedIcon />} sx={{ bgcolor: `${accents.mint}22`, color: accents.mint }} />)}
           </Box>
           <Actions busy={busy} confirmLabel="Apply tags" tone={accents.mint}
-            onConfirm={() => onConfirm(turn.id, { commit: 'tags', expense_id: card.expense_id, tags: card.tags })} onDiscard={() => onDiscard(turn.id)} />
+            onConfirm={() => onConfirm(turn.id, { commit: 'tags', expense_id: card.expense_id, tags: card.tags })} onDiscard={() => {}} />
         </Panel>
       );
     }
     case 'answer':
     default:
-      return null; // the reply text already renders above
+      return null;
   }
 }
 
@@ -509,6 +510,32 @@ function Row({ icon: Icon, tone, title, amount, type, category, tags }) {
       <Typography sx={{ fontWeight: 750, fontVariantNumeric: 'tabular-nums', color: income ? accents.mint : 'text.primary' }}>
         {income ? '+' : ''}{money(amount)}
       </Typography>
+    </Box>
+  );
+}
+
+function SavedActions({ busy, deleting, onDelete, onView, deleteLabel = 'Delete' }) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1 }}>
+        <CheckCircleRoundedIcon sx={{ color: accents.mint, fontSize: 16 }} />
+        <Typography variant="caption" sx={{ fontWeight: 600, color: accents.mint }}>Saved</Typography>
+      </Box>
+      <Box role="button" onClick={busy ? undefined : onView}
+        sx={{ px: 1.5, py: 0.6, borderRadius: 2, cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem', color: accents.blue }}>
+        View
+      </Box>
+      <Box role="button" onClick={busy ? undefined : onDelete}
+        sx={{
+          display: 'flex', alignItems: 'center', gap: 0.4,
+          px: 1.5, py: 0.6, borderRadius: 2, cursor: busy ? 'default' : 'pointer',
+          fontWeight: 600, fontSize: '0.8rem', color: accents.red, opacity: busy ? 0.5 : 1,
+          border: '1px solid', borderColor: `${accents.red}44`,
+          '&:hover': { backgroundColor: `${accents.red}14` },
+        }}>
+        <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
+        {deleting ? 'Deleting…' : deleteLabel}
+      </Box>
     </Box>
   );
 }

@@ -476,6 +476,12 @@ export const deleteShortcutKey = async (id) => {
     return await response.json();
 };
 
+/** Build a direct URL for downloading a .shortcut file (works on iOS Safari). */
+export const shortcutFileUrl = (keyId, type) => {
+    const token = authUtils.getToken();
+    return `${API_BASE_URL}/api-keys/${keyId}/shortcut/${type}/?token=${encodeURIComponent(token)}`;
+};
+
 /**
  * Forgot password — request a reset link (sent to the email out-of-band).
  * Always resolves the same way, so it can't reveal which emails have accounts.

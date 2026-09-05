@@ -7,12 +7,18 @@ import PhoneIphoneIcon from '@mui/icons-material/PhoneIphone';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import { getShortcutKeys, createShortcutKey, deleteShortcutKey } from '../rest/userApis';
+import GetAppIcon from '@mui/icons-material/GetApp';
+import { getShortcutKeys, createShortcutKey, deleteShortcutKey, shortcutFileUrl } from '../rest/userApis';
 import { ConfirmDialog } from './';
 import { feedback } from './feedback';
 import { accents, motion } from '../../theme/tokens';
 
 const SC = accents.violet;
+
+const SHORTCUT_TYPES = [
+  { type: 'log-expense', label: 'Log Expense' },
+  { type: 'review-spending', label: 'Review Spending' },
+];
 
 const cardSx = (sx) => ({
   position: 'relative', borderRadius: '14px', border: '1px solid', borderColor: 'divider',
@@ -27,6 +33,29 @@ function Header() {
       </Box>
       <Typography sx={{ fontWeight: 600, fontSize: '1rem' }}>Apple Shortcuts</Typography>
     </Box>
+  );
+}
+
+function AddToIphoneButtons({ keyId }) {
+  return (
+    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+      {SHORTCUT_TYPES.map(({ type, label }) => (
+        <Button
+          key={type}
+          size="small"
+          variant="outlined"
+          startIcon={<GetAppIcon sx={{ fontSize: 14 }} />}
+          onClick={() => { window.open(shortcutFileUrl(keyId, type), '_blank'); feedback('send'); }}
+          sx={{
+            fontSize: '0.72rem', textTransform: 'none', py: 0.5, px: 1.5,
+            borderColor: SC, color: SC, borderRadius: '8px',
+            '&:hover': { borderColor: SC, bgcolor: `${SC}14` },
+          }}
+        >
+          {label}
+        </Button>
+      ))}
+    </Stack>
   );
 }
 
@@ -111,25 +140,28 @@ export default function ShortcutConnect({ sx }) {
               <Box
                 key={k.id}
                 sx={{
-                  display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1,
+                  px: 1.5, py: 1,
                   borderTop: i > 0 ? '1px solid' : 'none', borderColor: 'divider',
                 }}
               >
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }} noWrap>
-                    {k.masked}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {k.label || 'No label'}
-                    {k.last_used_at ? ` · used ${new Date(k.last_used_at).toLocaleDateString()}` : ' · never used'}
-                  </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }} noWrap>
+                      {k.masked}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {k.label || 'No label'}
+                      {k.last_used_at ? ` · used ${new Date(k.last_used_at).toLocaleDateString()}` : ' · never used'}
+                    </Typography>
+                  </Box>
+                  <Tooltip title="Revoke">
+                    <IconButton size="small" onClick={() => setPendingDelete(k)}
+                      sx={{ color: accents.red, '&:hover': { bgcolor: `${accents.red}1f` } }}>
+                      <DeleteIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
-                <Tooltip title="Revoke">
-                  <IconButton size="small" onClick={() => setPendingDelete(k)}
-                    sx={{ color: accents.red, '&:hover': { bgcolor: `${accents.red}1f` } }}>
-                    <DeleteIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
-                </Tooltip>
+                <AddToIphoneButtons keyId={k.id} />
               </Box>
             ))}
           </Stack>
@@ -187,9 +219,36 @@ export default function ShortcutConnect({ sx }) {
               Label: {newKeyData.label}
             </Typography>
           )}
+
+          {/* Add to iPhone */}
+          <Box sx={{ mt: 2.5 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+              Add to iPhone
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              Tap a shortcut below to install it on your iPhone with this key already configured.
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              {SHORTCUT_TYPES.map(({ type, label: scLabel }) => (
+                <Button
+                  key={type}
+                  variant="outlined"
+                  startIcon={<PhoneIphoneIcon sx={{ fontSize: 16 }} />}
+                  onClick={() => { window.open(shortcutFileUrl(newKeyData.id, type), '_blank'); feedback('send'); }}
+                  sx={{
+                    textTransform: 'none', borderColor: SC, color: SC, borderRadius: '10px',
+                    '&:hover': { borderColor: SC, bgcolor: `${SC}14` },
+                  }}
+                >
+                  {scLabel}
+                </Button>
+              ))}
+            </Stack>
+          </Box>
+
           <Box sx={{ mt: 2, p: 1.5, borderRadius: 2, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600 }}>
-              In your Apple Shortcut's headers:
+              Or paste manually in your shortcut's headers:
             </Typography>
             <Typography sx={{ fontFamily: 'monospace', fontSize: '0.78rem', wordBreak: 'break-all' }}>
               Authorization: Api-Key {newKeyData?.key}

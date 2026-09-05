@@ -9,6 +9,7 @@ import LoginPage from './screens/LoginPage'
 import UserRegistrationPage from './screens/UserRegistrationPage'
 import UserProfilePage from './screens/UserProfilePage'
 import LandingPage from './screens/LandingPage'
+import StoryPage from './screens/StoryPage'
 import InboxPage from './screens/InboxPage'
 import RecurringPage from './screens/RecurringPage'
 import ForgotPasswordPage from './screens/ForgotPasswordPage'
@@ -80,6 +81,7 @@ export default function Router() {
       <Route element={<ProtectedRoute><DashboardLayoutBasic /></ProtectedRoute>}>
         <Route path="/" element={<LandingPage />} />
         <Route path="/dashboard" element={<LandingPage />} />
+        <Route path="/story" element={<StoryPage />} />
         <Route path="/inbox" element={<InboxPage />} />
         <Route path="/recurring" element={<RecurringPage />} />
         <Route path="/profile" element={<UserProfilePage />} />

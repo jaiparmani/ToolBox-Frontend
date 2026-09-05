@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { motion, useReducedMotion } from 'framer-motion';
 import DashboardIcon from '@mui/icons-material/SpaceDashboardRounded';
+import AutoStoriesRoundedIcon from '@mui/icons-material/AutoStoriesRounded';
 import AllInboxIcon from '@mui/icons-material/MoveToInboxRounded';
 import TimelineIcon from '@mui/icons-material/TimelineRounded';
 import AutorenewIcon from '@mui/icons-material/AutorenewRounded';
@@ -39,6 +40,7 @@ const RAIL_W = 256;
 
 const NAV = [
   { seg: 'dashboard', alias: ['', 'dashboard'], label: 'Home', icon: DashboardIcon, tone: accents.blue },
+  { seg: 'story', label: 'Today', icon: AutoStoriesRoundedIcon, tone: accents.mint },
   { seg: 'inbox', label: 'Inbox', icon: AllInboxIcon, tone: accents.cyan },
   { seg: 'expense-tracker', label: 'Activity', icon: TimelineIcon, tone: accents.blue },
   { seg: 'recurring', label: 'Recurring', icon: AutorenewIcon, tone: accents.violet },

@@ -1,13 +1,22 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography } from '@mui/material';
+import { motion } from 'framer-motion';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
+import ShowChartRoundedIcon from '@mui/icons-material/ShowChartRounded';
+import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
+import GraphicEqRoundedIcon from '@mui/icons-material/GraphicEqRounded';
+import SpeedRoundedIcon from '@mui/icons-material/SpeedRounded';
+import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
+import DonutLargeRoundedIcon from '@mui/icons-material/DonutLargeRounded';
+import CompareArrowsRoundedIcon from '@mui/icons-material/CompareArrowsRounded';
+import HistoryRoundedIcon from '@mui/icons-material/HistoryRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { yourShareOf } from '../rest/expenseTrackerApis';
-import StorySection from '../ui/StorySection';
+import StorySection, { storyItem } from '../ui/StorySection';
 import CategoryDonut from '../ui/CategoryDonut';
 import ProjectionChart from '../ui/ProjectionChart';
 import DashPace from '../ui/DashPace';
@@ -32,7 +41,42 @@ const Eyebrow = ({ children }) => (
   <Typography sx={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.11em', textTransform: 'uppercase', color: 'text.disabled' }}>{children}</Typography>
 );
 const Frame = ({ children, wide }) => <Box sx={{ maxWidth: wide ? 720 : 460, mx: 'auto', width: '100%' }}>{children}</Box>;
-const Tile = ({ children }) => <Box sx={{ flex: '1 1 260px', minWidth: 0 }}>{children}</Box>;
+/** A stat/card tile that pops in on its own beat within a staggered chapter. */
+const Tile = ({ children }) => <Box component={motion.div} variants={storyItem} sx={{ flex: '1 1 260px', minWidth: 0 }}>{children}</Box>;
+
+const CHAPTERS = {
+  trend: { icon: ShowChartRoundedIcon, color: accents.mint, label: "This month's shape" },
+  flow: { icon: AccountBalanceWalletRoundedIcon, color: accents.blue, label: 'Money in, money out' },
+  insight: { icon: AutoAwesomeRoundedIcon, color: accents.violet, label: 'Insight' },
+  rhythm: { icon: GraphicEqRoundedIcon, color: accents.amber, label: "This month's rhythm" },
+  pace: { icon: SpeedRoundedIcon, color: accents.cyan, label: "Where you're headed" },
+  calendar: { icon: CalendarMonthRoundedIcon, color: accents.mint, label: 'Day by day' },
+  breakdown: { icon: DonutLargeRoundedIcon, color: accents.purple, label: 'Where it went' },
+  changes: { icon: CompareArrowsRoundedIcon, color: accents.amber, label: 'What changed' },
+  recent: { icon: HistoryRoundedIcon, color: accents.blue, label: 'Recent' },
+};
+
+/** Icon badge + label + "03 / 10" chapter counter — the story's consistent chapter marker. */
+function ChapterHeader({ chapterKey, index, total, action }) {
+  const c = CHAPTERS[chapterKey];
+  const Icon = c.icon;
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, mb: 1.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ width: 26, height: 26, borderRadius: '8px', flexShrink: 0, display: 'grid', placeItems: 'center', bgcolor: `${c.color}1f` }}>
+          <Icon sx={{ fontSize: 14, color: c.color }} />
+        </Box>
+        <Eyebrow>{c.label}</Eyebrow>
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
+        {action}
+        <Typography sx={{ ...num, fontSize: 10, color: 'text.disabled' }}>
+          {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
 
 /** Big pill button — reused for the two closing CTAs. */
 function StoryButton({ onClick, primary, icon, children, pressRef, pressEvents }) {
@@ -116,57 +160,59 @@ export default function StoryPage() {
 
   const openAdd = (e) => { setOriginRect(e.currentTarget.getBoundingClientRect()); setAddOpen(true); };
 
-  const renderSection = (key) => {
+  const renderSection = (key, idx) => {
+    const total = sections.length;
     switch (key) {
       case 'cover':
         return (
           <Frame>
-            <Typography sx={{ fontSize: 12.5, color: 'text.disabled', fontWeight: 500 }}>{dateStr}</Typography>
-            <Typography sx={{ fontFamily: type.displayFamily, fontSize: { xs: '1.35rem', sm: '1.5rem' }, fontWeight: 600, letterSpacing: '-0.03em', mt: 0.25 }}>
-              {greetOf()}, {name}.
-            </Typography>
-            <Box sx={{ mt: 2.5 }}>
-              <Eyebrow>Spent this month</Eyebrow>
-              <Typography component="div" sx={{ ...num, fontSize: { xs: '2.9rem', sm: '3.6rem' }, fontWeight: 660, letterSpacing: '-0.04em', lineHeight: 0.95, mt: 0.75 }}>
-                <AnimatedNumber value={spent} format="money" />
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography sx={{ fontSize: 12.5, color: 'text.disabled', fontWeight: 500 }}>{dateStr}</Typography>
+              <Typography sx={{ fontFamily: type.displayFamily, fontSize: { xs: '1.4rem', sm: '1.6rem' }, fontWeight: 600, letterSpacing: '-0.03em', mt: 0.25 }}>
+                {greetOf()}, {name}.
               </Typography>
-              <Typography sx={{ fontSize: 13.5, color: 'text.secondary', mt: 1 }}>
-                {count} {count === 1 ? 'expense' : 'expenses'} · {monthName}
-                {delta != null && (
-                  <Box component="span" sx={{ color: delta <= 0 ? GREEN : accents.amber, fontWeight: 600 }}>
-                    {' · '}{delta <= 0 ? '↓' : '↑'} {Math.abs(delta).toFixed(0)}% vs last month
-                  </Box>
-                )}
-              </Typography>
-              {(avgPerDay > 0 || topCat) && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mt: 2 }}>
-                  {avgPerDay > 0 && (
-                    <Box>
-                      <Typography sx={{ ...num, fontSize: 15, fontWeight: 600 }}>{money(avgPerDay)}</Typography>
-                      <Typography sx={{ fontSize: 10.5, color: 'text.disabled' }}>avg / day</Typography>
+              <Box sx={{ mt: 3 }}>
+                <Eyebrow>Spent this month</Eyebrow>
+                <Typography component="div" sx={{ ...num, fontSize: { xs: '3.1rem', sm: '3.9rem' }, fontWeight: 660, letterSpacing: '-0.04em', lineHeight: 0.95, mt: 0.75 }}>
+                  <AnimatedNumber value={spent} format="money" />
+                </Typography>
+                <Typography sx={{ fontSize: 13.5, color: 'text.secondary', mt: 1 }}>
+                  {count} {count === 1 ? 'expense' : 'expenses'} · {monthName}
+                  {delta != null && (
+                    <Box component="span" sx={{ color: delta <= 0 ? GREEN : accents.amber, fontWeight: 600 }}>
+                      {' · '}{delta <= 0 ? '↓' : '↑'} {Math.abs(delta).toFixed(0)}% vs last month
                     </Box>
                   )}
-                  {topCat && (
-                    <>
-                      <Box sx={{ width: '1px', alignSelf: 'stretch', bgcolor: 'divider' }} />
+                </Typography>
+                {(avgPerDay > 0 || topCat) && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2.5, mt: 2 }}>
+                    {avgPerDay > 0 && (
                       <Box>
-                        <Typography sx={{ fontSize: 14, fontWeight: 600 }} noWrap>{topCat.name}</Typography>
-                        <Typography sx={{ fontSize: 10.5, color: 'text.disabled' }}>top category · {money(topCat.amount)}</Typography>
+                        <Typography sx={{ ...num, fontSize: 15, fontWeight: 600 }}>{money(avgPerDay)}</Typography>
+                        <Typography sx={{ fontSize: 10.5, color: 'text.disabled' }}>avg / day</Typography>
                       </Box>
-                    </>
-                  )}
-                </Box>
-              )}
+                    )}
+                    {topCat && (
+                      <>
+                        <Box sx={{ width: '1px', alignSelf: 'stretch', bgcolor: 'divider' }} />
+                        <Box>
+                          <Typography sx={{ fontSize: 14, fontWeight: 600 }} noWrap>{topCat.name}</Typography>
+                          <Typography sx={{ fontSize: 10.5, color: 'text.disabled' }}>top category · {money(topCat.amount)}</Typography>
+                        </Box>
+                      </>
+                    )}
+                  </Box>
+                )}
+              </Box>
             </Box>
           </Frame>
         );
       case 'trend':
         return (
           <Frame wide>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 1 }}>
-              <Eyebrow>This month's shape</Eyebrow>
-              <Typography sx={{ fontSize: 11, color: 'text.disabled', display: { xs: 'none', sm: 'block' } }}>cumulative · hover to inspect</Typography>
-            </Box>
+            <ChapterHeader chapterKey="trend" index={idx} total={total} action={
+              <Typography sx={{ fontSize: 11, color: 'text.disabled', display: { xs: 'none', sm: 'block' } }}>hover to inspect</Typography>
+            } />
             <ProjectionChart series={trend} accent={GREEN} height={180} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75 }}>
               <Typography sx={{ fontSize: 10.5, color: 'text.disabled' }}>1 {monthName.slice(0, 3)}</Typography>
@@ -177,8 +223,8 @@ export default function StoryPage() {
       case 'flow':
         return (
           <Frame wide>
-            <Eyebrow>Money in, money out</Eyebrow>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1.5 }}>
+            <ChapterHeader chapterKey="flow" index={idx} total={total} />
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
               {monthFlowVisible && <Tile><DashMonthFlow income={monthIncome ?? 0} spent={spent} monthName={monthName} /></Tile>}
               {spendTrendVisible && <Tile><DashSpendTrend months={history} /></Tile>}
             </Box>
@@ -187,29 +233,22 @@ export default function StoryPage() {
       case 'insight':
         return (
           <Frame>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-              <Box sx={{ width: 28, height: 28, flexShrink: 0, borderRadius: '8px', display: 'grid', placeItems: 'center', bgcolor: `${accents.violet}1f` }}>
-                <AutoAwesomeRoundedIcon sx={{ fontSize: 15, color: accents.violet }} />
-              </Box>
-              <Box>
-                <Eyebrow>Insight</Eyebrow>
-                <Typography sx={{ fontSize: 13.5, color: 'text.primary', lineHeight: 1.5, mt: 0.5 }}>{insightText}</Typography>
-              </Box>
-            </Box>
+            <ChapterHeader chapterKey="insight" index={idx} total={total} />
+            <Typography sx={{ fontSize: 13.5, color: 'text.primary', lineHeight: 1.5 }}>{insightText}</Typography>
           </Frame>
         );
       case 'rhythm':
         return (
           <Frame wide>
-            <Eyebrow>This month's rhythm</Eyebrow>
-            <Box sx={{ display: 'flex', alignItems: 'stretch', mt: 1.5, flexWrap: 'wrap', gap: { xs: 2, sm: 0 } }}>
+            <ChapterHeader chapterKey="rhythm" index={idx} total={total} />
+            <Box sx={{ display: 'flex', alignItems: 'stretch', flexWrap: 'wrap', gap: { xs: 2, sm: 0 } }}>
               {[
                 { label: 'Transactions', value: String(count) },
                 { label: 'Avg / transaction', value: money(rhythm.avgPerTxn) },
                 { label: 'Active days', value: `${rhythm.activeDays} of ${daysInMonth}` },
                 ...(rhythm.busiest ? [{ label: 'Busiest day', value: money(rhythm.busiest.total), sub: new Date(rhythm.busiest.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) }] : []),
               ].map((s, i) => (
-                <Box key={s.label} sx={{ flex: '1 1 120px', minWidth: 0, px: { xs: 0, sm: 1.75 }, borderLeft: { sm: i === 0 ? 'none' : '1px solid' }, borderColor: 'divider' }}>
+                <Box key={s.label} component={motion.div} variants={storyItem} sx={{ flex: '1 1 120px', minWidth: 0, px: { xs: 0, sm: 1.75 }, borderLeft: { sm: i === 0 ? 'none' : '1px solid' }, borderColor: 'divider' }}>
                   <Typography sx={{ ...num, fontSize: { xs: 19, sm: 22 }, fontWeight: 640, letterSpacing: '-0.02em', lineHeight: 1.05 }} noWrap>{s.value}</Typography>
                   <Typography sx={{ fontSize: 10.5, color: 'text.disabled', letterSpacing: '0.02em', mt: 0.4 }} noWrap>{s.label}{s.sub ? ` · ${s.sub}` : ''}</Typography>
                 </Box>
@@ -220,8 +259,8 @@ export default function StoryPage() {
       case 'pace':
         return (
           <Frame wide>
-            <Eyebrow>Where you're headed</Eyebrow>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1.5 }}>
+            <ChapterHeader chapterKey="pace" index={idx} total={total} />
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
               {paceVisible && <Tile><DashPace spent={spent} dayOfMonth={dayOfMonth} daysInMonth={daysInMonth} lastMonthTotal={lastReport?.total_amount ?? 0} monthName={monthName} /></Tile>}
               <Tile><DashWeekdayPattern dailyTotals={report?.daily_totals || []} /></Tile>
             </Box>
@@ -230,8 +269,8 @@ export default function StoryPage() {
       case 'calendar':
         return (
           <Frame wide>
-            <Eyebrow>Day by day</Eyebrow>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1.5 }}>
+            <ChapterHeader chapterKey="calendar" index={idx} total={total} />
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
               <Tile><DashSpendCalendar dailyTotals={report?.daily_totals || []} /></Tile>
               {settle && (
                 <Tile>
@@ -261,8 +300,8 @@ export default function StoryPage() {
       case 'breakdown':
         return (
           <Frame wide>
-            <Eyebrow>Where it went</Eyebrow>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1.5 }}>
+            <ChapterHeader chapterKey="breakdown" index={idx} total={total} />
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
               {cats.length > 0 && (
                 <Tile>
                   <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '14px', bgcolor: 'background.paper', p: { xs: 2, sm: 2.25 }, height: '100%' }}>
@@ -278,8 +317,8 @@ export default function StoryPage() {
       case 'changes':
         return (
           <Frame wide>
-            <Eyebrow>What changed</Eyebrow>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1.5 }}>
+            <ChapterHeader chapterKey="changes" index={idx} total={total} />
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
               {weekVisible && <Tile><DashWeekCompare dailyTotals={[...(report?.daily_totals || []), ...(lastReport?.daily_totals || [])]} /></Tile>}
               {moversVisible && <Tile><DashCategoryMovers current={report?.category_totals || []} previous={lastReport?.category_totals || []} /></Tile>}
             </Box>
@@ -288,16 +327,15 @@ export default function StoryPage() {
       case 'recent':
         return (
           <Frame wide>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-              <Eyebrow>Recent</Eyebrow>
+            <ChapterHeader chapterKey="recent" index={idx} total={total} action={
               <Typography onClick={() => navigate('/expense-tracker')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 0.4, '&:hover': { color: 'text.primary' } }}>
                 View all <ArrowForwardRoundedIcon sx={{ fontSize: 13 }} />
               </Typography>
-            </Box>
+            } />
             {recent.length === 0 ? (
               <Box sx={{ py: 2.5, textAlign: 'center' }}><Typography sx={{ fontSize: 12.5, color: 'text.disabled' }}>No expenses yet — add your first.</Typography></Box>
             ) : recent.slice(0, 8).map((e, i, arr) => (
-              <Box key={e.id ?? i} onClick={() => navigate('/expense-tracker')}
+              <Box key={e.id ?? i} component={motion.div} variants={storyItem} onClick={() => navigate('/expense-tracker')}
                 sx={{ display: 'flex', alignItems: 'center', gap: 1.4, py: 0.85, cursor: 'pointer',
                   borderBottom: i === Math.min(arr.length, 8) - 1 ? 'none' : '1px solid', borderColor: 'divider',
                   mx: -1, px: 1, borderRadius: 2, transition: 'background-color .12s ease', '&:hover': { bgcolor: 'action.hover' } }}>
@@ -318,19 +356,21 @@ export default function StoryPage() {
       default:
         return (
           <Frame>
-            <Typography sx={{ fontFamily: type.displayFamily, fontSize: { xs: '1.3rem', sm: '1.5rem' }, fontWeight: 650, letterSpacing: '-0.03em' }}>
-              That's your story so far.
-            </Typography>
-            <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 0.75 }}>
-              Come back any time — it rewrites itself around what actually happened.
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 2.5, flexWrap: 'wrap' }}>
-              <StoryButton primary onClick={openAdd} pressRef={addPress.ref} pressEvents={addPress.bindEvents} icon={<AddRoundedIcon sx={{ fontSize: 19 }} />}>
-                Add expense
-              </StoryButton>
-              <StoryButton onClick={() => navigate('/expense-tracker')} pressRef={activityPress.ref} pressEvents={activityPress.bindEvents}>
-                View full activity
-              </StoryButton>
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography sx={{ fontFamily: type.displayFamily, fontSize: { xs: '1.3rem', sm: '1.5rem' }, fontWeight: 650, letterSpacing: '-0.03em' }}>
+                That's your story so far.
+              </Typography>
+              <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 0.75 }}>
+                Come back any time — it rewrites itself around what actually happened.
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mt: 2.5, flexWrap: 'wrap' }}>
+                <StoryButton primary onClick={openAdd} pressRef={addPress.ref} pressEvents={addPress.bindEvents} icon={<AddRoundedIcon sx={{ fontSize: 19 }} />}>
+                  Add expense
+                </StoryButton>
+                <StoryButton onClick={() => navigate('/expense-tracker')} pressRef={activityPress.ref} pressEvents={activityPress.bindEvents}>
+                  View full activity
+                </StoryButton>
+              </Box>
             </Box>
           </Frame>
         );
@@ -339,35 +379,37 @@ export default function StoryPage() {
 
   return (
     <Box sx={{ position: 'relative', pb: { xs: 10, md: 6 } }}>
-      <Box ref={listRef}>
-        {sections.map((s, i) => (
-          <StorySection key={s.key} index={i} onEnter={handleEnter} divider={i < sections.length - 1}>
-            {renderSection(s.key)}
-          </StorySection>
-        ))}
-      </Box>
-
-      {/* progress rail — a quiet "you are here" through the story, not a paging control */}
+      {/* Stories-style segmented progress — a chapter-by-chapter "you are here" that
+          doubles as a tap-to-jump nav, sitting sticky just under the topbar. */}
       {sections.length > 1 && (
-        <Box role="tablist" aria-label="Story sections" sx={{
-          position: 'fixed', right: { xs: 8, sm: 16 }, top: '50%', transform: 'translateY(-50%)', zIndex: 2,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+        <Box role="tablist" aria-label="Story chapters" sx={{
+          position: 'sticky', top: 60, zIndex: 2, display: 'flex', gap: 0.5,
+          mx: { xs: -1.5, sm: -3 }, px: { xs: 1.5, sm: 3 }, py: 1.25,
+          backgroundColor: (t) => t.palette.mode === 'dark' ? 'rgba(10,10,12,0.85)' : 'rgba(251,251,250,0.85)',
+          backdropFilter: 'saturate(1.2) blur(10px)', WebkitBackdropFilter: 'saturate(1.2) blur(10px)',
         }}>
           {sections.map((s, i) => (
             <Box
               key={s.key}
-              component="button" role="tab" aria-selected={active === i} aria-label={`Go to section ${i + 1} of ${sections.length}`}
+              component="button" role="tab" aria-selected={active === i} aria-label={`Go to chapter ${i + 1} of ${sections.length}`}
               onClick={() => scrollToIndex(i)}
               sx={{
-                width: 7, height: 7, borderRadius: '50%', p: 0, border: 'none', cursor: 'pointer',
-                bgcolor: active === i ? GREEN : 'action.disabledBackground',
-                transform: active === i ? 'scale(1.25)' : 'scale(1)',
-                transition: `background-color ${motionTokens.normal}ms ${motionTokens.ease}, transform ${motionTokens.normal}ms ${motionTokens.ease}`,
+                flex: 1, height: 3, borderRadius: 999, p: 0, border: 'none', cursor: 'pointer',
+                bgcolor: i <= active ? GREEN : 'action.disabledBackground',
+                transition: `background-color ${motionTokens.normal}ms ${motionTokens.ease}`,
               }}
             />
           ))}
         </Box>
       )}
+
+      <Box ref={listRef}>
+        {sections.map((s, i) => (
+          <StorySection key={s.key} index={i} onEnter={handleEnter} divider={i < sections.length - 1}>
+            {renderSection(s.key, i)}
+          </StorySection>
+        ))}
+      </Box>
 
       <QuickAddExpense open={addOpen} onClose={() => setAddOpen(false)} categories={categories} onAdded={reload} originRect={originRect} />
     </Box>

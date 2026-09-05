@@ -1,20 +1,27 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { getMonthlyReport, getSplitBalances, getCategories } from '../rest/expenseTrackerApis';
+import { yourShareOf } from '../rest/expenseTrackerApis';
 import StorySection from '../ui/StorySection';
 import CategoryDonut from '../ui/CategoryDonut';
+import ProjectionChart from '../ui/ProjectionChart';
 import DashPace from '../ui/DashPace';
+import DashMonthFlow from '../ui/DashMonthFlow';
+import DashSpendTrend from '../ui/DashSpendTrend';
+import DashWeekdayPattern from '../ui/DashWeekdayPattern';
+import DashSpendCalendar from '../ui/DashSpendCalendar';
+import DashUpcomingBills from '../ui/DashUpcomingBills';
 import DashWeekCompare from '../ui/DashWeekCompare';
 import DashCategoryMovers from '../ui/DashCategoryMovers';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import QuickAddExpense from '../ui/QuickAddExpense';
 import usePressSpring from '../ui/usePressSpring';
-import { computeSettle } from '../ui/settleSummary';
+import useMonthlyDashboard from '../ui/useMonthlyDashboard';
 import { money } from '../ui/money';
 import { accents, type, motion as motionTokens } from '../../theme/tokens';
 
@@ -57,71 +64,49 @@ export default function StoryPage() {
   const listRef = useRef(null);
   const addPress = usePressSpring({ pressScale: 0.96 });
   const activityPress = usePressSpring({ pressScale: 0.96 });
-
-  const [report, setReport] = useState(null);
-  const [lastReport, setLastReport] = useState(null);
-  const [balances, setBalances] = useState(null);
-  const [categories, setCategories] = useState([]);
   const [addOpen, setAddOpen] = useState(false);
   const [originRect, setOriginRect] = useState(null);
   const [active, setActive] = useState(0);
 
-  const load = useCallback(() => {
-    const now = new Date();
-    const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    Promise.allSettled([
-      getMonthlyReport(now.getFullYear(), now.getMonth() + 1),
-      getMonthlyReport(lm.getFullYear(), lm.getMonth() + 1),
-      getSplitBalances(),
-      getCategories({ type: 'expense' }),
-    ]).then(([r, l, bal, cat]) => {
-      if (r.status === 'fulfilled') setReport(r.value);
-      if (l.status === 'fulfilled') setLastReport(l.value ?? null);
-      if (bal.status === 'fulfilled') setBalances(bal.value ?? null);
-      if (cat.status === 'fulfilled') setCategories(Array.isArray(cat.value) ? cat.value : (cat.value?.results || []));
-    });
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  const {
+    report, lastReport, recent, insightText, categories, recurring, monthIncome, history,
+    dayOfMonth, daysInMonth, monthName, spent, count, trend, cats, topCat, delta, avgPerDay, rhythm, settle,
+    reload,
+  } = useMonthlyDashboard();
 
   const name = user?.firstName || user?.first_name || user?.username || 'there';
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
-  const monthName = new Date().toLocaleDateString('en-IN', { month: 'long' });
-  const spent = report?.total_amount ?? 0;
-  const count = report?.total_count ?? 0;
-  const dayOfMonth = new Date().getDate();
-  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const catName = (e) => e.category?.name || e.categoryName || e.category_name || (typeof e.category === 'string' ? e.category : '');
+  const expAmount = (e) => Math.abs(Number(e.amount ?? e.amountValue ?? 0));
 
-  const cats = useMemo(
-    () => (report?.category_totals || []).map((c) => ({ name: c.category__name, amount: c.total, color: c.category__color })),
-    [report],
-  );
-  const topCat = useMemo(() => (cats.length ? [...cats].sort((a, b) => b.amount - a.amount)[0] : null), [cats]);
-
-  const lastSamePeriod = useMemo(() => {
-    if (!lastReport?.daily_totals) return null;
-    return lastReport.daily_totals.reduce((s, d) => {
-      const dd = new Date(d.date).getDate();
-      return dd <= dayOfMonth ? s + (Number(d.total) || 0) : s;
-    }, 0);
-  }, [lastReport, dayOfMonth]);
-  const delta = (lastSamePeriod != null && lastSamePeriod > 0) ? ((spent - lastSamePeriod) / lastSamePeriod) * 100 : null;
-  const avgPerDay = spent > 0 ? spent / dayOfMonth : 0;
-
-  const settle = useMemo(() => computeSettle(balances), [balances]);
   const paceVisible = spent > 0 && dayOfMonth >= 8 && dayOfMonth < daysInMonth;
   const weekVisible = spent > 0 || (lastReport?.total_amount ?? 0) > 0;
   const moversVisible = (report?.category_totals?.length ?? 0) > 0 && (lastReport?.category_totals?.length ?? 0) > 0;
-  const breakdownVisible = cats.length > 0 || weekVisible;
-  const changesVisible = moversVisible || !!settle;
+  const activeDaysCount = (report?.daily_totals || []).filter((d) => (Number(d.total) || 0) > 0).length;
+  const billsVisible = (recurring || []).some((r) => r.transaction_type === 'expense' && r.is_active !== false && r.next_date);
+  const monthFlowVisible = (monthIncome ?? 0) > 0;
+  const spendTrendVisible = history.length >= 4 && history.filter((m) => m.total > 0).length >= 3;
+
+  const flowVisible = monthFlowVisible || spendTrendVisible;
+  const rhythmVisible = spent > 0;
+  const paceChapterVisible = paceVisible || activeDaysCount > 0;
+  const calendarVisible = activeDaysCount >= 4 || !!settle;
+  const breakdownVisible = cats.length > 0 || billsVisible;
+  const changesVisible = moversVisible || weekVisible;
 
   const sections = useMemo(() => {
-    const list = [{ key: 'cover' }];
-    if (paceVisible) list.push({ key: 'pace' });
+    const list = [{ key: 'cover' }, { key: 'trend' }];
+    if (flowVisible) list.push({ key: 'flow' });
+    if (insightText) list.push({ key: 'insight' });
+    if (rhythmVisible) list.push({ key: 'rhythm' });
+    if (paceChapterVisible) list.push({ key: 'pace' });
+    if (calendarVisible) list.push({ key: 'calendar' });
     if (breakdownVisible) list.push({ key: 'breakdown' });
     if (changesVisible) list.push({ key: 'changes' });
+    list.push({ key: 'recent' });
     list.push({ key: 'close' });
     return list;
-  }, [paceVisible, breakdownVisible, changesVisible]);
+  }, [flowVisible, insightText, rhythmVisible, paceChapterVisible, calendarVisible, breakdownVisible, changesVisible]);
 
   const handleEnter = useCallback((i) => setActive(i), []);
   const scrollToIndex = (i) => {
@@ -175,46 +160,79 @@ export default function StoryPage() {
             </Box>
           </Frame>
         );
-      case 'pace':
+      case 'trend':
+        return (
+          <Frame wide>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 1 }}>
+              <Eyebrow>This month's shape</Eyebrow>
+              <Typography sx={{ fontSize: 11, color: 'text.disabled', display: { xs: 'none', sm: 'block' } }}>cumulative · hover to inspect</Typography>
+            </Box>
+            <ProjectionChart series={trend} accent={GREEN} height={180} />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75 }}>
+              <Typography sx={{ fontSize: 10.5, color: 'text.disabled' }}>1 {monthName.slice(0, 3)}</Typography>
+              <Typography sx={{ fontSize: 10.5, color: 'text.disabled' }}>Today · {money(spent)}</Typography>
+            </Box>
+          </Frame>
+        );
+      case 'flow':
+        return (
+          <Frame wide>
+            <Eyebrow>Money in, money out</Eyebrow>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1.5 }}>
+              {monthFlowVisible && <Tile><DashMonthFlow income={monthIncome ?? 0} spent={spent} monthName={monthName} /></Tile>}
+              {spendTrendVisible && <Tile><DashSpendTrend months={history} /></Tile>}
+            </Box>
+          </Frame>
+        );
+      case 'insight':
         return (
           <Frame>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+              <Box sx={{ width: 28, height: 28, flexShrink: 0, borderRadius: '8px', display: 'grid', placeItems: 'center', bgcolor: `${accents.violet}1f` }}>
+                <AutoAwesomeRoundedIcon sx={{ fontSize: 15, color: accents.violet }} />
+              </Box>
+              <Box>
+                <Eyebrow>Insight</Eyebrow>
+                <Typography sx={{ fontSize: 13.5, color: 'text.primary', lineHeight: 1.5, mt: 0.5 }}>{insightText}</Typography>
+              </Box>
+            </Box>
+          </Frame>
+        );
+      case 'rhythm':
+        return (
+          <Frame wide>
+            <Eyebrow>This month's rhythm</Eyebrow>
+            <Box sx={{ display: 'flex', alignItems: 'stretch', mt: 1.5, flexWrap: 'wrap', gap: { xs: 2, sm: 0 } }}>
+              {[
+                { label: 'Transactions', value: String(count) },
+                { label: 'Avg / transaction', value: money(rhythm.avgPerTxn) },
+                { label: 'Active days', value: `${rhythm.activeDays} of ${daysInMonth}` },
+                ...(rhythm.busiest ? [{ label: 'Busiest day', value: money(rhythm.busiest.total), sub: new Date(rhythm.busiest.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) }] : []),
+              ].map((s, i) => (
+                <Box key={s.label} sx={{ flex: '1 1 120px', minWidth: 0, px: { xs: 0, sm: 1.75 }, borderLeft: { sm: i === 0 ? 'none' : '1px solid' }, borderColor: 'divider' }}>
+                  <Typography sx={{ ...num, fontSize: { xs: 19, sm: 22 }, fontWeight: 640, letterSpacing: '-0.02em', lineHeight: 1.05 }} noWrap>{s.value}</Typography>
+                  <Typography sx={{ fontSize: 10.5, color: 'text.disabled', letterSpacing: '0.02em', mt: 0.4 }} noWrap>{s.label}{s.sub ? ` · ${s.sub}` : ''}</Typography>
+                </Box>
+              ))}
+            </Box>
+          </Frame>
+        );
+      case 'pace':
+        return (
+          <Frame wide>
             <Eyebrow>Where you're headed</Eyebrow>
-            <Box sx={{ mt: 1.5 }}>
-              <DashPace spent={spent} dayOfMonth={dayOfMonth} daysInMonth={daysInMonth} lastMonthTotal={lastReport?.total_amount ?? 0} monthName={monthName} />
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1.5 }}>
+              {paceVisible && <Tile><DashPace spent={spent} dayOfMonth={dayOfMonth} daysInMonth={daysInMonth} lastMonthTotal={lastReport?.total_amount ?? 0} monthName={monthName} /></Tile>}
+              <Tile><DashWeekdayPattern dailyTotals={report?.daily_totals || []} /></Tile>
             </Box>
           </Frame>
         );
-      case 'breakdown':
+      case 'calendar':
         return (
           <Frame wide>
-            <Eyebrow>The full picture</Eyebrow>
+            <Eyebrow>Day by day</Eyebrow>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1.5 }}>
-              {cats.length > 0 && (
-                <Tile>
-                  <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '14px', bgcolor: 'background.paper', p: { xs: 2, sm: 2.25 }, height: '100%' }}>
-                    <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 1.25 }}>Where it went</Typography>
-                    <CategoryDonut cats={cats} size={104} />
-                  </Box>
-                </Tile>
-              )}
-              {weekVisible && (
-                <Tile>
-                  <DashWeekCompare dailyTotals={[...(report?.daily_totals || []), ...(lastReport?.daily_totals || [])]} />
-                </Tile>
-              )}
-            </Box>
-          </Frame>
-        );
-      case 'changes':
-        return (
-          <Frame wide>
-            <Eyebrow>What changed</Eyebrow>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1.5 }}>
-              {moversVisible && (
-                <Tile>
-                  <DashCategoryMovers current={report?.category_totals || []} previous={lastReport?.category_totals || []} />
-                </Tile>
-              )}
+              <Tile><DashSpendCalendar dailyTotals={report?.daily_totals || []} /></Tile>
               {settle && (
                 <Tile>
                   <Box
@@ -238,6 +256,62 @@ export default function StoryPage() {
                 </Tile>
               )}
             </Box>
+          </Frame>
+        );
+      case 'breakdown':
+        return (
+          <Frame wide>
+            <Eyebrow>Where it went</Eyebrow>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1.5 }}>
+              {cats.length > 0 && (
+                <Tile>
+                  <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '14px', bgcolor: 'background.paper', p: { xs: 2, sm: 2.25 }, height: '100%' }}>
+                    <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 1.25 }}>By category</Typography>
+                    <CategoryDonut cats={cats} size={104} />
+                  </Box>
+                </Tile>
+              )}
+              {billsVisible && <Tile><DashUpcomingBills rules={recurring} /></Tile>}
+            </Box>
+          </Frame>
+        );
+      case 'changes':
+        return (
+          <Frame wide>
+            <Eyebrow>What changed</Eyebrow>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 1.5 }}>
+              {weekVisible && <Tile><DashWeekCompare dailyTotals={[...(report?.daily_totals || []), ...(lastReport?.daily_totals || [])]} /></Tile>}
+              {moversVisible && <Tile><DashCategoryMovers current={report?.category_totals || []} previous={lastReport?.category_totals || []} /></Tile>}
+            </Box>
+          </Frame>
+        );
+      case 'recent':
+        return (
+          <Frame wide>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Eyebrow>Recent</Eyebrow>
+              <Typography onClick={() => navigate('/expense-tracker')} sx={{ fontSize: 11.5, color: 'text.secondary', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 0.4, '&:hover': { color: 'text.primary' } }}>
+                View all <ArrowForwardRoundedIcon sx={{ fontSize: 13 }} />
+              </Typography>
+            </Box>
+            {recent.length === 0 ? (
+              <Box sx={{ py: 2.5, textAlign: 'center' }}><Typography sx={{ fontSize: 12.5, color: 'text.disabled' }}>No expenses yet — add your first.</Typography></Box>
+            ) : recent.slice(0, 8).map((e, i, arr) => (
+              <Box key={e.id ?? i} onClick={() => navigate('/expense-tracker')}
+                sx={{ display: 'flex', alignItems: 'center', gap: 1.4, py: 0.85, cursor: 'pointer',
+                  borderBottom: i === Math.min(arr.length, 8) - 1 ? 'none' : '1px solid', borderColor: 'divider',
+                  mx: -1, px: 1, borderRadius: 2, transition: 'background-color .12s ease', '&:hover': { bgcolor: 'action.hover' } }}>
+                <Box sx={{ width: 8, height: 8, borderRadius: '2px', flexShrink: 0, bgcolor: e.category?.color || accents.blue }} />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontSize: 12.75, fontWeight: 550 }} noWrap>{e.description || catName(e) || 'Expense'}</Typography>
+                  <Typography sx={{ fontSize: 11, color: 'text.disabled' }} noWrap>
+                    {catName(e)}{catName(e) && e.date ? ' · ' : ''}{e.date ? new Date(e.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
+                    {e.isSplit ? ` · split of ${money(expAmount(e))}` : ''}
+                  </Typography>
+                </Box>
+                <Typography sx={{ ...num, fontSize: 13, fontWeight: 600 }}>−{money(yourShareOf(e))}</Typography>
+              </Box>
+            ))}
           </Frame>
         );
       case 'close':
@@ -295,7 +369,7 @@ export default function StoryPage() {
         </Box>
       )}
 
-      <QuickAddExpense open={addOpen} onClose={() => setAddOpen(false)} categories={categories} onAdded={load} originRect={originRect} />
+      <QuickAddExpense open={addOpen} onClose={() => setAddOpen(false)} categories={categories} onAdded={reload} originRect={originRect} />
     </Box>
   );
 }

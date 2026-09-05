@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Fab } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
@@ -6,7 +6,7 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { getMonthlyReport, getRecentExpenses, getLatestExpenseInsight, getCategories, getSplitBalances, getRecurring, getExpenseSummary, yourShareOf } from '../rest/expenseTrackerApis';
+import { yourShareOf } from '../rest/expenseTrackerApis';
 import ProjectionChart from '../ui/ProjectionChart';
 import DashPace from '../ui/DashPace';
 import DashMonthFlow from '../ui/DashMonthFlow';
@@ -22,7 +22,7 @@ import CategoryDonut from '../ui/CategoryDonut';
 import CursorGlow from '../motion/CursorGlow';
 import Reveal from '../ui/Reveal';
 import { money } from '../ui/money';
-import { computeSettle } from '../ui/settleSummary';
+import useMonthlyDashboard from '../ui/useMonthlyDashboard';
 import usePressSpring from '../ui/usePressSpring';
 import { accents, type } from '../../theme/tokens';
 
@@ -40,59 +40,13 @@ export default function LandingPage() {
   const heroPress = usePressSpring({ pressScale: 0.96 });
   const fabPress = usePressSpring({ pressScale: 0.92 });
   const [originRect, setOriginRect] = useState(null);
-  const [report, setReport] = useState(null);
-  const [lastReport, setLastReport] = useState(null);
-  const [recent, setRecent] = useState([]);
-  const [insight, setInsight] = useState(null);
-  const [categories, setCategories] = useState([]);
-  const [balances, setBalances] = useState(null);
-  const [recurring, setRecurring] = useState([]);
-  const [monthIncome, setMonthIncome] = useState(null);
-  const [history, setHistory] = useState([]);
   const [addOpen, setAddOpen] = useState(false);
 
-  const load = useCallback(() => {
-    const now = new Date();
-    const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    Promise.allSettled([
-      getMonthlyReport(now.getFullYear(), now.getMonth() + 1),
-      getMonthlyReport(lm.getFullYear(), lm.getMonth() + 1),
-      getRecentExpenses(),
-      getLatestExpenseInsight(),
-      getCategories({ type: 'expense' }),
-      getSplitBalances(),
-      getRecurring(),
-    ]).then(([r, l, rc, ins, cat, bal, rec]) => {
-      if (r.status === 'fulfilled') setReport(r.value);
-      if (l.status === 'fulfilled') setLastReport(l.value ?? null);
-      if (rc.status === 'fulfilled') setRecent(Array.isArray(rc.value) ? rc.value : []);
-      if (ins.status === 'fulfilled') setInsight(ins.value);
-      if (cat.status === 'fulfilled') setCategories(Array.isArray(cat.value) ? cat.value : (cat.value?.results || []));
-      if (bal.status === 'fulfilled') setBalances(bal.value ?? null);
-      if (rec.status === 'fulfilled') setRecurring(Array.isArray(rec.value) ? rec.value : (rec.value?.results || []));
-    });
-
-    // month-to-date income + 6-month spend history — kept in a separate pass so the
-    // main grid never waits on the extra monthly-report calls.
-    const pad2 = (n) => String(n).padStart(2, '0');
-    const iso = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const sixMonths = [];
-    for (let i = 5; i >= 0; i--) sixMonths.push(new Date(now.getFullYear(), now.getMonth() - i, 1));
-    Promise.allSettled([
-      getExpenseSummary({ dateFrom: iso(monthStart), dateTo: iso(now) }),
-      ...sixMonths.map((d) => getMonthlyReport(d.getFullYear(), d.getMonth() + 1)),
-    ]).then(([sum, ...mReports]) => {
-      if (sum.status === 'fulfilled') setMonthIncome(sum.value?.totalIncome ?? 0);
-      setHistory(mReports.map((m, i) => ({
-        label: sixMonths[i].toLocaleDateString('en-IN', { month: 'short' }),
-        total: m.status === 'fulfilled' ? (Number(m.value?.total_amount) || 0) : 0,
-        ok: m.status === 'fulfilled',
-        partial: i === sixMonths.length - 1,
-      })));
-    });
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  const {
+    report, lastReport, recent, insightText, categories, recurring, monthIncome, history,
+    dayOfMonth, daysInMonth, monthName, spent, count, trend, cats, topCat, delta, avgPerDay, rhythm, settle,
+    reload,
+  } = useMonthlyDashboard();
 
   // open quick-add with the "a" shortcut (when not typing)
   useEffect(() => {
@@ -109,63 +63,6 @@ export default function LandingPage() {
 
   const name = user?.firstName || user?.first_name || user?.username || 'there';
   const dateStr = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
-  const spent = report?.total_amount ?? 0;
-  const count = report?.total_count ?? 0;
-  const monthName = new Date().toLocaleDateString('en-IN', { month: 'long' });
-
-  // cumulative month-to-date spend → the trend line
-  const trend = useMemo(() => {
-    if (!report?.daily_totals) return [];
-    const map = new Map(report.daily_totals.map((d) => [d.date, Number(d.total) || 0]));
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    const out = []; let cum = 0;
-    for (let dt = new Date(start); dt <= now; dt.setDate(dt.getDate() + 1)) {
-      const key = dt.toISOString().slice(0, 10);
-      cum += map.get(key) || 0;
-      out.push({ date: key, balance: cum });
-    }
-    return out;
-  }, [report]);
-
-  const cats = useMemo(
-    () => (report?.category_totals || []).map((c) => ({ name: c.category__name, amount: c.total, color: c.category__color })),
-    [report],
-  );
-
-  // fair comparison: this month-to-date vs the SAME stretch of last month
-  const lastSamePeriod = useMemo(() => {
-    if (!lastReport?.daily_totals) return null;
-    const dayOfMonth = new Date().getDate();
-    return lastReport.daily_totals.reduce((s, d) => {
-      const dd = new Date(d.date).getDate();
-      return dd <= dayOfMonth ? s + (Number(d.total) || 0) : s;
-    }, 0);
-  }, [lastReport]);
-  const delta = (lastSamePeriod != null && lastSamePeriod > 0) ? ((spent - lastSamePeriod) / lastSamePeriod) * 100 : null;
-  const avgPerDay = spent > 0 ? spent / new Date().getDate() : 0;
-  const topCat = useMemo(() => {
-    if (!cats.length) return null;
-    return [...cats].sort((a, b) => b.amount - a.amount)[0];
-  }, [cats]);
-
-  // this month's rhythm — all factual, straight from the report (no projection)
-  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-  const rhythm = useMemo(() => {
-    const dt = report?.daily_totals || [];
-    const active = dt.filter((d) => (Number(d.total) || 0) > 0);
-    const busiest = active.reduce((m, d) => (Number(d.total) > (m ? Number(m.total) : -1) ? d : m), null);
-    return {
-      avgPerTxn: count > 0 ? spent / count : 0,
-      activeDays: active.length,
-      busiest: busiest ? { date: busiest.date, total: Number(busiest.total) } : null,
-    };
-  }, [report, spent, count]);
-
-  // money that's out but coming back — the counterpart to share-only spending
-  const settle = useMemo(() => computeSettle(balances), [balances]);
-
-  const insightText = insight ? (insight.summary || insight.text || insight.body || insight.message || (typeof insight === 'string' ? insight : null)) : null;
 
   const catName = (e) => e.category?.name || e.categoryName || e.category_name || (typeof e.category === 'string' ? e.category : '');
   const expAmount = (e) => Math.abs(Number(e.amount ?? e.amountValue ?? 0));
@@ -299,7 +196,7 @@ export default function LandingPage() {
         {/* ── pace | weekday — two factual reads, side by side for density ── */}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: { xs: 2, md: 2.5 }, '&:not(:has(> *:not(:empty)))': { display: 'none' } }}>
           <Reveal index={7} sx={{ flex: '1 1 300px', minWidth: 0, '&:empty': { display: 'none' } }}>
-            <DashPace spent={spent} dayOfMonth={new Date().getDate()} daysInMonth={daysInMonth} lastMonthTotal={lastReport?.total_amount ?? 0} monthName={monthName} />
+            <DashPace spent={spent} dayOfMonth={dayOfMonth} daysInMonth={daysInMonth} lastMonthTotal={lastReport?.total_amount ?? 0} monthName={monthName} />
           </Reveal>
           <Reveal index={8} sx={{ flex: '1 1 300px', minWidth: 0, '&:empty': { display: 'none' } }}>
             <DashWeekdayPattern dailyTotals={report?.daily_totals || []} />
@@ -404,7 +301,7 @@ export default function LandingPage() {
         <AddRoundedIcon />
       </Fab>
 
-      <QuickAddExpense open={addOpen} onClose={() => setAddOpen(false)} categories={categories} onAdded={load} originRect={originRect} />
+      <QuickAddExpense open={addOpen} onClose={() => setAddOpen(false)} categories={categories} onAdded={reload} originRect={originRect} />
     </Box>
   );
 }

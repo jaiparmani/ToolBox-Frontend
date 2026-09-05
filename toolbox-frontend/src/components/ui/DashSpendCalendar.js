@@ -54,6 +54,12 @@ export default function DashSpendCalendar({ dailyTotals = [] }) {
     };
   }, [dailyTotals, year, month, today]);
 
+  // hovered (desktop) takes over from picked (tap-to-pin, works without a mouse)
+  const [pointedDay, setPointedDay] = React.useState(null);
+  const [pickedDay, setPickedDay] = React.useState(null);
+  const shownDay = pointedDay ?? pickedDay;
+  const shownCell = shownDay != null ? weeks.flat().find((c) => c && c.day === shownDay) : null;
+
   // Not a pattern until money has moved on at least four separate days.
   if (active < 4 || !heaviest || max <= 0) return null;
 
@@ -68,7 +74,15 @@ export default function DashSpendCalendar({ dailyTotals = [] }) {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 1.5, gap: 1 }}>
         <Eyebrow>Daily spend</Eyebrow>
         <Typography sx={{ fontSize: 11.5, color: 'text.secondary' }} noWrap>
-          Heaviest <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>{heaviestDate}</Box> · <Box component="span" sx={{ ...num }}>{money(heaviest.amount)}</Box>
+          {shownCell ? (
+            <>
+              <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>{shownCell.day} {monthLabel.slice(0, 3)}</Box> · <Box component="span" sx={{ ...num }}>{shownCell.future ? 'upcoming' : shownCell.amt > 0 ? money(shownCell.amt) : 'nothing spent'}</Box>
+            </>
+          ) : (
+            <>
+              Heaviest <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>{heaviestDate}</Box> · <Box component="span" sx={{ ...num }}>{money(heaviest.amount)}</Box>
+            </>
+          )}
         </Typography>
       </Box>
 
@@ -78,23 +92,34 @@ export default function DashSpendCalendar({ dailyTotals = [] }) {
         ))}
       </Box>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5 }} aria-hidden>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5 }}>
         {weeks.flat().map((c, i) => {
           if (!c) return <Box key={i} sx={{ aspectRatio: '1 / 1' }} />;
           const isToday = c.day === today;
           const on = c.amt > 0;
+          const isPicked = pickedDay === c.day;
           // Perceptual floor so a small spend day still reads above an empty one.
           const t = on ? 0.22 + 0.78 * Math.sqrt(c.amt / max) : 0;
           return (
             <Box
               key={i}
-              title={`${c.day} ${monthLabel.slice(0, 3)} · ${on ? money(c.amt) : (c.future ? 'upcoming' : 'nothing spent')}`}
+              role="button" tabIndex={0}
+              aria-label={`${c.day} ${monthLabel.slice(0, 3)} · ${on ? money(c.amt) : (c.future ? 'upcoming' : 'nothing spent')}`}
+              aria-pressed={isPicked}
+              onMouseEnter={() => setPointedDay(c.day)}
+              onMouseLeave={() => setPointedDay(null)}
+              onFocus={() => setPointedDay(c.day)}
+              onBlur={() => setPointedDay(null)}
+              onClick={() => setPickedDay((d) => (d === c.day ? null : c.day))}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPickedDay((d) => (d === c.day ? null : c.day)); } }}
               sx={{
-                aspectRatio: '1 / 1', borderRadius: '5px', display: 'grid', placeItems: 'center',
+                aspectRatio: '1 / 1', borderRadius: '5px', display: 'grid', placeItems: 'center', cursor: 'pointer',
                 bgcolor: on ? `${GREEN}${alphaHex(t)}` : (c.future ? 'transparent' : 'action.hover'),
-                border: isToday ? '1.5px solid' : (c.future ? '1px dashed' : '1px solid transparent'),
-                borderColor: isToday ? GREEN : (c.future ? 'divider' : 'transparent'),
-                transition: 'background-color .12s ease',
+                border: (isToday || isPicked) ? '1.5px solid' : (c.future ? '1px dashed' : '1px solid transparent'),
+                borderColor: isPicked ? GREEN : isToday ? GREEN : (c.future ? 'divider' : 'transparent'),
+                outline: 'none',
+                transition: 'background-color .12s ease, border-color .12s ease',
+                '&:focus-visible': { boxShadow: `0 0 0 2px ${GREEN}` },
               }}
             >
               <Typography sx={{

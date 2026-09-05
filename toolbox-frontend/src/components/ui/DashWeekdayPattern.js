@@ -55,25 +55,26 @@ export default function DashWeekdayPattern({ dailyTotals = [] }) {
         </Typography>
       </Box>
 
-      <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: 0.75, sm: 1.25 }, height: 96 }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: 0.75, sm: 1.25 } }}>
         {buckets.map((v, i) => {
           const isMax = i === heaviest.i && v > 0;
           const h = v > 0 ? Math.max(6, (v / max) * 100) : 2;
           return (
-            <Box key={i} sx={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 0.75 }}>
-              {v > 0 && (
-                <Typography sx={{ ...num, fontSize: 9.5, color: isMax ? 'text.primary' : 'text.disabled', fontWeight: isMax ? 650 : 500, lineHeight: 1 }} noWrap>
-                  {moneySmart(v)}
-                </Typography>
-              )}
-              <Box
-                title={`${LABELS[i]} · ${money(v)}`}
-                sx={{
-                  width: '100%', height: `${h}%`, borderRadius: '5px 5px 3px 3px',
-                  bgcolor: v <= 0 ? 'action.hover' : isMax ? GREEN : `${GREEN}3d`,
-                  transition: 'background-color .12s ease',
-                }}
-              />
+            <Box key={i} sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75 }}>
+              {/* fixed-height label row, independent of the bar track below, so the tallest bar's own value never gets pushed out the top */}
+              <Typography sx={{ ...num, fontSize: 9.5, height: 12, lineHeight: '12px', color: isMax ? 'text.primary' : 'text.disabled', fontWeight: isMax ? 650 : 500, visibility: v > 0 ? 'visible' : 'hidden' }} noWrap>
+                {moneySmart(v)}
+              </Typography>
+              <Box sx={{ width: '100%', height: 74, display: 'flex', alignItems: 'flex-end' }}>
+                <Box
+                  title={`${LABELS[i]} · ${money(v)}`}
+                  sx={{
+                    width: '100%', height: `${h}%`, borderRadius: '5px 5px 3px 3px',
+                    bgcolor: v <= 0 ? 'action.hover' : isMax ? GREEN : `${GREEN}3d`,
+                    transition: 'background-color .12s ease',
+                  }}
+                />
+              </Box>
               <Typography sx={{ fontSize: 10.5, color: isMax ? 'text.secondary' : 'text.disabled', fontWeight: isMax ? 600 : 500, letterSpacing: '0.02em' }}>{LABELS[i]}</Typography>
             </Box>
           );

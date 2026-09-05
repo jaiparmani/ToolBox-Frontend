@@ -45,28 +45,29 @@ export default function DashSpendTrend({ months = [] }) {
       </Box>
 
       <Box sx={{ position: 'relative' }}>
-        {/* average reference across completed months */}
+        {/* average reference across completed months — positioned against the fixed 70px bar track (label row 11px + 4.8px gap sit above it), so it lines up exactly with the bars regardless of label content */}
         {avgPct > 0 && (
-          <Box aria-hidden sx={{ position: 'absolute', left: 0, right: 0, bottom: `${avgPct * 0.86}%`, height: 0, borderTop: '1px dashed', borderColor: 'divider', zIndex: 1 }} />
+          <Box aria-hidden sx={{ position: 'absolute', left: 0, right: 0, top: `${(11 + 4.8 + (1 - avgPct / 100) * 70).toFixed(1)}px`, height: 0, borderTop: '1px dashed', borderColor: 'divider', zIndex: 1 }} />
         )}
-        <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: 0.75, sm: 1 }, height: 92 }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: 0.75, sm: 1 } }}>
           {data.map((m, i) => {
             const h = m.total > 0 ? Math.max(6, (m.total / max) * 100) : 2;
             const cur = m.partial;
             return (
-              <Box key={i} sx={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 0.6 }}>
-                {m.total > 0 && (
-                  <Typography sx={{ ...num, fontSize: 9, color: cur ? 'text.primary' : 'text.disabled', fontWeight: cur ? 650 : 500, lineHeight: 1 }} noWrap>
-                    {moneySmart(m.total)}
-                  </Typography>
-                )}
-                <Box
-                  title={`${m.label}${cur ? ' (so far)' : ''} · ${money(m.total)}`}
-                  sx={{
-                    width: '100%', height: `${h}%`, borderRadius: '5px 5px 3px 3px', zIndex: 2,
-                    bgcolor: m.total <= 0 ? 'action.hover' : cur ? GREEN : `${GREEN}33`,
-                  }}
-                />
+              <Box key={i} sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.6 }}>
+                {/* fixed-height label row, independent of the bar track below, so the tallest bar's own value never gets pushed out the top */}
+                <Typography sx={{ ...num, fontSize: 9, height: 11, lineHeight: '11px', color: cur ? 'text.primary' : 'text.disabled', fontWeight: cur ? 650 : 500, visibility: m.total > 0 ? 'visible' : 'hidden' }} noWrap>
+                  {moneySmart(m.total)}
+                </Typography>
+                <Box sx={{ width: '100%', height: 70, display: 'flex', alignItems: 'flex-end', zIndex: 2 }}>
+                  <Box
+                    title={`${m.label}${cur ? ' (so far)' : ''} · ${money(m.total)}`}
+                    sx={{
+                      width: '100%', height: `${h}%`, borderRadius: '5px 5px 3px 3px',
+                      bgcolor: m.total <= 0 ? 'action.hover' : cur ? GREEN : `${GREEN}33`,
+                    }}
+                  />
+                </Box>
                 <Typography sx={{ fontSize: 10, color: cur ? 'text.secondary' : 'text.disabled', fontWeight: cur ? 600 : 500, letterSpacing: '0.02em' }} noWrap>{m.label}</Typography>
               </Box>
             );

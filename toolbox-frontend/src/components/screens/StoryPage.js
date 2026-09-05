@@ -1,7 +1,7 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography } from '@mui/material';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
@@ -31,6 +31,7 @@ import AnimatedNumber from '../ui/AnimatedNumber';
 import QuickAddExpense from '../ui/QuickAddExpense';
 import usePressSpring from '../ui/usePressSpring';
 import useMonthlyDashboard from '../ui/useMonthlyDashboard';
+import { feedback } from '../ui/feedback';
 import { money } from '../ui/money';
 import { accents, type, motion as motionTokens } from '../../theme/tokens';
 
@@ -105,12 +106,15 @@ function StoryButton({ onClick, primary, icon, children, pressRef, pressEvents }
 export default function StoryPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const reduce = useReducedMotion();
   const listRef = useRef(null);
   const addPress = usePressSpring({ pressScale: 0.96 });
   const activityPress = usePressSpring({ pressScale: 0.96 });
   const [addOpen, setAddOpen] = useState(false);
   const [originRect, setOriginRect] = useState(null);
   const [active, setActive] = useState(0);
+  const [scrubDay, setScrubDay] = useState(null); // { date, balance } while dragging the month chart, else null
+  const finaleFiredRef = useRef(false);
 
   const {
     report, lastReport, recent, insightText, categories, recurring, monthIncome, history,
@@ -153,6 +157,17 @@ export default function StoryPage() {
   }, [flowVisible, insightText, rhythmVisible, paceChapterVisible, calendarVisible, breakdownVisible, changesVisible]);
 
   const handleEnter = useCallback((i) => setActive(i), []);
+
+  // The story's one ceremonial moment: reaching the end fires a single haptic
+  // pulse, once per visit — a real milestone (finished today's story), not a
+  // reward for passive scrolling, so it never re-fires on scrolling back up
+  // and down again.
+  useEffect(() => {
+    if (sections.length > 1 && active === sections.length - 1 && !finaleFiredRef.current) {
+      finaleFiredRef.current = true;
+      feedback('success');
+    }
+  }, [active, sections.length]);
   const scrollToIndex = (i) => {
     const el = listRef.current?.children?.[i];
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -207,19 +222,40 @@ export default function StoryPage() {
             </Box>
           </Frame>
         );
-      case 'trend':
+      case 'trend': {
+        const scrubIdx = scrubDay ? trend.findIndex((d) => d.date === scrubDay.date) : -1;
+        const scrubOwnSpend = scrubIdx >= 0 ? (trend[scrubIdx].balance - (scrubIdx > 0 ? trend[scrubIdx - 1].balance : 0)) : null;
+        const shownLabel = scrubDay
+          ? new Date(scrubDay.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
+          : `Today · ${monthName} ${dayOfMonth}`;
+        const shownValue = scrubDay ? scrubDay.balance : spent;
         return (
           <Frame wide>
             <ChapterHeader chapterKey="trend" index={idx} total={total} action={
-              <Typography sx={{ fontSize: 11, color: 'text.disabled', display: { xs: 'none', sm: 'block' } }}>hover to inspect</Typography>
+              <Typography sx={{ fontSize: 11, color: 'text.disabled', display: { xs: 'none', sm: 'block' } }}>drag to explore</Typography>
             } />
-            <ProjectionChart series={trend} accent={GREEN} height={180} />
+            <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+              <Box>
+                <Typography sx={{ fontSize: 11.5, color: 'text.disabled', fontWeight: 500 }}>{shownLabel}</Typography>
+                <Typography sx={{ ...num, fontSize: { xs: 26, sm: 30 }, fontWeight: 660, letterSpacing: '-0.03em', lineHeight: 1.1,
+                  color: scrubDay ? GREEN : 'text.primary', transition: `color ${motionTokens.fast}ms ${motionTokens.ease}` }}>
+                  {money(shownValue)}
+                </Typography>
+              </Box>
+              {scrubOwnSpend != null && (
+                <Typography sx={{ ...num, fontSize: 12, color: 'text.secondary' }}>
+                  {scrubOwnSpend > 0 ? `${money(scrubOwnSpend)} that day` : 'nothing spent that day'}
+                </Typography>
+              )}
+            </Box>
+            <ProjectionChart series={trend} accent={GREEN} height={160} onScrub={setScrubDay} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75 }}>
               <Typography sx={{ fontSize: 10.5, color: 'text.disabled' }}>1 {monthName.slice(0, 3)}</Typography>
-              <Typography sx={{ fontSize: 10.5, color: 'text.disabled' }}>Today · {money(spent)}</Typography>
+              <Typography sx={{ fontSize: 10.5, color: 'text.disabled' }}>{monthName} {dayOfMonth}</Typography>
             </Box>
           </Frame>
         );
+      }
       case 'flow':
         return (
           <Frame wide>
@@ -357,7 +393,21 @@ export default function StoryPage() {
         return (
           <Frame>
             <Box sx={{ textAlign: 'center' }}>
-              <Typography sx={{ fontFamily: type.displayFamily, fontSize: { xs: '1.3rem', sm: '1.5rem' }, fontWeight: 650, letterSpacing: '-0.03em' }}>
+              <motion.div
+                initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.6 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true, amount: 0.6 }}
+                transition={reduce ? { duration: motionTokens.fast / 1000 } : { type: 'spring', stiffness: 320, damping: 22, mass: 0.9 }}
+              >
+                <Eyebrow>Final tally</Eyebrow>
+                <Typography component="div" sx={{ ...num, fontSize: { xs: '2.6rem', sm: '3.2rem' }, fontWeight: 660, letterSpacing: '-0.04em', mt: 0.75, color: GREEN }}>
+                  {money(spent)}
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: 'text.disabled', mt: 0.5 }}>
+                  across {count} {count === 1 ? 'expense' : 'expenses'} this {monthName}
+                </Typography>
+              </motion.div>
+              <Typography sx={{ fontFamily: type.displayFamily, fontSize: { xs: '1.3rem', sm: '1.5rem' }, fontWeight: 650, letterSpacing: '-0.03em', mt: 3 }}>
                 That's your story so far.
               </Typography>
               <Typography sx={{ fontSize: 13, color: 'text.secondary', mt: 0.75 }}>

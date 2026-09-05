@@ -16,7 +16,7 @@ import { money } from './money';
  * overlay is real DOM positioned in %, so text and the dot stay crisp and
  * un-stretched. Touch drags work; nothing animates per-frame.
  */
-export default function ProjectionChart({ series = [], low, nextIncomeDate, height = 190, accent = accents.mint }) {
+export default function ProjectionChart({ series = [], low, nextIncomeDate, height = 190, accent = accents.mint, onScrub }) {
   const gid = React.useId();
   const wrapRef = React.useRef(null);
   const [hover, setHover] = React.useState(null); // index
@@ -46,7 +46,9 @@ export default function ProjectionChart({ series = [], low, nextIncomeDate, heig
     const el = wrapRef.current; if (!el) return;
     const r = el.getBoundingClientRect();
     const frac = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-    setHover(Math.round(frac * (pts.length - 1)));
+    const idx = Math.round(frac * (pts.length - 1));
+    setHover(idx);
+    onScrub?.(pts[idx]);
   };
   const active = hover != null ? pts[hover] : null;
   const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -55,7 +57,7 @@ export default function ProjectionChart({ series = [], low, nextIncomeDate, heig
     <Box
       ref={wrapRef}
       onPointerMove={onMove}
-      onPointerLeave={() => setHover(null)}
+      onPointerLeave={() => { setHover(null); onScrub?.(null); }}
       sx={{ position: 'relative', width: '100%', height, touchAction: 'pan-y', cursor: 'crosshair' }}
     >
       <svg viewBox={`0 0 ${geom.W} ${geom.H}`} width="100%" height={height} preserveAspectRatio="none" role="img"

@@ -4,6 +4,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import SwipeAction from './SwipeAction';
 import { money } from './money';
 import { yourShareOf } from '../rest/expenseTrackerApis';
@@ -173,9 +174,13 @@ export default function ExpenseTimeline({ expenses = [], onEdit, onDelete, onDel
               <SwipeAction
                 key={expense.id}
                 onAction={() => onDeleteDirect?.(expense.id)}
+                onSecondaryAction={() => onEdit?.(expense)}
                 color={accents.red}
+                secondaryColor={accents.blue}
                 icon={<DeleteOutlineIcon sx={{ color: '#fff' }} />}
+                secondaryIcon={<EditRoundedIcon sx={{ color: '#fff' }} />}
                 label="Delete"
+                secondaryLabel="Edit"
                 borderRadius={0}
               >
                 <ExpenseRow

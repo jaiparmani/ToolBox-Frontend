@@ -31,6 +31,8 @@ import BrandLogo from './motion/BrandLogo';
 import PageTransition from './motion/PageTransition';
 import { NotificationBell, FinancialWeatherBar } from './ui';
 import Assistant from './ui/Assistant';
+import usePressSpring from './ui/usePressSpring';
+import useScrollEdge from './ui/useScrollEdge';
 import { accents, type } from '../theme/tokens';
 
 const RAIL_W = 256;
@@ -58,10 +60,13 @@ function isActive(item, pathname) {
 /** One nav row. Active state carries a shared, animated indicator (framer layoutId). */
 function NavItem({ item, active, onClick, reduce }) {
   const Icon = item.icon;
+  const press = usePressSpring({ pressScale: 0.97 });
   return (
     <Box
       component="button"
+      ref={press.ref}
       onClick={onClick}
+      {...press.bindEvents}
       aria-current={active ? 'page' : undefined}
       sx={{
         position: 'relative', width: '100%', textAlign: 'left', cursor: 'pointer',
@@ -197,6 +202,7 @@ export default function AppShell() {
   const { name: acctName, initial: acctInitial } = displayIdentity(user);
   const { mode, toggleColorMode } = useColorMode();
   const reduceMotion = useReducedMotion();
+  const { sentinelRef, scrolled } = useScrollEdge();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuEl, setMenuEl] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -259,9 +265,13 @@ export default function AppShell() {
             sx={{
               position: 'sticky', top: 0, zIndex: 3, display: 'flex', alignItems: 'center', gap: 1,
               px: { xs: 1.5, sm: 2.5 }, py: 1, minHeight: 60,
-              borderBottom: '1px solid', borderColor: 'divider',
+              borderBottom: '1px solid',
+              borderColor: scrolled ? 'divider' : 'transparent',
+              boxShadow: scrolled ? '0 1px 12px rgba(0,0,0,0.08)' : 'none',
               backgroundColor: (t) => t.palette.mode === 'dark' ? 'rgba(10,10,12,0.85)' : 'rgba(251,251,250,0.85)',
-              backdropFilter: 'saturate(1.2) blur(8px)', WebkitBackdropFilter: 'saturate(1.2) blur(8px)',
+              backdropFilter: scrolled ? 'saturate(1.4) blur(16px)' : 'saturate(1.2) blur(8px)',
+              WebkitBackdropFilter: scrolled ? 'saturate(1.4) blur(16px)' : 'saturate(1.2) blur(8px)',
+              transition: 'border-color 240ms ease, box-shadow 240ms ease, backdrop-filter 240ms ease',
             }}
           >
             <IconButton onClick={() => setDrawerOpen(true)} sx={{ display: { xs: 'inline-flex', md: 'none' } }} aria-label="Open navigation">
@@ -311,8 +321,7 @@ export default function AppShell() {
           {/* Routed content — the shell above/left persists; only this transitions
               per route (keyed), so navigation feels continuous, not a full reload. */}
           <Box component="main" sx={{ flex: 1, px: { xs: 1.5, sm: 3 }, py: { xs: 2, sm: 3 } }}>
-            {/* Generous cap: fills the canvas on typical PC widths (up to ~1080p),
-                only reins in ultra-wide monitors so lines don't sprawl. */}
+            <Box ref={sentinelRef} sx={{ height: 1, mt: -1 }} aria-hidden />
             <Box sx={{ maxWidth: 1600, mx: 'auto', width: '100%' }}>
               <PageTransition key={location.pathname}>
                 <Outlet />

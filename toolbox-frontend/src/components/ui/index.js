@@ -16,6 +16,9 @@ export { default as AnimatedNumber } from './AnimatedNumber';
 export { default as EmptyState } from './EmptyState';
 export { default as StatusBadge, ConfidenceBadge } from './StatusBadge';
 
+// Interaction primitives
+export { default as usePressSpring } from './usePressSpring';
+
 // Controls & feedback
 export { default as SegmentedControl } from './SegmentedControl';
 export { default as ConfirmDialog } from './ConfirmDialog';

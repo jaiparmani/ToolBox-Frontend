@@ -21,6 +21,7 @@ import AnimatedNumber from '../ui/AnimatedNumber';
 import CursorGlow from '../motion/CursorGlow';
 import Reveal from '../ui/Reveal';
 import { money, moneySmart } from '../ui/money';
+import usePressSpring from '../ui/usePressSpring';
 import { accents, type } from '../../theme/tokens';
 
 const GREEN = accents.mint;
@@ -82,6 +83,9 @@ function CategoryDonut({ cats }) {
 export default function LandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const heroPress = usePressSpring({ pressScale: 0.96 });
+  const fabPress = usePressSpring({ pressScale: 0.92 });
+  const [originRect, setOriginRect] = useState(null);
   const [report, setReport] = useState(null);
   const [lastReport, setLastReport] = useState(null);
   const [recent, setRecent] = useState([]);
@@ -277,13 +281,13 @@ export default function LandingPage() {
 
               {/* hero action */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 3, flexWrap: 'wrap' }}>
-                <Box role="button" tabIndex={0} onClick={() => setAddOpen(true)}
+                <Box ref={heroPress.ref} role="button" tabIndex={0} onClick={(e) => { setOriginRect(e.currentTarget.getBoundingClientRect()); setAddOpen(true); }}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAddOpen(true); } }}
+                  {...heroPress.bindEvents}
                   sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, pl: 1.75, pr: 2.25, py: 1.15, borderRadius: 999, cursor: 'pointer',
                     bgcolor: GREEN, color: '#04150e', fontWeight: 650, fontSize: 14.5,
-                    transition: 'transform .12s ease, filter .12s ease',
-                    '&:hover': { transform: 'translateY(-1px)', filter: 'brightness(1.05)' },
-                    '&:active': { transform: 'scale(0.98)' },
+                    transition: 'filter .12s ease',
+                    '&:hover': { filter: 'brightness(1.05)' },
                     '&:focus-visible': { outline: `2px solid ${GREEN}`, outlineOffset: 3 } }}>
                   <AddRoundedIcon sx={{ fontSize: 20 }} /> Add expense
                 </Box>
@@ -453,12 +457,13 @@ export default function LandingPage() {
       </Box>
 
       {/* floating add (mobile-friendly, always reachable) */}
-      <Fab onClick={() => setAddOpen(true)} aria-label="Add expense"
+      <Fab ref={fabPress.ref} onClick={(e) => { setOriginRect(e.currentTarget.getBoundingClientRect()); setAddOpen(true); }} aria-label="Add expense"
+        {...fabPress.bindEvents}
         sx={{ position: 'fixed', bottom: { xs: 20, md: 28 }, right: { xs: 20, md: 28 }, zIndex: 20, bgcolor: GREEN, color: '#04150e', boxShadow: '0 8px 24px -6px rgba(0,0,0,0.5)', '&:hover': { bgcolor: GREEN, filter: 'brightness(1.05)' } }}>
         <AddRoundedIcon />
       </Fab>
 
-      <QuickAddExpense open={addOpen} onClose={() => setAddOpen(false)} categories={categories} onAdded={load} />
+      <QuickAddExpense open={addOpen} onClose={() => setAddOpen(false)} categories={categories} onAdded={load} originRect={originRect} />
     </Box>
   );
 }

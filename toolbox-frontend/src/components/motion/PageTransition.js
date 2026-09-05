@@ -1,30 +1,42 @@
 import React from 'react';
-import { Box } from '@mui/material';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 
 /**
- * The entrance every screen animates in through.
+ * Interruptible page entrance — Apple Design §3.
  *
- * Deliberately pure CSS, not a JS spring. A framer-motion animation here froze
- * partway on the heavier screens: those components re-render many times a
- * second while data loads, which starved the animation loop and left the page
- * stuck at ~25% opacity. A CSS keyframe runs on the compositor and cannot be
- * interrupted by React re-renders, so the page always finishes arriving.
+ * Replaced the CSS @keyframes with a framer-motion spring so navigating
+ * mid-animation crossfades seamlessly from the current opacity/position
+ * instead of cutting. The spring animates from the presentation value by
+ * default, which is exactly what interruption needs.
  *
- * Keyed by route in the router, so navigating re-runs the animation.
+ * Mode "wait" is wrong for page transitions — it blocks the new page until
+ * the old one exits. Instead we use no exit animation (instant unmount of
+ * the old page) and only animate the entrance of the new page. This keeps
+ * navigation feeling instant while the new page settles in gracefully.
  */
 export default function PageTransition({ children }) {
+  const reduce = useReducedMotion();
+
   return (
-    <Box
-      sx={{
-        animation: 'pageIn 360ms cubic-bezier(0.32, 0.72, 0, 1) both',
-        '@keyframes pageIn': {
-          from: { opacity: 0, transform: 'translateY(10px) scale(0.994)' },
-          to: { opacity: 1, transform: 'none' },
-        },
-        '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
-      }}
-    >
-      {children}
-    </Box>
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={children?.key || 'page'}
+        initial={reduce ? { opacity: 0 } : { opacity: 0, y: 10, filter: 'blur(3px)' }}
+        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+        exit={reduce ? { opacity: 0 } : { opacity: 0 }}
+        transition={reduce
+          ? { duration: 0.12 }
+          : {
+              type: 'spring',
+              stiffness: 380,
+              damping: 36,
+              mass: 0.8,
+              filter: { duration: 0.25 },
+            }
+        }
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
   );
 }

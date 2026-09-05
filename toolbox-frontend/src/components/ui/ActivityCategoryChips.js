@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box } from '@mui/material';
+import ScrollFade from './ScrollFade';
 import { accents, motion, radius } from '../../theme/tokens';
 
 const NEUTRAL_DOT = '#8A8A8E';
@@ -48,42 +49,17 @@ export default function ActivityCategoryChips({ categories = [], selected = '', 
   );
 
   return (
-    <Box
-      sx={{
-        position: 'relative', mb: 2.25,
-        /* fade mask on the right edge to hint at scrollable content */
-        '&::after': {
-          content: '""', position: 'absolute',
-          top: 0, right: 0, bottom: 0, width: 32,
-          background: (t) => t.palette.mode === 'dark'
-            ? 'linear-gradient(to right, transparent, #0b0b10)'
-            : 'linear-gradient(to right, transparent, #eef0f4)',
-          pointerEvents: 'none', zIndex: 1,
-          borderRadius: `0 ${radius.sm}px ${radius.sm}px 0`,
-        },
-      }}
-    >
-      <Box
-        sx={{
-          display: 'flex', gap: 0.75, alignItems: 'center',
-          overflowX: 'auto', pb: 0.5,
-          pr: 4, /* breathing room so the last chip isn't under the fade */
-          scrollbarWidth: 'none', msOverflowStyle: 'none',
-          '&::-webkit-scrollbar': { display: 'none' },
-          WebkitOverflowScrolling: 'touch',
-        }}
-      >
-        <Chip id="" label="All" color={null} isSelected={!selected} />
-        {list.map((c) => (
-          <Chip
-            key={c.id}
-            id={String(c.id)}
-            label={c.name}
-            color={c.color}
-            isSelected={String(selected) === String(c.id)}
-          />
-        ))}
-      </Box>
-    </Box>
+    <ScrollFade sx={{ gap: 0.75, alignItems: 'center', pb: 0.5, mb: 2.25 }}>
+      <Chip id="" label="All" color={null} isSelected={!selected} />
+      {list.map((c) => (
+        <Chip
+          key={c.id}
+          id={String(c.id)}
+          label={c.name}
+          color={c.color}
+          isSelected={String(selected) === String(c.id)}
+        />
+      ))}
+    </ScrollFade>
   );
 }

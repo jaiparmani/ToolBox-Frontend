@@ -321,7 +321,7 @@ export default function AppShell() {
           {/* Routed content — the shell above/left persists; only this transitions
               per route (keyed), so navigation feels continuous, not a full reload. */}
           <Box component="main" sx={{ flex: 1, px: { xs: 1.5, sm: 3 }, py: { xs: 2, sm: 3 } }}>
-            <Box ref={sentinelRef} sx={{ height: 1, mt: -1 }} aria-hidden />
+            <Box ref={sentinelRef} sx={{ height: '1px', mt: '-1px' }} aria-hidden />
             <Box sx={{ maxWidth: 1600, mx: 'auto', width: '100%' }}>
               <PageTransition key={location.pathname}>
                 <Outlet />

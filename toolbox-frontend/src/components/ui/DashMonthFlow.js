@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { accents, type } from '../../theme/tokens';
 import { money, moneySmart } from './money';
+import AnimatedNumber from './AnimatedNumber';
 
 const GREEN = accents.mint;
 const num = { fontVariantNumeric: 'tabular-nums', fontFamily: type.displayFamily };
@@ -47,8 +48,8 @@ export default function DashMonthFlow({ income = 0, spent = 0, monthName = '' })
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mt: 0.75, flexWrap: 'wrap' }}>
-        <Typography sx={{ ...num, fontSize: { xs: 28, sm: 32 }, fontWeight: 640, letterSpacing: '-0.03em', lineHeight: 1, color: over ? accents.red : GREEN }}>
-          {over ? `−${money(Math.abs(left))}` : money(left)}
+        <Typography component="div" sx={{ ...num, fontSize: { xs: 28, sm: 32 }, fontWeight: 640, letterSpacing: '-0.03em', lineHeight: 1, color: over ? accents.red : GREEN }}>
+          {over && '−'}<AnimatedNumber value={Math.abs(left)} format="money" />
         </Typography>
         <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>of {moneySmart(income)} earned</Typography>
       </Box>

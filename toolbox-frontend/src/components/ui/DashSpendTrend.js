@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { accents, type } from '../../theme/tokens';
 import { money, moneySmart } from './money';
+import BarGrow from './BarGrow';
 
 const GREEN = accents.mint;
 const num = { fontVariantNumeric: 'tabular-nums', fontFamily: type.displayFamily };
@@ -60,10 +61,11 @@ export default function DashSpendTrend({ months = [] }) {
                   {moneySmart(m.total)}
                 </Typography>
                 <Box sx={{ width: '100%', height: 70, display: 'flex', alignItems: 'flex-end', zIndex: 2 }}>
-                  <Box
+                  <BarGrow
+                    heightPct={h} index={i}
                     title={`${m.label}${cur ? ' (so far)' : ''} · ${money(m.total)}`}
                     sx={{
-                      width: '100%', height: `${h}%`, borderRadius: '5px 5px 3px 3px',
+                      width: '100%', borderRadius: '5px 5px 3px 3px',
                       bgcolor: m.total <= 0 ? 'action.hover' : cur ? GREEN : `${GREEN}33`,
                     }}
                   />

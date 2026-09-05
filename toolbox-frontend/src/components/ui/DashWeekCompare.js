@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { accents, type } from '../../theme/tokens';
 import { money, moneySmart } from './money';
+import BarGrow from './BarGrow';
 
 const GREEN = accents.mint;
 const num = { fontVariantNumeric: 'tabular-nums', fontFamily: type.displayFamily };
@@ -84,13 +85,13 @@ export default function DashWeekCompare({ dailyTotals = [] }) {
               <Box sx={{ position: 'relative', width: '100%', flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                 {/* same weekday, last week — a faint reference */}
                 {ghostPct > 0 && (
-                  <Box aria-hidden title={`Last ${d.label} · ${money(d.lwAmt)}`}
-                    sx={{ position: 'absolute', bottom: 0, width: '100%', height: `${ghostPct}%`, borderRadius: '4px 4px 2px 2px', bgcolor: 'action.hover' }} />
+                  <BarGrow aria-hidden heightPct={ghostPct} index={i} title={`Last ${d.label} · ${money(d.lwAmt)}`}
+                    sx={{ position: 'absolute', bottom: 0, width: '100%', borderRadius: '4px 4px 2px 2px', bgcolor: 'action.hover' }} />
                 )}
                 {/* this week */}
                 {amtPct > 0 && (
-                  <Box title={`${d.label} · ${money(d.amount)}`}
-                    sx={{ position: 'relative', zIndex: 1, width: '58%', height: `${amtPct}%`, borderRadius: '4px 4px 2px 2px',
+                  <BarGrow heightPct={amtPct} index={i} title={`${d.label} · ${money(d.amount)}`}
+                    sx={{ position: 'relative', zIndex: 1, width: '58%', borderRadius: '4px 4px 2px 2px',
                       bgcolor: d.isToday ? GREEN : `${GREEN}55` }} />
                 )}
               </Box>

@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { accents, type } from '../../theme/tokens';
 import { money, moneySmart } from './money';
+import BarGrow from './BarGrow';
 
 const GREEN = accents.mint;
 const num = { fontVariantNumeric: 'tabular-nums', fontFamily: type.displayFamily };
@@ -66,10 +67,11 @@ export default function DashWeekdayPattern({ dailyTotals = [] }) {
                 {moneySmart(v)}
               </Typography>
               <Box sx={{ width: '100%', height: 74, display: 'flex', alignItems: 'flex-end' }}>
-                <Box
+                <BarGrow
+                  heightPct={h} index={i}
                   title={`${LABELS[i]} · ${money(v)}`}
                   sx={{
-                    width: '100%', height: `${h}%`, borderRadius: '5px 5px 3px 3px',
+                    width: '100%', borderRadius: '5px 5px 3px 3px',
                     bgcolor: v <= 0 ? 'action.hover' : isMax ? GREEN : `${GREEN}3d`,
                     transition: 'background-color .12s ease',
                   }}

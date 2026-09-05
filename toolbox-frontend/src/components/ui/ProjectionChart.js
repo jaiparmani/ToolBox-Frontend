@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
+import { motion, useReducedMotion } from 'framer-motion';
 import { accents, type } from '../../theme/tokens';
 import { money } from './money';
 
@@ -19,6 +20,7 @@ import { money } from './money';
 export default function ProjectionChart({ series = [], low, nextIncomeDate, height = 190, accent = accents.mint, onScrub }) {
   const gid = React.useId();
   const wrapRef = React.useRef(null);
+  const reduce = useReducedMotion();
   const [hover, setHover] = React.useState(null); // index
 
   const pts = React.useMemo(() => (series || []).filter((d) => typeof d.balance === 'number'), [series]);
@@ -71,8 +73,20 @@ export default function ProjectionChart({ series = [], low, nextIncomeDate, heig
         {geom.min < 0 && geom.max > 0 && (
           <line x1="0" y1={geom.zeroY} x2={geom.W} y2={geom.zeroY} stroke="rgba(255,255,255,0.14)" strokeWidth="1" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />
         )}
-        <path d={geom.area} fill={`url(#${gid}-f)`} />
-        <path d={geom.line} fill="none" stroke={accent} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+        <motion.path
+          d={geom.area} fill={`url(#${gid}-f)`}
+          initial={reduce ? false : { opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, amount: 0.4 }}
+          transition={reduce ? { duration: 0 } : { duration: 0.6, delay: 0.5 }}
+        />
+        <motion.path
+          d={geom.line} fill="none" stroke={accent} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round"
+          initial={reduce ? false : { pathLength: 0 }}
+          whileInView={{ pathLength: 1 }}
+          viewport={{ once: true, amount: 0.4 }}
+          transition={reduce ? { duration: 0 } : { duration: 1.1, ease: [0.32, 0.72, 0, 1] }}
+        />
         {lowIdx >= 0 && (
           <>
             <line x1={geom.xPx(lowIdx)} y1={geom.yPx(pts[lowIdx].balance)} x2={geom.xPx(lowIdx)} y2={geom.H} stroke="rgba(224,161,58,0.4)" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />

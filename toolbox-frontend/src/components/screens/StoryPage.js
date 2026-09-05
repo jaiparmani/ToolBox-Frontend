@@ -237,9 +237,9 @@ export default function StoryPage() {
             <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1 }}>
               <Box>
                 <Typography sx={{ fontSize: 11.5, color: 'text.disabled', fontWeight: 500 }}>{shownLabel}</Typography>
-                <Typography sx={{ ...num, fontSize: { xs: 26, sm: 30 }, fontWeight: 660, letterSpacing: '-0.03em', lineHeight: 1.1,
+                <Typography component="div" sx={{ ...num, fontSize: { xs: 26, sm: 30 }, fontWeight: 660, letterSpacing: '-0.03em', lineHeight: 1.1,
                   color: scrubDay ? GREEN : 'text.primary', transition: `color ${motionTokens.fast}ms ${motionTokens.ease}` }}>
-                  {money(shownValue)}
+                  <AnimatedNumber value={shownValue} format="money" duration={280} />
                 </Typography>
               </Box>
               {scrubOwnSpend != null && (
@@ -279,13 +279,15 @@ export default function StoryPage() {
             <ChapterHeader chapterKey="rhythm" index={idx} total={total} />
             <Box sx={{ display: 'flex', alignItems: 'stretch', flexWrap: 'wrap', gap: { xs: 2, sm: 0 } }}>
               {[
-                { label: 'Transactions', value: String(count) },
-                { label: 'Avg / transaction', value: money(rhythm.avgPerTxn) },
-                { label: 'Active days', value: `${rhythm.activeDays} of ${daysInMonth}` },
-                ...(rhythm.busiest ? [{ label: 'Busiest day', value: money(rhythm.busiest.total), sub: new Date(rhythm.busiest.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) }] : []),
+                { label: 'Transactions', num: count, kind: 'plain' },
+                { label: 'Avg / transaction', num: rhythm.avgPerTxn, kind: 'money' },
+                { label: 'Active days', num: rhythm.activeDays, kind: 'plain', suffix: ` of ${daysInMonth}` },
+                ...(rhythm.busiest ? [{ label: 'Busiest day', num: rhythm.busiest.total, kind: 'money', sub: new Date(rhythm.busiest.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) }] : []),
               ].map((s, i) => (
                 <Box key={s.label} component={motion.div} variants={storyItem} sx={{ flex: '1 1 120px', minWidth: 0, px: { xs: 0, sm: 1.75 }, borderLeft: { sm: i === 0 ? 'none' : '1px solid' }, borderColor: 'divider' }}>
-                  <Typography sx={{ ...num, fontSize: { xs: 19, sm: 22 }, fontWeight: 640, letterSpacing: '-0.02em', lineHeight: 1.05 }} noWrap>{s.value}</Typography>
+                  <Typography component="div" sx={{ ...num, fontSize: { xs: 19, sm: 22 }, fontWeight: 640, letterSpacing: '-0.02em', lineHeight: 1.05 }} noWrap>
+                    <AnimatedNumber value={s.num} format={s.kind} />{s.suffix || ''}
+                  </Typography>
                   <Typography sx={{ fontSize: 10.5, color: 'text.disabled', letterSpacing: '0.02em', mt: 0.4 }} noWrap>{s.label}{s.sub ? ` · ${s.sub}` : ''}</Typography>
                 </Box>
               ))}
@@ -317,8 +319,8 @@ export default function StoryPage() {
                       transition: `border-color ${motionTokens.fast}ms ${motionTokens.ease}`, '&:hover': { borderColor: 'text.disabled' } }}
                   >
                     <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 1.25 }}>Owed to you</Typography>
-                    <Typography sx={{ ...num, fontSize: { xs: 26, sm: 30 }, fontWeight: 660, letterSpacing: '-0.03em', color: GREEN, lineHeight: 1 }}>
-                      {money(settle.owed)}
+                    <Typography component="div" sx={{ ...num, fontSize: { xs: 26, sm: 30 }, fontWeight: 660, letterSpacing: '-0.03em', color: GREEN, lineHeight: 1 }}>
+                      <AnimatedNumber value={settle.owed} format="money" />
                     </Typography>
                     {settle.youOwe > 0 && (
                       <Typography sx={{ ...num, fontSize: 12.5, color: accents.amber, mt: 0.75 }}>you owe {money(settle.youOwe)}</Typography>

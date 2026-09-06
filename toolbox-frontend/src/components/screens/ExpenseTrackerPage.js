@@ -1274,19 +1274,24 @@ export default function ExpenseTrackerPage() {
                    {activeFilterCount}
                  </Box>
                )}
-               {/* Fold away on mobile so filters don't eat the viewport */}
+               {/* Fold away on mobile so filters don't eat the viewport. The
+                   chevron is the keyboard path to the same toggle the whole
+                   header row exposes to touch, so it carries the state. */}
                <IconButton
                  size="small"
+                 aria-expanded={filtersOpen}
+                 aria-controls="activity-filters-tray"
+                 aria-label={filtersOpen ? 'Hide filters' : 'Show filters'}
                  sx={{
                    display: { xs: 'inline-flex', md: 'none' },
-                   transition: `transform ${motion.fast}ms ${motion.ease}`,
+                   transition: `transform ${motion.normal}ms ${motion.ease}`,
                    transform: filtersOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                  }}
                >
                  <ExpandMoreIcon fontSize="small" />
                </IconButton>
              </Box>
-             <Collapse in={filtersOpen} timeout={motion.normal} easing={motion.ease}>
+             <Collapse in={filtersOpen} timeout={motion.normal} easing={motion.ease} id="activity-filters-tray">
                {/* Search + amount range only — category and date are already owned by
                    the chips and scope bar just below, so this tray isn't a second,
                    conflicting way to set the same thing. A single wrapping row instead

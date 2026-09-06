@@ -8,10 +8,30 @@ import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import SwipeAction from './SwipeAction';
 import { money } from './money';
 import { yourShareOf } from '../rest/expenseTrackerApis';
-import { accents, type } from '../../theme/tokens';
+import { accents, motion as motionTokens, type } from '../../theme/tokens';
 
 const num = { fontFamily: type.displayFamily, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' };
 const NEUTRAL_DOT = '#8A8A8E';
+
+/**
+ * A short staggered lift as the stream arrives, so a page of rows reads as a
+ * list being dealt out top-down rather than a block appearing. The delay is
+ * capped so row 40 of a 50-row page doesn't sit invisible for two seconds, and
+ * the whole thing is dropped under prefers-reduced-motion (Apple Design §14).
+ * Transform + opacity only, and it's a one-shot on mount — nothing here is
+ * recomputed while scrolling.
+ */
+const STAGGER_STEP = 26;
+const STAGGER_CAP = 420;
+const dealIn = (index) => ({
+  animation: `timelineDealIn ${motionTokens.slow}ms ${motionTokens.ease} both`,
+  animationDelay: `${Math.min(index * STAGGER_STEP, STAGGER_CAP)}ms`,
+  '@keyframes timelineDealIn': {
+    from: { opacity: 0, transform: 'translateY(10px)' },
+    to: { opacity: 1, transform: 'none' },
+  },
+  '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+});
 
 const isIncomeOf = (e) => e.transaction_type === 'income' || e.type === 'income';
 // What counts on the ledger: income at full value, an expense at your own share
@@ -51,8 +71,14 @@ function ExpenseRow({ expense, prominent, onEdit, onDelete, onOpen }) {
       sx={{
         display: 'flex', alignItems: 'center', gap: 1.5, px: { xs: 0.75, sm: 1 }, py: 1.15,
         borderRadius: 2, cursor: onOpen ? 'pointer' : 'default',
-        transition: 'background-color 140ms ease',
+        WebkitTapHighlightColor: 'transparent',
+        transition: `background-color ${motionTokens.fast}ms ${motionTokens.ease}`,
         '&:hover': { bgcolor: 'action.hover' },
+        // Apple Design §1: the row answers on pointer-DOWN, not on release.
+        // A cell highlight rather than a scale, because the row is already a
+        // swipe surface (SwipeAction owns its transform) — and `:active` is
+        // free, instant, and cancels itself if the press becomes a swipe.
+        '&:active': { bgcolor: 'action.selected', transition: 'none' },
         '&:hover .exp-more': { opacity: 1 },
       }}
       onClick={() => onOpen?.(expense)}
@@ -138,16 +164,32 @@ export default function ExpenseTimeline({ expenses = [], onEdit, onDelete, onDel
     };
   }, [expenses]);
 
+  // One running index across every group so the stagger reads as a single
+  // top-to-bottom sweep down the page rather than restarting at each day.
+  let dealIndex = -1;
+
   return (
     <Box>
       {groups.map((g) => (
         <Box key={g.key || 'undated'} sx={{ mb: 2.5, '&:last-of-type': { mb: 0 } }}>
           {/* day header — sticks under the app bar so the current day stays
-              labelled while its rows scroll past */}
+              labelled while its rows scroll past. It's a translucent material
+              with the rows travelling under it (Apple Design §12) rather than
+              an opaque strip cut out of the panel; it also inherits the panel's
+              own surface, so it can't read as a mismatched band. */}
           <Box
             sx={{
               position: 'sticky', top: { xs: 54, md: 60 }, zIndex: 2,
-              bgcolor: 'background.default', pt: 0.5, pb: 0.75, px: { xs: 0.75, sm: 1 },
+              pt: 0.5, pb: 0.75, px: { xs: 0.75, sm: 1 },
+              backdropFilter: 'blur(18px) saturate(180%)',
+              bgcolor: (t) => t.palette.mode === 'dark'
+                ? 'rgba(20,20,26,0.82)'
+                : 'rgba(255,255,255,0.86)',
+              '@media (prefers-reduced-transparency: reduce)': {
+                backdropFilter: 'none',
+                bgcolor: 'background.paper',
+              },
+              ...dealIn(++dealIndex),
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1 }}>
@@ -182,6 +224,7 @@ export default function ExpenseTimeline({ expenses = [], onEdit, onDelete, onDel
                 label="Delete"
                 secondaryLabel="Edit"
                 borderRadius={0}
+                sx={dealIn(++dealIndex)}
               >
                 <ExpenseRow
                   expense={expense}

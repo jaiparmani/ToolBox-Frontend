@@ -1,6 +1,7 @@
 import React from 'react';
-import { Box, Stack, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import AnimatedNumber from './AnimatedNumber';
+import ScrollFade from './ScrollFade';
 import { type } from '../../theme/tokens';
 
 /**
@@ -41,19 +42,24 @@ function StatCard({ stat }) {
   );
 }
 
+/**
+ * On a phone these four cards overflow. ScrollFade replaces the hard cut at the
+ * viewport edge with a gradient mask that only appears on the side that has
+ * more content (Apple Design §12: a scroll-edge effect rather than a hard
+ * divider), so the strip says "there's more" instead of looking truncated —
+ * and it reuses the same primitive the category chip row already uses, rather
+ * than a second, differently-behaving scroller.
+ */
 export default function SummaryStrip({ stats }) {
   return (
-    <Stack
-      direction="row"
-      spacing={1.25}
+    <ScrollFade
       sx={{
-        overflowX: 'auto', pb: 0.5,
+        gap: 1.25, pb: 0.5,
         scrollSnapType: 'x mandatory',
-        '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none',
         mx: { xs: -2, sm: 0 }, px: { xs: 2, sm: 0 },
       }}
     >
       {stats.map((stat) => <StatCard key={stat.label} stat={stat} />)}
-    </Stack>
+    </ScrollFade>
   );
 }

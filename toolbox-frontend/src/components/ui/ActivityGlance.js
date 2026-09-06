@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, useMediaQuery } from '@mui/material';
-import { moneySmart } from './money';
+import AnimatedNumber from './AnimatedNumber';
 import { yourShareOf } from '../rest/expenseTrackerApis';
 import { type, radius, color } from '../../theme/tokens';
 
@@ -13,7 +13,15 @@ const dayKey = (value) => {
   return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
 };
 
-function Metric({ label, shortLabel, value, sub }) {
+/**
+ * One reading. The figure counts to its real value with the shared
+ * AnimatedNumber rather than snapping, so when the scope or a filter changes
+ * you can see WHICH of the three moved and by roughly how much — the strip's
+ * whole job. It counts from the previous real value, never from zero, and
+ * AnimatedNumber snaps instead of counting under reduced motion or in a
+ * backgrounded tab, so the number on screen is never a number the data isn't.
+ */
+function Metric({ label, shortLabel, value, format = 'smart', sub }) {
   const isMobile = useMediaQuery('(max-width:600px)');
   return (
     <Box sx={{ flex: 1, minWidth: 0, px: { xs: 1, sm: 2 }, py: { xs: 0.85, sm: 1.25 } }}>
@@ -28,6 +36,7 @@ function Metric({ label, shortLabel, value, sub }) {
         {isMobile && shortLabel ? shortLabel : label}
       </Typography>
       <Typography
+        component="div"
         sx={{
           ...num,
           fontSize: { xs: '1.1rem', sm: '1.25rem' },
@@ -38,7 +47,7 @@ function Metric({ label, shortLabel, value, sub }) {
         }}
         noWrap
       >
-        {value}
+        <AnimatedNumber value={value} format={format} />
       </Typography>
       {sub && (
         <Typography sx={{ fontSize: { xs: 10, sm: 11 }, color: 'text.disabled', mt: 0.1, lineHeight: 1.2 }} noWrap>
@@ -92,17 +101,18 @@ export default function ActivityGlance({ expenses = [] }) {
         label="Days with spend"
         shortLabel="Days"
         value={stats.activeDays}
+        format="plain"
         sub={stats.activeDays === 1 ? 'in view' : 'active'}
       />
       <Metric
         label="Avg / active day"
         shortLabel="Avg/day"
-        value={moneySmart(stats.avgPerDay)}
+        value={stats.avgPerDay}
       />
       <Metric
         label="Biggest"
         shortLabel="Peak"
-        value={moneySmart(stats.biggestShare)}
+        value={stats.biggestShare}
         sub={stats.biggest.description || stats.biggest.category?.name}
       />
     </Box>

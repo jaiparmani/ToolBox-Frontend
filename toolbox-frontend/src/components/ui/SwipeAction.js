@@ -35,6 +35,7 @@ export default function SwipeAction({
   icon, secondaryIcon,
   label = 'Delete', secondaryLabel = 'Edit',
   direction = 'left', threshold = 96, borderRadius = 12,
+  sx,
 }) {
   const frontRef = React.useRef(null);
   const stopRef = React.useRef(null);
@@ -202,7 +203,7 @@ export default function SwipeAction({
   const showRight = revealDir === 'right' && onSecondaryAction;
 
   return (
-    <Box sx={{ position: 'relative', borderRadius: `${borderRadius}px`, overflow: 'hidden' }}>
+    <Box sx={{ position: 'relative', borderRadius: `${borderRadius}px`, overflow: 'hidden', ...sx }}>
       {/* Left action layer (swipe left = delete) */}
       {onAction && (
         <Box

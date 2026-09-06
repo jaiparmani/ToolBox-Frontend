@@ -11,6 +11,10 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import AddIcon from '@mui/icons-material/Add';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import SouthWestIcon from '@mui/icons-material/SouthWest';
+import NorthEastIcon from '@mui/icons-material/NorthEast';
 
 import MoneyConstellation from '../ui/MoneyConstellation';
 import Reveal from '../ui/Reveal';
@@ -24,8 +28,9 @@ import { accents, type } from '../../theme/tokens';
 import { feedback } from '../ui/feedback';
 import GroupStrip from '../ui/GroupStrip';
 import SettleConfirmSheet from '../ui/SettleConfirmSheet';
+import ConfirmDialog from '../ui/ConfirmDialog';
 import {
-  getSplitBalances, settleUpWith, getSplits,
+  getSplitBalances, settleUpWith, getSplits, updateSplit, deleteSplit,
   getGroups, createGroup, getGroupBalances, getGroupExpenses, splitInGroup,
   addGroupMembers, searchSplitUsers,
 } from '../rest/expenseTrackerApis';
@@ -76,6 +81,47 @@ function optimisticSettle(prev, person) {
 }
 
 /**
+ * Which way one split runs, said four ways at once.
+ *
+ * The same ExpenseSplit row is "owed to you" for whoever paid and "you owe" for
+ * the account the person is linked to, and getting that backwards is the worst
+ * mistake this screen can make. So direction is carried by colour (mint in, red
+ * out), an arrow, a sign and a word - colour is never the only signal, which is
+ * also what keeps it readable for anyone who can't separate the two hues.
+ */
+const DIRECTION = {
+  owed_to_you: {
+    color: accents.mint, sign: '+', label: 'owed to you',
+    Arrow: SouthWestIcon, arrowLabel: 'Money coming to you',
+  },
+  you_owe: {
+    color: accents.red, sign: '−', label: 'you owe',
+    Arrow: NorthEastIcon, arrowLabel: 'Money you owe',
+  },
+};
+
+function SplitAmount({ direction, amount, size = 'body2' }) {
+  const dir = DIRECTION[direction] || DIRECTION.owed_to_you;
+  const { Arrow } = dir;
+  return (
+    <Box sx={{ textAlign: 'right' }}>
+      <Box display="flex" alignItems="center" justifyContent="flex-end" gap={0.4}>
+        <Arrow titleAccess={dir.arrowLabel} sx={{ fontSize: 14, color: dir.color }} />
+        <Typography
+          variant={size}
+          sx={{ fontWeight: 700, color: dir.color, fontVariantNumeric: 'tabular-nums' }}
+        >
+          {dir.sign}{money(Math.abs(amount))}
+        </Typography>
+      </Box>
+      <Typography variant="caption" sx={{ color: dir.color, opacity: 0.85 }}>
+        {dir.label}
+      </Typography>
+    </Box>
+  );
+}
+
+/**
  * Splitting lives on its own page now.
  *
  * As a tab inside the expense tracker it was buried under that page's own
@@ -102,6 +148,9 @@ export default function SplitsPage() {
   const [settle, setSettle] = useState({
     open: false, person: null, settling: false, done: false, doneTotal: 0, error: null,
   });
+  // Editing one share, from either side of it.
+  const [editSplit, setEditSplit] = useState({ open: false, item: null, amount: '', saving: false });
+  const [removeTarget, setRemoveTarget] = useState({ open: false, item: null, saving: false });
 
   // Groups. `openGroup` switches the page into that group's own view rather
   // than navigating away, so the constellation can simply re-scope itself.
@@ -248,15 +297,62 @@ export default function SplitsPage() {
     return [...byName.values()].sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
   }, [state.balances, state.youOwe]);
 
-  const openPerson = async (person) => {
+  /**
+   * The bills behind one person's balance.
+   *
+   * Which filter to send depends on which side of the split you are. A person
+   * who owes you is a Person in your own contact list, so `personId` works. An
+   * account you owe has no Person id you can see - that row lives in *their*
+   * contact list - so it is narrowed by the account instead. Sending an
+   * undefined personId used to fall through to an unfiltered list, which showed
+   * every split you were party to under one person's name.
+   */
+  const openPerson = useCallback(async (person) => {
     setSelected(person);
     if (!person) return;
     setDetail({ loading: true, items: [] });
     try {
-      const items = await getSplits({ personId: person.personId, settled: 'false' });
+      const items = await getSplits(
+        person.personId
+          ? { personId: person.personId, settled: 'false' }
+          : { owedToUserId: person.owedToUserId, settled: 'false' });
       setDetail({ loading: false, items });
     } catch (err) {
       setDetail({ loading: false, items: [] });
+    }
+  }, []);
+
+  /**
+   * Change a share. Either party may: the person being billed is usually the
+   * one who notices the figure is wrong, and the server notifies the other side
+   * so it is never a silent edit. The payer's own share absorbs the difference,
+   * so raising a share to the whole bill leaves the payer owing nothing on it.
+   */
+  const saveSplitEdit = async () => {
+    const amount = parseFloat(editSplit.amount);
+    if (!amount || amount <= 0) { setError("A share has to be more than zero"); return; }
+    setEditSplit(prev => ({ ...prev, saving: true }));
+    try {
+      await updateSplit(editSplit.item.id, { amount });
+      setEditSplit({ open: false, item: null, amount: '', saving: false });
+      setSuccess('Share updated');
+      await Promise.all([load(), openPerson(selected)]);
+    } catch (err) {
+      setEditSplit(prev => ({ ...prev, saving: false }));
+      setError(err.message || 'Could not update that share');
+    }
+  };
+
+  const removeSplit = async () => {
+    setRemoveTarget(prev => ({ ...prev, saving: true }));
+    try {
+      await deleteSplit(removeTarget.item.id);
+      setRemoveTarget({ open: false, item: null, saving: false });
+      setSuccess('Split removed');
+      await Promise.all([load(), openPerson(selected)]);
+    } catch (err) {
+      setRemoveTarget(prev => ({ ...prev, saving: false }));
+      setError(err.message || 'Could not remove that split');
     }
   };
 
@@ -407,20 +503,26 @@ export default function SplitsPage() {
               <Box sx={{ minWidth: 0, flex: 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 650 }} noWrap>{openGroup.name}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {groupView.data
-                    ? `${groupView.data.members.length} ${groupView.data.members.length === 1 ? 'person' : 'people'} · ${groupView.data.expenseCount} ${groupView.data.expenseCount === 1 ? 'bill' : 'bills'}`
-                    : 'loading…'}
+                  {!groupView.data
+                    ? 'loading…'
+                    : groupView.data.viewerIsOwner === false
+                      ? `shared by ${groupView.data.ownerUsername || 'someone else'} · ${groupView.data.expenseCount} ${groupView.data.expenseCount === 1 ? 'bill' : 'bills'} with you`
+                      : `${groupView.data.members.length} ${groupView.data.members.length === 1 ? 'person' : 'people'} · ${groupView.data.expenseCount} ${groupView.data.expenseCount === 1 ? 'bill' : 'bills'}`}
                 </Typography>
               </Box>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<PersonAddIcon />}
-                onClick={openAddPeople}
-                sx={{ flexShrink: 0 }}
-              >
-                Add people
-              </Button>
+              {/* Only the person who made the group can restructure it - the
+                  members in it are their contacts, not yours. */}
+              {groupView.data?.viewerIsOwner !== false && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<PersonAddIcon />}
+                  onClick={openAddPeople}
+                  sx={{ flexShrink: 0 }}
+                >
+                  Add people
+                </Button>
+              )}
             </Box>
 
             {groupView.loading ? (
@@ -432,17 +534,26 @@ export default function SplitsPage() {
                     elevation={0}
                     sx={{ p: 2.5, mb: 2, borderRadius: 4, textAlign: 'center', border: '1px solid', borderColor: 'divider' }}
                   >
-                    <Typography variant="overline" color="text.secondary">Spent in this group</Typography>
+                    <Typography variant="overline" color="text.secondary">
+                      {groupView.data.viewerIsOwner ? 'Spent in this group' : 'Your bills in this group'}
+                    </Typography>
                     <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: '2rem', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
                       {moneySmart(groupView.data.totalSpent)}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {money(groupView.data.totalOutstanding)} still to come back to you
+                    {/* Same rows, opposite ends: the owner is owed this, a
+                        member owes it - so the colour and the words both flip. */}
+                    <Typography
+                      variant="caption"
+                      sx={{ color: groupView.data.viewerIsOwner ? posColor : negColor, fontWeight: 600 }}
+                    >
+                      {groupView.data.viewerIsOwner
+                        ? `+${money(groupView.data.totalOutstanding)} still to come back to you`
+                        : `−${money(groupView.data.yourShareOutstanding)} you still owe ${groupView.data.ownerUsername || 'them'}`}
                     </Typography>
                   </Paper>
                 </Reveal>
 
-                {groupView.data.members.length === 0 && (
+                {groupView.data.members.length === 0 && groupView.data.viewerIsOwner && (
                   <Reveal index={1}>
                     <Paper
                       elevation={0}
@@ -470,7 +581,9 @@ export default function SplitsPage() {
                       <MoneyConstellation
                         centreLabel={openGroup.emoji || 'You'}
                         people={groupView.data.members.map(m => ({
-                          id: `g${m.personId}`, personId: m.personId, name: m.name, net: m.owed,
+                          id: `g${m.personId}`, personId: m.personId, name: m.name,
+                          // A member's own row is money leaving them, not coming in.
+                          net: groupView.data.viewerIsOwner ? m.owed : -m.owed,
                         }))}
                         selectedId={null}
                         onSelect={() => {}}
@@ -479,8 +592,11 @@ export default function SplitsPage() {
                   </Reveal>
                 )}
 
-                {/* Split without leaving the group - only once there are members */}
-                {groupView.data.members.length > 0 && (
+                {/* Split without leaving the group - only once there are
+                    members, and only for the owner: the members are their
+                    contacts, so a bill added from the other side would have
+                    nobody to attach to. */}
+                {groupView.data.members.length > 0 && groupView.data.viewerIsOwner && (
                 <Reveal index={2}>
                   <Paper
                     elevation={0}
@@ -521,15 +637,25 @@ export default function SplitsPage() {
                         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
                           <Box display="flex" justifyContent="space-between" alignItems="center">
                             <Box sx={{ minWidth: 0 }}>
-                              <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>{m.name}</Typography>
+                              <Typography variant="body1" sx={{ fontWeight: 600 }} noWrap>
+                                {m.isYou ? 'You' : m.name}
+                              </Typography>
                               <Typography variant="caption" color="text.secondary">
                                 {m.owed > 0 ? `${m.unsettledCount} unsettled` : 'settled up'}
                                 {m.linkedUsername ? ' · has an account' : ''}
                               </Typography>
                             </Box>
-                            <Typography sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: m.owed > 0 ? posColor : 'text.secondary' }}>
-                              {m.owed > 0 ? '+' : ''}{money(m.owed)}
-                            </Typography>
+                            {m.owed > 0 ? (
+                              <SplitAmount
+                                direction={groupView.data.viewerIsOwner ? 'owed_to_you' : 'you_owe'}
+                                amount={m.owed}
+                                size="body1"
+                              />
+                            ) : (
+                              <Typography sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'text.secondary' }}>
+                                {money(0)}
+                              </Typography>
+                            )}
                           </Box>
                         </CardContent>
                       </Card>
@@ -677,18 +803,50 @@ export default function SplitsPage() {
                       {selected?.id === person.id && detail.items.length > 0 && (
                         <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
                           {detail.items.slice(0, 6).map((item) => (
-                            <Box key={item.id} display="flex" justifyContent="space-between" sx={{ py: 0.5 }}>
-                              <Typography variant="body2" color="text.secondary" noWrap sx={{ pr: 1 }}>
-                                {item.description}
-                                <Chip
-                                  label={relativeDay(item.date)}
-                                  size="small"
-                                  sx={{ ml: 1, height: 17, fontSize: '0.62rem' }}
-                                />
-                              </Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 600, flexShrink: 0 }}>
-                                {money(item.amount)}
-                              </Typography>
+                            <Box
+                              key={item.id}
+                              display="flex" alignItems="center" justifyContent="space-between"
+                              gap={1}
+                              sx={{ py: 0.75 }}
+                            >
+                              <Box sx={{ minWidth: 0 }}>
+                                <Typography variant="body2" color="text.secondary" noWrap>
+                                  {item.description}
+                                  <Chip
+                                    label={relativeDay(item.date)}
+                                    size="small"
+                                    sx={{ ml: 1, height: 17, fontSize: '0.62rem' }}
+                                  />
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {item.direction === 'you_owe'
+                                    ? `${item.counterparty} paid`
+                                    : 'you paid'}
+                                </Typography>
+                              </Box>
+                              <Box display="flex" alignItems="center" gap={0.25} sx={{ flexShrink: 0 }}>
+                                <SplitAmount direction={item.direction} amount={item.amount} />
+                                {item.canEdit && (
+                                  <>
+                                    <IconButton
+                                      size="small"
+                                      aria-label={`Edit the ${item.description} share`}
+                                      onClick={() => setEditSplit({
+                                        open: true, item, amount: String(item.amount), saving: false,
+                                      })}
+                                    >
+                                      <EditIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                    <IconButton
+                                      size="small"
+                                      aria-label={`Remove the ${item.description} split`}
+                                      onClick={() => setRemoveTarget({ open: true, item, saving: false })}
+                                    >
+                                      <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </>
+                                )}
+                              </Box>
                             </Box>
                           ))}
                         </Box>
@@ -721,6 +879,56 @@ export default function SplitsPage() {
           status={settle}
           onConfirm={() => runSettle(settle.person, { sheet: true })}
           onClose={closeSettle}
+        />
+
+        {/* Either party can correct a share - the payer, or the person being
+            billed. The other side is notified by the server, so nothing here
+            changes quietly behind someone's back. */}
+        <Dialog
+          open={editSplit.open}
+          onClose={() => setEditSplit(prev => ({ ...prev, open: false }))}
+          maxWidth="xs" fullWidth
+        >
+          <DialogTitle sx={{ fontWeight: 650 }}>Edit this share</DialogTitle>
+          <DialogContent>
+            {editSplit.item && (
+              <>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  {editSplit.item.description} · {editSplit.item.direction === 'you_owe'
+                    ? `${editSplit.item.counterparty} paid ${money(editSplit.item.expenseTotal)}`
+                    : `you paid ${money(editSplit.item.expenseTotal)}`}
+                </Typography>
+                <TextField
+                  autoFocus fullWidth type="number" label="Share"
+                  value={editSplit.amount}
+                  onChange={(e) => setEditSplit(prev => ({ ...prev, amount: e.target.value }))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') saveSplitEdit(); }}
+                  helperText="Raise it to the whole bill and the payer owes nothing on it."
+                />
+              </>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setEditSplit(prev => ({ ...prev, open: false }))} color="inherit">
+              Cancel
+            </Button>
+            <Button onClick={saveSplitEdit} variant="contained" disabled={editSplit.saving}>
+              {editSplit.saving ? 'Saving…' : 'Save'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <ConfirmDialog
+          open={removeTarget.open}
+          title="Remove this split?"
+          message={removeTarget.item
+            ? `${removeTarget.item.description} — ${money(removeTarget.item.amount)}. Everyone on this bill is told it was removed.`
+            : ''}
+          confirmLabel="Remove"
+          destructive
+          loading={removeTarget.saving}
+          onConfirm={removeSplit}
+          onCancel={() => setRemoveTarget({ open: false, item: null, saving: false })}
         />
 
         <Snackbar

@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Card, Stack, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import GroupsIcon from '@mui/icons-material/Groups';
+import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import { motion } from '../../theme/tokens';
 
 /**
@@ -10,6 +11,10 @@ import { motion } from '../../theme/tokens';
  * A group is a place you keep going back to - the flat, the trip - so it
  * belongs at the top as a way in, not buried in a menu. Tapping one opens
  * that group's own view.
+ *
+ * A group can also reach you from the other side: somebody splits a flat's
+ * rent with you and their group appears here. Those are marked "shared with
+ * you", because you can read them but not rename them or add people.
  */
 export default function GroupStrip({ groups, activeId, onOpen, onCreate }) {
   return (
@@ -45,14 +50,24 @@ export default function GroupStrip({ groups, activeId, onOpen, onCreate }) {
               '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
             }}
           >
-            <Typography sx={{ fontSize: 22, lineHeight: 1.1 }}>
-              {group.emoji || '👥'}
-            </Typography>
+            <Box display="flex" alignItems="center" gap={0.75}>
+              <Typography sx={{ fontSize: 22, lineHeight: 1.1 }}>
+                {group.emoji || '👥'}
+              </Typography>
+              {group.isOwner === false && (
+                <PeopleAltIcon
+                  titleAccess={`Shared with you by ${group.ownerUsername || 'someone else'}`}
+                  sx={{ fontSize: 15, color: 'text.disabled' }}
+                />
+              )}
+            </Box>
             <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }} noWrap>
               {group.name}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {group.memberCount} {group.memberCount === 1 ? 'person' : 'people'}
+            <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+              {group.isOwner === false
+                ? `shared by ${group.ownerUsername || 'someone else'}`
+                : `${group.memberCount} ${group.memberCount === 1 ? 'person' : 'people'}`}
             </Typography>
           </Card>
         );

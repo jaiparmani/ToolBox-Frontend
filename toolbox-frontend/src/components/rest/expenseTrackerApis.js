@@ -506,12 +506,21 @@ export const createSplitManually = async ({ amount, description, categoryId, dat
     }
 };
 
-// The individual splits behind a balance, so a person's card can show the
-// bills rather than just the total.
-export const getSplits = async ({ personId, settled } = {}) => {
+/**
+ * The individual splits behind a balance, so a person's card can show the bills
+ * rather than just the total.
+ *
+ * The same row reads both ways, so which filter you use depends on which side
+ * you are: `personId` for someone in your own contact list who owes you,
+ * `owedToUserId` for an account you owe (their Person row lives in *their*
+ * contact list, so you have no id for it). Every row comes back with
+ * `direction`, which is the server's answer rather than a guess from names.
+ */
+export const getSplits = async ({ personId, owedToUserId, settled } = {}) => {
     try {
         const params = new URLSearchParams();
         if (personId) params.append('person', personId);
+        if (owedToUserId) params.append('owed_to', owedToUserId);
         if (settled) params.append('settled', settled);
         const query = params.toString() ? `?${params}` : '';
         const response = await authenticatedFetch(`${API_BASE_URL}/splits/${query}`);
@@ -525,6 +534,12 @@ export const getSplits = async ({ personId, settled } = {}) => {
             expenseTotal: parseFloat(s.expense_total || 0),
             personName: s.person_name,
             paidBy: s.paid_by,
+            // 'owed_to_you' when you paid, 'you_owe' when the bill is somebody
+            // else's and this row is your share of it.
+            direction: s.direction || 'owed_to_you',
+            counterparty: s.counterparty || s.person_name,
+            payerUserId: s.payer_user_id ?? null,
+            canEdit: s.can_edit !== false,
             isSettled: s.is_settled,
             splitOnly: s.expense_split_only || false,
         }));
@@ -542,8 +557,11 @@ export const addSplitToExpenses = async (expenseId) => {
 };
 
 /**
- * Update a split's amount. Only the amount field is editable; the server
- * adjusts the parent expense total and notifies all parties.
+ * Update a split's amount. Only the amount is editable, and either party can do
+ * it - the person being billed is usually the one who spots a wrong figure.
+ * The payer's own share absorbs the change first (it may fall to zero, which is
+ * what covering somebody's whole share looks like); the bill itself only grows
+ * once the shares would exceed it. Both sides are notified.
  */
 export const updateSplit = async (splitId, { amount }) => {
     try {
@@ -558,6 +576,8 @@ export const updateSplit = async (splitId, { amount }) => {
             expenseTotal: parseFloat(data.expense_total || 0),
             personName: data.person_name,
             description: data.description,
+            direction: data.direction || 'owed_to_you',
+            counterparty: data.counterparty || data.person_name,
         };
     } catch (error) {
         throw handleApiError(error, 'update the split');
@@ -591,6 +611,10 @@ const asGroup = (g) => ({
     members: (g.members || []).map(m => ({
         personId: m.id, name: m.name, linkedUsername: m.linked_username || null,
     })),
+    // Groups read from both ends now: you can be in one you didn't make. Only
+    // the owner may rename it, add people or archive it.
+    isOwner: g.is_owner !== false,
+    ownerUsername: g.owner_username || null,
     isArchived: g.is_archived,
 });
 
@@ -638,12 +662,18 @@ export const getGroupBalances = async (groupId) => {
         const data = await response.json();
         return {
             group: asGroup(data.group),
+            // Whose reading this is. The owner sees everyone's balance; someone
+            // looking in from the other side sees only their own side of it.
+            viewerIsOwner: data.viewer_is_owner !== false,
+            ownerUsername: data.owner_username || null,
             totalSpent: parseFloat(data.total_spent || 0),
             expenseCount: data.expense_count || 0,
             totalOutstanding: parseFloat(data.total_outstanding || 0),
+            yourShareOutstanding: parseFloat(data.your_share_outstanding || 0),
             members: (data.members || []).map(m => ({
                 personId: m.person_id, name: m.name,
                 linkedUsername: m.linked_username || null,
+                isYou: !!m.is_you,
                 owed: parseFloat(m.owed || 0),
                 unsettledCount: m.unsettled_count || 0,
             })),

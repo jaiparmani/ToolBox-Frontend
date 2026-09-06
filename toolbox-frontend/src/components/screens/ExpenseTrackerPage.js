@@ -63,6 +63,7 @@ import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { money } from '../ui/money';
 import Reveal from '../ui/Reveal';
 import { feedback } from '../ui/feedback';
+import usePressSpring from '../ui/usePressSpring';
 import { TransactionStoryDrawer, buildStoryFromExpense, PageHeader } from '../ui';
 import CursorGlow from '../motion/CursorGlow';
 import AssistantOrb from '../ui/AssistantOrb';
@@ -110,6 +111,33 @@ function AssistantNudge({ label }) {
        <Typography variant="body2" sx={{ color: 'text.secondary' }} noWrap>{label}</Typography>
      </Box>
      <Box sx={{ display: { xs: 'none', sm: 'block' }, px: 0.75, py: 0.15, borderRadius: 1, border: '1px solid', borderColor: 'divider', fontSize: '0.7rem', fontWeight: 700, color: 'text.disabled', flexShrink: 0 }}>⌘K</Box>
+   </Box>
+ );
+}
+
+/** A compact amount pill — matches the app's borderless-input language instead of a raw number spinner. */
+function AmountField({ value, onChange, placeholder, ariaLabel }) {
+ return (
+   <Box
+     sx={{
+       display: 'flex', alignItems: 'center', gap: 0.4,
+       px: 1.1, py: 0.7, borderRadius: radius.pill,
+       border: '1px solid', borderColor: 'divider',
+       bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+       transition: `border-color ${motion.fast}ms ${motion.ease}, background-color ${motion.fast}ms ${motion.ease}`,
+       '&:focus-within': {
+         borderColor: accents.mint,
+         bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(48,214,165,0.08)' : 'rgba(48,214,165,0.06)',
+       },
+     }}
+   >
+     <Typography sx={{ fontSize: 12.5, color: 'text.disabled', fontWeight: 500 }}>₹</Typography>
+     <InputBase
+       value={value}
+       onChange={(e) => onChange(e.target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))}
+       placeholder={placeholder}
+       inputProps={{ inputMode: 'decimal', 'aria-label': ariaLabel, style: { width: 46, padding: 0, fontSize: 12.5, fontVariantNumeric: 'tabular-nums' } }}
+     />
    </Box>
  );
 }
@@ -219,6 +247,7 @@ export default function ExpenseTrackerPage() {
  const isCompact = useMediaQuery((theme) => theme.breakpoints.down('md'));
  const [filtersOpen, setFiltersOpen] = useState(false);
  useEffect(() => { setFiltersOpen(!isCompact); }, [isCompact]);
+ const clearFiltersPress = usePressSpring({ pressScale: 0.88 });
  const [anchorEl, setAnchorEl] = useState(null);
  const [menuType, setMenuType] = useState(null);
 
@@ -1257,18 +1286,13 @@ export default function ExpenseTrackerPage() {
                  <ExpandMoreIcon fontSize="small" />
                </IconButton>
              </Box>
-             <Collapse in={filtersOpen}>
-               {/* Compact 2-col on mobile, fluid row on desktop */}
-               <Box
-                 sx={{
-                   display: 'grid',
-                   gridTemplateColumns: { xs: '1fr 1fr', md: '2fr 1fr 1fr 1fr auto' },
-                   gap: { xs: 1.25, sm: 2 },
-                   alignItems: 'start',
-                 }}
-               >
-                 {/* Search — full width on mobile */}
-                 <Box sx={{ gridColumn: { xs: '1 / -1', md: 'auto' } }}>
+             <Collapse in={filtersOpen} timeout={motion.normal} easing={motion.ease}>
+               {/* Search + amount range only — category and date are already owned by
+                   the chips and scope bar just below, so this tray isn't a second,
+                   conflicting way to set the same thing. A single wrapping row instead
+                   of a rigid grid, since there are only three controls left to place. */}
+               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 1.25, sm: 1.5 }, alignItems: 'center' }}>
+                 <Box sx={{ flex: '1 1 200px', minWidth: 0 }}>
                    <TextField
                      id="search-input"
                      fullWidth
@@ -1286,80 +1310,39 @@ export default function ExpenseTrackerPage() {
                      placeholder="Description, location..."
                    />
                  </Box>
-                 {/* Category — half width on mobile */}
-                 <Box>
-                   <AutocompleteComponent
-                     options={categories.map(cat => ({ label: cat.name, id: cat.id }))}
-                     label="Category"
-                     value={filters.category}
-                     onChange={(value) => handleFilterChange('category', value)}
+                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+                   <AmountField
+                     value={filters.amountMin}
+                     onChange={(v) => handleFilterChange('amountMin', v)}
+                     placeholder="Min"
+                     ariaLabel="Minimum amount"
+                   />
+                   <Box aria-hidden sx={{ width: 8, height: '1px', bgcolor: 'divider', flexShrink: 0 }} />
+                   <AmountField
+                     value={filters.amountMax}
+                     onChange={(v) => handleFilterChange('amountMax', v)}
+                     placeholder="Max"
+                     ariaLabel="Maximum amount"
                    />
                  </Box>
-                 {/* From date — half width on mobile */}
-                 <Box>
-                   <TextField
-                     fullWidth
+                 <Tooltip title="Clear filters">
+                   <IconButton
+                     ref={clearFiltersPress.ref}
+                     {...clearFiltersPress.bindEvents}
+                     onClick={clearFilters}
                      size="small"
-                     type="date"
-                     label="From"
-                     value={filters.dateFrom}
-                     onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-                     InputLabelProps={{ shrink: true }}
-                   />
-                 </Box>
-                 {/* To date — half width on mobile */}
-                 <Box>
-                   <TextField
-                     fullWidth
-                     size="small"
-                     type="date"
-                     label="To"
-                     value={filters.dateTo}
-                     onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-                     InputLabelProps={{ shrink: true }}
-                   />
-                 </Box>
-                 {/* Action buttons — inline row */}
-                 <Box
-                   sx={{
-                     display: 'flex', gap: 0.5, alignItems: 'center',
-                     gridColumn: { xs: '1 / -1', md: 'auto' },
-                     justifyContent: { xs: 'flex-end', md: 'flex-end' },
-                   }}
-                 >
-                   <Tooltip title="Clear filters">
-                     <IconButton
-                       onClick={clearFilters}
-                       size="small"
-                       sx={{
-                         width: 32, height: 32, borderRadius: `${radius.sm}px`,
-                         bgcolor: (t) => t.palette.mode === 'dark'
-                           ? 'rgba(255,255,255,0.04)'
-                           : 'rgba(0,0,0,0.03)',
-                         '&:hover': { color: accents.red, bgcolor: `${accents.red}14` },
-                         transition: `color ${motion.fast}ms ${motion.ease}, background-color ${motion.fast}ms ${motion.ease}`,
-                       }}
-                     >
-                       <CloseIcon sx={{ fontSize: 16 }} />
-                     </IconButton>
-                   </Tooltip>
-                   <Tooltip title="More filters">
-                     <IconButton
-                       onClick={(e) => handleMenuOpen(e, 'filter', null)}
-                       size="small"
-                       sx={{
-                         width: 32, height: 32, borderRadius: `${radius.sm}px`,
-                         bgcolor: (t) => t.palette.mode === 'dark'
-                           ? 'rgba(255,255,255,0.04)'
-                           : 'rgba(0,0,0,0.03)',
-                         '&:hover': { color: 'text.primary' },
-                         transition: `color ${motion.fast}ms ${motion.ease}`,
-                       }}
-                     >
-                       <FilterIcon sx={{ fontSize: 16 }} />
-                     </IconButton>
-                   </Tooltip>
-                 </Box>
+                     sx={{
+                       width: 32, height: 32, borderRadius: `${radius.sm}px`, flexShrink: 0,
+                       bgcolor: (t) => t.palette.mode === 'dark'
+                         ? 'rgba(255,255,255,0.04)'
+                         : 'rgba(0,0,0,0.03)',
+                       '&:hover': { color: accents.red, bgcolor: `${accents.red}14` },
+                       transition: `color ${motion.fast}ms ${motion.ease}, background-color ${motion.fast}ms ${motion.ease}`,
+                     }}
+                   >
+                     <CloseIcon sx={{ fontSize: 16 }} />
+                   </IconButton>
+                 </Tooltip>
                </Box>
              </Collapse>
            </Paper>
@@ -2004,18 +1987,6 @@ export default function ExpenseTrackerPage() {
            <MenuItem onClick={() => { handleMenuClose(); deleteTagHandler(menuType.item.id); }} sx={{ color: '#FF453A' }}>
              <ListItemIcon><DeleteIcon fontSize="small" sx={{ color: '#FF453A' }} /></ListItemIcon>
              <ListItemText>Delete</ListItemText>
-           </MenuItem>
-         </>
-       )}
-       {menuType?.type === 'filter' && (
-         <>
-           <MenuItem onClick={() => { handleMenuClose(); handleFilterChange('amountMin', ''); handleFilterChange('amountMax', ''); }}>
-             <ListItemIcon><FilterIcon fontSize="small" sx={{ color: '#0A84FF' }} /></ListItemIcon>
-             <ListItemText>Amount Range</ListItemText>
-           </MenuItem>
-           <MenuItem onClick={() => { handleMenuClose(); handleFilterChange('tags', []); }}>
-             <ListItemIcon><TagIcon fontSize="small" sx={{ color: '#FF9F0A' }} /></ListItemIcon>
-             <ListItemText>Tag Filter</ListItemText>
            </MenuItem>
          </>
        )}

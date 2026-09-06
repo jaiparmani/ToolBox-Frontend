@@ -98,6 +98,13 @@ const DIRECTION = {
     color: accents.red, sign: '−', label: 'you owe',
     Arrow: NorthEastIcon, arrowLabel: 'Money you owe',
   },
+  // A third member's debt, seen by someone who is neither end of it. Red and
+  // mint both claim "this is your money"; this is not, so it stays neutral and
+  // says who it is actually owed to.
+  owed_to_owner: {
+    color: 'text.secondary', sign: '', label: 'owed to the group',
+    Arrow: SouthWestIcon, arrowLabel: 'Owed to the group owner',
+  },
 };
 
 function SplitAmount({ direction, amount, size = 'body2' }) {
@@ -535,7 +542,7 @@ export default function SplitsPage() {
                     sx={{ p: 2.5, mb: 2, borderRadius: 4, textAlign: 'center', border: '1px solid', borderColor: 'divider' }}
                   >
                     <Typography variant="overline" color="text.secondary">
-                      {groupView.data.viewerIsOwner ? 'Spent in this group' : 'Your bills in this group'}
+                      Spent in this group
                     </Typography>
                     <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: '2rem', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
                       {moneySmart(groupView.data.totalSpent)}
@@ -582,8 +589,13 @@ export default function SplitsPage() {
                         centreLabel={openGroup.emoji || 'You'}
                         people={groupView.data.members.map(m => ({
                           id: `g${m.personId}`, personId: m.personId, name: m.name,
-                          // A member's own row is money leaving them, not coming in.
-                          net: groupView.data.viewerIsOwner ? m.owed : -m.owed,
+                          // Signed from the viewer's own position: the owner is
+                          // owed by everyone, a member owes only their own row,
+                          // and a third member's debt is owed to the owner, not
+                          // to the person reading it - so it carries no sign.
+                          net: groupView.data.viewerIsOwner ? m.owed
+                            : m.isYou ? -m.owed
+                              : 0,
                         }))}
                         selectedId={null}
                         onSelect={() => {}}
@@ -642,12 +654,19 @@ export default function SplitsPage() {
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
                                 {m.owed > 0 ? `${m.unsettledCount} unsettled` : 'settled up'}
+                                {!groupView.data.viewerIsOwner && !m.isYou && m.owed > 0
+                                  ? ` · owes ${groupView.data.ownerUsername || 'the owner'}`
+                                  : ''}
                                 {m.linkedUsername ? ' · has an account' : ''}
                               </Typography>
                             </Box>
                             {m.owed > 0 ? (
                               <SplitAmount
-                                direction={groupView.data.viewerIsOwner ? 'owed_to_you' : 'you_owe'}
+                                direction={
+                                  groupView.data.viewerIsOwner ? 'owed_to_you'
+                                    : m.isYou ? 'you_owe'
+                                      : 'owed_to_owner'
+                                }
                                 amount={m.owed}
                                 size="body1"
                               />

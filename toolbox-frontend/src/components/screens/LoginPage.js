@@ -170,9 +170,14 @@ export default function LoginPage() {
     </Box>
   );
 
+  // Mobile has always resolved to an account server-side, but the label never
+  // said so, which made it a feature nobody could find. Naming all three is
+  // the whole fix - people type what the field asks for.
   const idField = (autoFocus) => (
     <TextField
-      fullWidth label="Email or username" value={identifier} required autoFocus={autoFocus} autoComplete="username"
+      fullWidth label="Mobile, email or username" value={identifier} required autoFocus={autoFocus}
+      autoComplete="username"
+      helperText="Your mobile number works here too"
       onChange={(e) => setIdentifier(e.target.value)}
       InputProps={{ startAdornment: <InputAdornment position="start"><PersonIcon /></InputAdornment> }}
     />

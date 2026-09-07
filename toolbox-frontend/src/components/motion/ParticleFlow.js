@@ -1,5 +1,6 @@
 import React from 'react';
 import { useReducedMotion } from 'framer-motion';
+import { accents } from '../../theme/tokens';
 
 /**
  * A single, app-wide particle layer for money in motion.
@@ -26,15 +27,18 @@ export default function ParticleFlow() {
     const ctx = canvas?.getContext('2d');
     if (!ctx) return undefined;
 
-    let raf = 0, dpr = 1, running = false;
+    let raf = 0, dpr = 1, running = false, prev = 0, W = 0, Hh = 0;
     const particles = [];
 
     const resize = () => {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.round(window.innerWidth * dpr);
-      canvas.height = Math.round(window.innerHeight * dpr);
-      canvas.style.width = window.innerWidth + 'px';
-      canvas.style.height = window.innerHeight + 'px';
+      // Cache the viewport: reading window.innerWidth inside the loop makes the
+      // per-frame clear a layout read.
+      W = window.innerWidth; Hh = window.innerHeight;
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(Hh * dpr);
+      canvas.style.width = W + 'px';
+      canvas.style.height = Hh + 'px';
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     resize();
@@ -47,7 +51,7 @@ export default function ParticleFlow() {
       return null;
     };
 
-    const spawn = ({ from, to, amount = 0, color = '#0A84FF' }) => {
+    const spawn = ({ from, to, amount = 0, color = accents.blue }) => {
       const a = point(from), b = point(to);
       if (!a || !b) return;
       // Particle count scales with the amount but stays bounded.
@@ -61,13 +65,13 @@ export default function ParticleFlow() {
         particles.push({
           a, b, c: { x: cx, y: cy }, color,
           t: -Math.random() * 0.5,           // staggered start (negative = delay)
-          speed: 0.012 + Math.random() * 0.01,
+          speed: (0.012 + Math.random() * 0.01) * 60, // progress per second
           size: 1.4 + Math.random() * 2.2,
           jitter: (Math.random() - 0.5) * 10,
           life: 1,
         });
       }
-      if (!running) { running = true; raf = requestAnimationFrame(loop); }
+      if (!running) { running = true; prev = 0; raf = requestAnimationFrame(loop); }
     };
 
     const bezier = (p, t) => {
@@ -78,12 +82,16 @@ export default function ParticleFlow() {
       };
     };
 
-    const loop = () => {
-      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    const loop = (now) => {
+      // Wall-clock flight: a stream takes the same time to arrive whatever the
+      // display refresh rate, and a stall resumes instead of teleporting.
+      const dt = prev ? Math.min((now - prev) / 1000, 0.05) : 1 / 60;
+      prev = now;
+      ctx.clearRect(0, 0, W, Hh);
       ctx.globalCompositeOperation = 'lighter'; // additive glow where streams overlap
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
-        p.t += p.speed;
+        p.t += p.speed * dt;
         if (p.t < 0) continue;
         if (p.t >= 1) { particles.splice(i, 1); continue; }
         const pos = bezier(p, p.t);
@@ -101,7 +109,7 @@ export default function ParticleFlow() {
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
       if (particles.length) raf = requestAnimationFrame(loop);
-      else { running = false; ctx.clearRect(0, 0, window.innerWidth, window.innerHeight); }
+      else { running = false; ctx.clearRect(0, 0, W, Hh); }
     };
 
     const onFlow = (e) => spawn(e.detail || {});

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Stack, Typography, useMediaQuery, useTheme } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import FormatListBulletedRoundedIcon from '@mui/icons-material/FormatListBulletedRounded';
 import BubbleChartRoundedIcon from '@mui/icons-material/BubbleChartRounded';
 import { chart, motion as motionTokens } from '../../theme/tokens';
@@ -20,6 +21,11 @@ import { money, moneySmart } from './money';
  *
  * `data`: [{ id, label, value, color }]. `onSelect(node)` drills in.
  */
+
+// Entrance stagger, derived from the motion scale rather than picked by feel:
+// each node lands a little over half an "instant" after the one before it, so a
+// full field assembles inside one `slower` beat.
+const STAGGER = Math.round(motionTokens.instant * 0.6);
 export default function InsightConstellation({ data = [], onSelect, title = 'Explore spending' }) {
   const theme = useTheme();
   const compact = useMediaQuery(theme.breakpoints.down('sm'));
@@ -85,7 +91,13 @@ export default function InsightConstellation({ data = [], onSelect, title = 'Exp
   return (
     <Box>
       <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <Typography sx={{ fontWeight: 650, fontSize: '1rem' }}>{title}</Typography>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 650, fontSize: '1rem' }}>{title}</Typography>
+          {/* The figures the picture is made of, in plain text, always visible. */}
+          <Typography variant="caption" color="text.secondary">
+            {money(total)} across {items.length} {items.length === 1 ? 'category' : 'categories'}
+          </Typography>
+        </Box>
         <Box
           role="button" tabIndex={0}
           onClick={() => setView(v => (v === 'map' ? 'list' : 'map'))}
@@ -113,6 +125,7 @@ export default function InsightConstellation({ data = [], onSelect, title = 'Exp
               return (
                 <g
                   key={n.id}
+                  data-ic-node
                   role="button"
                   tabIndex={0}
                   aria-label={`${n.label}: ${money(n.value)}, ${pct}% of spending. Open transactions.`}
@@ -121,30 +134,38 @@ export default function InsightConstellation({ data = [], onSelect, title = 'Exp
                   style={{
                     cursor: 'pointer',
                     animation: `constPop ${motionTokens.slow}ms ${motionTokens.emphasis} both`,
-                    animationDelay: `${i * 55}ms`, transformOrigin: `${n.x}px ${n.y}px`,
+                    animationDelay: `${i * STAGGER}ms`, transformOrigin: `${n.x}px ${n.y}px`,
                   }}
                 >
-                  <circle cx={n.x} cy={n.y} r={n.r} fill={`${col}2e`} stroke={col} strokeWidth={2} />
+                  <circle cx={n.x} cy={n.y} r={n.r} fill={alpha(col, 0.18)} stroke={col} strokeWidth={2} />
                   {n.r >= 24 && (
                     <text x={n.x} y={n.y - 2} textAnchor="middle"
                       style={{ fill: theme.palette.text.primary, fontSize: n.r > 40 ? 12 : 10, fontWeight: 650, pointerEvents: 'none' }}>
                       {n.label.length > 9 ? `${n.label.slice(0, 8)}…` : n.label}
                     </text>
                   )}
-                  {n.r >= 18 && (
-                    <text x={n.x} y={n.r >= 24 ? n.y + 12 : n.y + 4} textAnchor="middle"
-                      style={{ fill: col, fontSize: 10, fontWeight: 700, fontVariantNumeric: 'tabular-nums', pointerEvents: 'none' }}>
-                      {moneySmart(n.value)}
-                    </text>
-                  )}
+                  {/* The amount is printed on every bubble, however small — a
+                      node that only had a colour would be unreadable, and the
+                      figure would exist nowhere but the tooltip. */}
+                  <text x={n.x} y={n.r >= 24 ? n.y + 12 : n.y + 3} textAnchor="middle"
+                    style={{ fill: col, fontSize: n.r >= 24 ? 10 : 8.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums', pointerEvents: 'none' }}>
+                    {moneySmart(n.value)}
+                  </text>
                 </g>
               );
             })}
             <style>{`
               @keyframes constPop { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-              @media (prefers-reduced-motion: reduce) { g { animation: none !important; } }
-              g:focus-visible circle { stroke-width: 3.5; }
+              /* Hover/focus lifts the bubble toward you — transform only, from
+                 its own centre, so nothing reflows. */
+              g[data-ic-node] circle { transition: transform ${motionTokens.fast}ms ${motionTokens.ease}, stroke-width ${motionTokens.fast}ms ${motionTokens.ease}; transform-origin: inherit; }
+              g[data-ic-node]:hover circle, g[data-ic-node]:focus-visible circle { transform: scale(1.06); stroke-width: 3.5; }
               g:focus-visible { outline: none; }
+              @media (prefers-reduced-motion: reduce) {
+                g { animation: none !important; }
+                g[data-ic-node] circle { transition: none; }
+                g[data-ic-node]:hover circle, g[data-ic-node]:focus-visible circle { transform: none; }
+              }
             `}</style>
           </Box>
         </Box>

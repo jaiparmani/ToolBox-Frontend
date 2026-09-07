@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Typography, useTheme, useMediaQuery } from '@mui/material';
-import { accents, chart } from '../../theme/tokens';
+import { accents, chart, color as colorRole } from '../../theme/tokens';
 import { moneySmart } from './money';
 import { deriveWeather } from './FinancialWeather';
 import AnimatedNumber from './AnimatedNumber';
@@ -14,6 +14,13 @@ import AnimatedNumber from './AnimatedNumber';
  * body's radius maps (on a square-root scale, so area tracks the amount) to a
  * real figure, printed on hover and listed for screen readers. It's atmosphere
  * in service of the truth, not instead of it.
+ *
+ * The SPENDING orbit is also a donut: each category owns a wedge whose angular
+ * width is its share of the month's spend, and its world rides the centre of
+ * that wedge — so size (amount) and arc (share) are two readings of the same
+ * real figure, and the ring shows composition at a glance. The star chart's
+ * backdrop (specks, nebulae, the odd meteor) is declared sky, not encoding: it
+ * carries no figure and claims none.
  *
  * Honours the same Financial Weather the rest of the app shows: the star's aura
  * warms and quickens as conditions turn. Reduced motion holds the scene still
@@ -49,8 +56,8 @@ export default function MoneyUniverse({
   const targetNet = netOverride != null ? netOverride : net;
   const targetNetRef = useRef(targetNet); targetNetRef.current = targetNet;
   const dispNetRef = useRef(targetNet);
-  // A day scrubbed into the red storms the aura, on-track keeps the weather hue.
-  const auraColor = targetNet < 0 ? accents.red : baseAura;
+  // (A day scrubbed into the red storms the aura — decided per frame in draw(),
+  // from the eased display value, so the colour change tracks the motion.)
 
   // Reduced-motion is a live signal, not a one-shot read.
   useEffect(() => {
@@ -70,23 +77,38 @@ export default function MoneyUniverse({
     let shown = cats;
     if (cats.length > MAX) {
       const head = cats.slice(0, MAX - 1);
-      const rest = cats.slice(MAX - 1).reduce((s, c) => s + c.amount, 0);
-      shown = [...head, { name: 'Other', amount: rest }];
+      const tail = cats.slice(MAX - 1);
+      shown = [...head, { name: 'Other', amount: tail.reduce((s, c) => s + c.amount, 0), folds: tail.length }];
     }
     const palette = dark ? chart.categorical.dark : chart.categorical.light;
+    const spend = shown.reduce((s, c) => s + c.amount, 0);
 
     const list = [];
     if (income > 0) list.push({ kind: 'income', name: 'Income', amount: income, ring: RING.income, color: accents.mint });
-    shown.forEach((c, i) => list.push({ kind: 'category', name: c.name, amount: c.amount, ring: RING.category, color: palette[i % palette.length] }));
+    // Spending worlds each own a wedge of the SPENDING ring whose angular width
+    // is that category's share of the month's spend — so the ring is a real
+    // donut of composition and every world sits on its own segment.
+    let acc = 0;
+    shown.forEach((c, i) => {
+      const share = spend > 0 ? c.amount / spend : 1 / shown.length;
+      const a0 = acc; acc += share;
+      list.push({ kind: 'category', name: c.name, amount: c.amount, ring: RING.category,
+        color: palette[i % palette.length], share, a0, a1: acc, folds: c.folds });
+    });
     if (bills > 0) list.push({ kind: 'bill', name: 'Bills ahead', amount: bills, ring: RING.bill, color: accents.amber });
 
     const peak = Math.max(...list.map(b => b.amount), 1);
-    // Spread same-ring bodies evenly; start at the top and go clockwise.
-    const ringCounts = {}; list.forEach(b => { ringCounts[b.ring] = (ringCounts[b.ring] || 0) + 1; });
+    // Income/bill rings spread evenly; categories sit at the centre of their share.
+    const ringCounts = {}; list.forEach(b => { if (b.share == null) ringCounts[b.ring] = (ringCounts[b.ring] || 0) + 1; });
     const ringIndex = {};
     return list.map((b) => {
-      const n = ringCounts[b.ring]; const idx = (ringIndex[b.ring] = (ringIndex[b.ring] ?? -1) + 1);
-      const baseAngle = (idx / n) * Math.PI * 2 - Math.PI / 2 + (b.ring * 1.3);
+      let baseAngle;
+      if (b.share != null) {
+        baseAngle = ((b.a0 + b.a1) / 2) * Math.PI * 2 - Math.PI / 2;
+      } else {
+        const n = ringCounts[b.ring]; const idx = (ringIndex[b.ring] = (ringIndex[b.ring] ?? -1) + 1);
+        baseAngle = (idx / n) * Math.PI * 2 - Math.PI / 2 + (b.ring * 1.3);
+      }
       const scale = Math.sqrt(b.amount / peak); // area ∝ amount
       return { ...b, baseAngle, rMin: compact ? 9 : 11, rMax: compact ? 26 : 34, scale,
         r: (compact ? 9 : 11) + scale * (compact ? 17 : 23),
@@ -96,6 +118,13 @@ export default function MoneyUniverse({
 
   // Total spending across categories — used for the hover tooltip percentage.
   const totalSpent = useMemo(() => (categories || []).filter(c => c.amount > 0).reduce((s, c) => s + c.amount, 0), [categories]);
+
+  // Every category, unfolded, for the screen-reader list: the ones the scene
+  // merges into "Other" keep their own real figure in text.
+  const allCats = useMemo(
+    () => [...(categories || [])].filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount),
+    [categories],
+  );
 
   const hasData = bodies.length > 0 || Math.abs(net) > 0;
 
@@ -107,7 +136,7 @@ export default function MoneyUniverse({
     const ctx = canvas.getContext('2d');
     if (!ctx) return; // no 2D context → dashboard cards remain the truth
 
-    let raf = 0, running = true, t = 0, dpr = 1, W = 0, Hh = 0;
+    let raf = 0, running = true, t = 0, dt = 0, last = 0, dpr = 1, W = 0, Hh = 0;
     const stars = []; // static backdrop specks
     const trails = bodies.map(() => []); // recent positions per body → comet tails
     const TRAIL = compact ? 12 : 18;
@@ -124,7 +153,10 @@ export default function MoneyUniverse({
       for (let i = 0; i < count; i++) stars.push({ x: Math.random() * W, y: Math.random() * Hh, r: Math.random() * 1.2 + 0.2, a: Math.random() * 0.5 + 0.1 });
     };
     resize();
-    const ro = new ResizeObserver(resize); ro.observe(wrap);
+    // Resizing a canvas clears it. Under reduced motion there is no loop to
+    // repaint, so the still frame has to be recomposed here or the scene would
+    // go blank on any layout change.
+    const ro = new ResizeObserver(() => { resize(); if (reduce || !running) draw(); }); ro.observe(wrap);
 
     const orbitMax = () => Math.min(W, Hh) / 2 - (compact ? 30 : 40);
 
@@ -168,14 +200,16 @@ export default function MoneyUniverse({
 
       // Shooting stars — a rare streak across the field, purely ambient.
       if (!reduce) {
-        if (Math.random() < 0.007 && meteors.length < 2) {
+        // ~0.44 streaks a second, independent of the frame rate.
+        if (Math.random() < 0.44 * dt && meteors.length < 2) {
           const dir = Math.random() < 0.5 ? 1 : -1;
           meteors.push({ x: dir > 0 ? -20 : W + 20, y: Math.random() * Hh * 0.55, vx: dir * (5 + Math.random() * 3), vy: 1.3 + Math.random() * 1.6, life: 1 });
         }
         ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
         for (let i = meteors.length - 1; i >= 0; i--) {
           const m = meteors[i];
-          m.x += m.vx; m.y += m.vy; m.life -= 0.016;
+          const step = dt * 60;
+          m.x += m.vx * step; m.y += m.vy * step; m.life -= dt;
           if (m.life <= 0 || m.x < -40 || m.x > W + 40 || m.y > Hh + 40) { meteors.splice(i, 1); continue; }
           const grad = ctx.createLinearGradient(m.x, m.y, m.x - m.vx * 4.5, m.y - m.vy * 4.5);
           grad.addColorStop(0, `rgba(255,255,255,${0.85 * m.life})`);
@@ -215,6 +249,27 @@ export default function MoneyUniverse({
         ctx.fillText(l.text, cx + Math.cos(labelAngle) * rl, cy + Math.sin(labelAngle) * rl);
       });
       ctx.restore();
+
+      // Share wedges — the SPENDING orbit drawn as a donut of composition. Each
+      // arc's angular length is that category's share of the month's spend, and
+      // its world rides the centre of its own wedge, so size and arc agree.
+      const catRot = reduce ? 0 : t * 0.11;
+      ctx.save();
+      ctx.lineCap = 'butt';
+      bodies.forEach((b, i) => {
+        if (b.share == null) return;
+        const on = hoverRef.current === i;
+        const rl = oMax * RING.category;
+        const hair = Math.min(0.05, (Math.PI * 2 * b.share) * 0.08); // hairline split
+        const a0 = b.a0 * Math.PI * 2 - Math.PI / 2 + catRot + hair;
+        const a1 = b.a1 * Math.PI * 2 - Math.PI / 2 + catRot - hair;
+        if (a1 <= a0) return;
+        ctx.strokeStyle = b.color; ctx.globalAlpha = on ? 0.85 : 0.34;
+        ctx.lineWidth = on ? 5 : 2.5;
+        ctx.beginPath(); ctx.arc(cx, cy, rl, a0, a1); ctx.stroke();
+      });
+      ctx.restore();
+      ctx.globalAlpha = 1;
 
       // Positions
       const pts = bodies.map((b, i) => {
@@ -269,8 +324,11 @@ export default function MoneyUniverse({
         ctx.globalAlpha = 1;
       }
 
-      // Star: net position (eased toward the scrubbed target), weather-tinted aura
-      dispNetRef.current += (targetNetRef.current - dispNetRef.current) * (reduce ? 1 : 0.14);
+      // Star: net position (eased toward the scrubbed target), weather-tinted aura.
+      // Exponential ease expressed per second, so a scrub settles over the same
+      // wall-clock time on a 120Hz display as on a 30Hz one.
+      const k = reduce ? 1 : 1 - Math.exp(-9 * dt);
+      dispNetRef.current += (targetNetRef.current - dispNetRef.current) * k;
       const dNet = dispNetRef.current;
       const sColor = dNet >= 0 ? accents.mint : accents.red;
       const auraCol = dNet < 0 ? accents.red : baseAura;
@@ -298,21 +356,26 @@ export default function MoneyUniverse({
       bodies.forEach((b, i) => {
         const p = pts[i]; const on = hoverRef.current === i;
         const br = b.r * pop;
-        // Depth of field — worlds on the outer rings sit softly out of focus; the
-        // one you hover snaps sharp, so attention pulls it forward.
-        const blur = (reduce || on) ? 0 : Math.max(0, (b.ring - 0.55) * 6);
-        if (blur > 0.2) ctx.filter = `blur(${blur.toFixed(1)}px)`;
+        // Aerial perspective instead of a real blur: distant rings lose specular
+        // contrast and gain a wider, softer halo, so they read as further back —
+        // and hovering pulls one forward to full contrast. (ctx.filter would give
+        // a truer defocus but re-rasterises every body every frame; this costs
+        // nothing and survives the frame budget.)
+        const depth = (reduce || on) ? 0 : Math.min(1, Math.max(0, (b.ring - 0.55) / 0.5));
+        const spec = 0.9 - depth * 0.55;      // white highlight fades with distance
+        const halo = br * (3 + depth * 1.4);  // and the bloom spreads
         // Bloom halo — additive so overlapping bodies glow into each other.
         ctx.globalCompositeOperation = 'lighter';
-        const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, br * 3);
-        glow.addColorStop(0, hexA(b.color, Math.min(0.95, (on ? 0.6 : 0.4) + flash * 0.4)));
+        const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, halo);
+        glow.addColorStop(0, hexA(b.color, Math.min(0.95, (on ? 0.6 : 0.4 - depth * 0.12) + flash * 0.4)));
         glow.addColorStop(1, hexA(b.color, 0));
-        ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p.x, p.y, br * 3, 0, 7); ctx.fill();
+        ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p.x, p.y, halo, 0, 7); ctx.fill();
         ctx.globalCompositeOperation = 'source-over';
         const g = ctx.createRadialGradient(p.x - br * 0.3, p.y - br * 0.3, 0, p.x, p.y, br);
-        g.addColorStop(0, hexA('#ffffff', dark ? 0.9 : 0.95)); g.addColorStop(0.4, b.color); g.addColorStop(1, hexA(b.color, 0.7));
+        g.addColorStop(0, hexA('#ffffff', dark ? spec : spec + 0.05));
+        g.addColorStop(0.4, b.color);
+        g.addColorStop(1, hexA(b.color, 0.7 - depth * 0.15));
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, br, 0, 7); ctx.fill();
-        ctx.filter = 'none';
         if (on) { ctx.strokeStyle = dark ? '#fff' : '#111'; ctx.globalAlpha = 0.8; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, b.r + 4, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
       });
 
@@ -320,15 +383,30 @@ export default function MoneyUniverse({
       canvas._pts = pts; canvas._star = { x: cx, y: cy, r: coreR };
     };
 
-    const loop = () => { if (!running) return; t += 0.016; draw(); raf = requestAnimationFrame(loop); };
-    if (reduce) { draw(); } else { raf = requestAnimationFrame(loop); }
+    // Wall-clock timestep, clamped so a stall (a hidden tab, a long task, a
+    // throttled preview) resumes where it left off instead of teleporting.
+    const loop = (now) => {
+      if (!running) return;
+      dt = last ? Math.min((now - last) / 1000, 0.05) : 0.016;
+      last = now; t += dt;
+      draw();
+      raf = requestAnimationFrame(loop);
+    };
+    const start = () => { last = 0; raf = requestAnimationFrame(loop); };
+    if (reduce) { dt = 0.016; draw(); } else { start(); }
 
-    const onVis = () => { if (document.hidden) { running = false; cancelAnimationFrame(raf); } else if (!reduce) { running = true; raf = requestAnimationFrame(loop); } };
+    // Offscreen or hidden, the scene stops entirely — no frame budget is spent
+    // on a universe nobody is looking at.
+    let visible = true, onScreen = true;
+    const sync = () => {
+      const want = visible && onScreen && !reduce;
+      if (want === running) return;
+      running = want;
+      if (want) start(); else cancelAnimationFrame(raf);
+    };
+    const onVis = () => { visible = !document.hidden; sync(); };
     document.addEventListener('visibilitychange', onVis);
-    const io = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) { if (!running && !reduce) { running = true; raf = requestAnimationFrame(loop); } }
-      else { running = false; cancelAnimationFrame(raf); }
-    }, { threshold: 0.05 });
+    const io = new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; sync(); }, { threshold: 0.05 });
     io.observe(wrap);
 
     return () => { running = false; cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); document.removeEventListener('visibilitychange', onVis); };
@@ -343,8 +421,10 @@ export default function MoneyUniverse({
     bodies.forEach((b, i) => { const p = canvas._pts[i]; const d = Math.hypot(p.x - x, p.y - y); if (d < b.r + 12 && d < bestD) { bestD = d; best = i; } });
     return best;
   };
-  const onMove = (e) => setHover(pick(e.clientX, e.clientY));
-  const onLeave = () => setHover(null);
+  // Only commit a hover when the picked body actually changes — otherwise every
+  // pointermove would re-render the tree for no visible difference.
+  const onMove = (e) => { const i = pick(e.clientX, e.clientY); if (i !== hoverRef.current) setHover(i); };
+  const onLeave = () => { if (hoverRef.current !== null) setHover(null); };
   const onClick = (e) => { const i = pick(e.clientX, e.clientY); if (i != null && bodies[i].kind === 'category' && onSelectCategory) onSelectCategory(bodies[i].name); };
   const onKey = (e) => {
     if (!bodies.length) return;
@@ -358,14 +438,17 @@ export default function MoneyUniverse({
 
   const active = hover != null ? bodies[hover] : null;
   const summary = `Money Universe. Net ${moneySmart(net)}. ${income > 0 ? `Income ${moneySmart(income)}. ` : ''}` +
-    `${bodies.filter(b => b.kind === 'category').length} spending categories. ${bills > 0 ? `Bills ahead ${moneySmart(bills)}.` : ''}`;
+    `${allCats.length} spending categories totalling ${moneySmart(totalSpent)}. ${bills > 0 ? `Bills ahead ${moneySmart(bills)}.` : ''}`;
 
   return (
     <Box
       ref={wrapRef}
       sx={{ position: 'relative', width: '100%', height: H, borderRadius: 5, overflow: 'hidden',
         border: '1px solid', borderColor: 'divider',
-        background: dark ? 'radial-gradient(120% 100% at 50% 40%, #16182400 0%, #0b0c12 100%)' : 'radial-gradient(120% 100% at 50% 40%, #eef1f800 0%, #dfe4f0 100%)' }}
+        background: dark
+          ? `radial-gradient(120% 100% at 50% 40%, ${hexA(colorRole.bg.dark, 0)} 0%, ${colorRole.bg.dark} 100%)`
+          : `radial-gradient(120% 100% at 50% 40%, ${hexA(colorRole.bg.light, 0)} 0%, ${colorRole.bg.light} 100%)`,
+        '&:focus-within': { borderColor: 'primary.main' } }}
     >
       <canvas
         ref={canvasRef}
@@ -398,7 +481,9 @@ export default function MoneyUniverse({
           px: 1.5, py: 1, borderRadius: 3, backdropFilter: 'blur(10px)',
           bgcolor: dark ? 'rgba(20,22,32,0.78)' : 'rgba(255,255,255,0.85)', border: '1px solid', borderColor: 'divider', pointerEvents: 'none' }}>
           <Box sx={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, background: active.color, boxShadow: `0 0 8px ${active.color}` }} />
-          <Typography sx={{ fontSize: 13, fontWeight: 600 }} noWrap>{active.name}</Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 600 }} noWrap>
+            {active.name}{active.folds ? ` · ${active.folds} smaller categories` : ''}
+          </Typography>
           <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'baseline', gap: 0.75, flexShrink: 0 }}>
             <Typography sx={{ fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: active.color }}>{moneySmart(active.amount)}</Typography>
             {active.kind === 'category' && totalSpent > 0 && (
@@ -413,13 +498,23 @@ export default function MoneyUniverse({
       {/* Hint (fades where a body is active) */}
       {!active && (
         <Typography sx={{ position: 'absolute', left: 0, right: 0, bottom: 10, textAlign: 'center', fontSize: 11, color: 'text.secondary', pointerEvents: 'none', opacity: 0.8 }}>
-          {reduce ? 'Every body is real money — hover to read it' : 'Hover a world to read it · bigger means more · centre is your net'}
+          {reduce ? 'Every body is real money — hover to read it' : 'Hover a world to read it · bigger means more · arc = share of spending'}
         </Typography>
       )}
 
-      {/* Screen-reader truth: the same figures as a list, never trapped in the canvas */}
+      {/* Screen-reader truth: the same figures as a list, never trapped in the
+          canvas. Categories are listed unfolded, so the ones the scene merges
+          into "Other" still have their own number here. */}
       <Box component="ul" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', m: -1, p: 0 }}>
-        {bodies.map((b, i) => <li key={i}>{b.name}: {moneySmart(b.amount)}</li>)}
+        <li>Net position: {moneySmart(net)}</li>
+        {income > 0 && <li>Income: {moneySmart(income)}</li>}
+        {allCats.map((c, i) => (
+          <li key={`c${i}`}>
+            {c.name}: {moneySmart(c.amount)}
+            {totalSpent > 0 ? `, ${Math.round((c.amount / totalSpent) * 100)}% of spending` : ''}
+          </li>
+        ))}
+        {bills > 0 && <li>Bills ahead: {moneySmart(bills)}</li>}
       </Box>
     </Box>
   );

@@ -7,10 +7,15 @@ import { accents } from '../../theme/tokens';
  * A comet that follows the pointer.
  *
  * A soft trail of sparks streams off the cursor as it moves across the surface,
- * fading and drifting like embers. Purely ambient decoration on a fixed,
- * pointer-transparent canvas — it never blocks a click. Desktop only (needs a
- * fine pointer), and a no-op under reduced motion. Emits nothing while the
- * pointer is still, so a resting cursor is calm.
+ * fading and drifting like embers. Purely ambient texture on a fixed,
+ * pointer-transparent canvas — it never blocks a click, and it encodes no
+ * figure (ParticleFlow is the layer that carries money). Desktop only (needs a
+ * fine pointer), and a no-op under reduced motion.
+ *
+ * A resting cursor costs nothing: with no sparks alive the loop stops entirely
+ * rather than clearing a full-viewport canvas sixty times a second forever, and
+ * the next pointer move restarts it. Spark physics run on wall-clock time, so a
+ * 120Hz display doesn't burn the embers twice as fast as a 60Hz one.
  */
 export default function CursorComet() {
   const canvasRef = React.useRef(null);
@@ -26,7 +31,7 @@ export default function CursorComet() {
     const ctx = canvas?.getContext('2d');
     if (!ctx) return undefined;
 
-    let raf = 0, dpr = 1, W = 0, Hh = 0, running = true;
+    let raf = 0, dpr = 1, W = 0, Hh = 0, running = false, visible = true, prev = 0;
     const parts = [];
     let last = null;
 
@@ -55,27 +60,39 @@ export default function CursorComet() {
         }
       }
       last = { x, y };
+      if (parts.length) start(); // no-op while already running
     };
     window.addEventListener('pointermove', onMove, { passive: true });
 
-    const loop = () => {
+    const loop = (now) => {
       if (!running) return;
+      const dt = prev ? Math.min((now - prev) / 1000, 0.05) : 1 / 60;
+      prev = now;
+      const step = dt * 60; // the tuned constants below are per 60Hz frame
       ctx.clearRect(0, 0, W, Hh);
       ctx.globalCompositeOperation = 'lighter';
       for (let i = parts.length - 1; i >= 0; i--) {
         const p = parts[i];
-        p.x += p.vx; p.y += p.vy; p.vy += 0.02; p.life -= 0.03;
+        p.x += p.vx * step; p.y += p.vy * step; p.vy += 0.02 * step; p.life -= 1.8 * dt;
         if (p.life <= 0) { parts.splice(i, 1); continue; }
         ctx.globalAlpha = p.life * 0.7;
         ctx.fillStyle = p.c;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, 7); ctx.fill();
       }
       ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-      raf = requestAnimationFrame(loop);
+      // Nothing left to draw → stop the loop rather than idle on an empty canvas.
+      if (parts.length) raf = requestAnimationFrame(loop);
+      else { running = false; raf = 0; }
     };
-    raf = requestAnimationFrame(loop);
+    const start = () => {
+      if (running || !visible) return;
+      running = true; prev = 0; raf = requestAnimationFrame(loop);
+    };
 
-    const onVis = () => { if (document.hidden) { running = false; cancelAnimationFrame(raf); } else { running = true; raf = requestAnimationFrame(loop); } };
+    const onVis = () => {
+      visible = !document.hidden;
+      if (!visible) { running = false; cancelAnimationFrame(raf); parts.length = 0; ctx.clearRect(0, 0, W, Hh); }
+    };
     document.addEventListener('visibilitychange', onVis);
 
     return () => {

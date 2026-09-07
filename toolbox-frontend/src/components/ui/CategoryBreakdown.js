@@ -19,6 +19,12 @@ import { money, moneySmart } from './money';
  *
  * Every bar is labelled directly, so the chart still works with colour
  * removed entirely.
+ *
+ * The tooltip carries the exact rupee figure, but a tooltip is a mouse-only
+ * affordance: on a phone or with a screen reader it never opens. So each row
+ * also prints its share of the total, and carries the exact, unabbreviated
+ * amount in a visually-hidden span — the number always exists somewhere a
+ * person can actually get to it, not only inside a hover.
  */
 export default function CategoryBreakdown({ data, max = 6, title = 'Where it went' }) {
   const theme = useTheme();
@@ -54,7 +60,7 @@ export default function CategoryBreakdown({ data, max = 6, title = 'Where it wen
         </Typography>
       </Box>
 
-      <Stack spacing={1.25}>
+      <Stack component="ul" spacing={1.25} sx={{ listStyle: 'none', m: 0, p: 0 }}>
         {rows.map((row, i) => {
           const share = total ? Math.round((row.value / total) * 100) : 0;
           return (
@@ -66,17 +72,26 @@ export default function CategoryBreakdown({ data, max = 6, title = 'Where it wen
               placement="top"
               arrow
             >
-              <Box sx={{ cursor: 'default' }}>
+              <Box component="li" sx={{ cursor: 'default', listStyle: 'none' }}>
                 <Box display="flex" justifyContent="space-between" alignItems="baseline" sx={{ mb: 0.5 }}>
                   <Typography variant="body2" noWrap sx={{ minWidth: 0, pr: 1, fontWeight: 500 }}>
                     {row.label}
                   </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ fontWeight: 600, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}
-                  >
-                    {moneySmart(row.value)}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, flexShrink: 0 }}>
+                    <Typography variant="caption" color="text.disabled" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {share}%
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
+                    >
+                      {moneySmart(row.value)}
+                    </Typography>
+                  </Box>
+                  {/* The exact figure, for anyone who can't reach the tooltip. */}
+                  <Box component="span" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}>
+                    {money(row.value)}
+                  </Box>
                 </Box>
                 <Box
                   sx={{

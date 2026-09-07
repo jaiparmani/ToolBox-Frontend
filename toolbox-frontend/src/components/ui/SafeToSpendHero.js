@@ -1,7 +1,8 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
-import { accents, type } from '../../theme/tokens';
+import { accents, motion as motionTokens, type } from '../../theme/tokens';
 import AnimatedNumber from './AnimatedNumber';
+import { moneySmart } from './money';
 
 /**
  * Safe To Spend — the one number the whole app answers. Restraint version: the
@@ -9,6 +10,12 @@ import AnimatedNumber from './AnimatedNumber';
  * gradient — hierarchy is size and space; colour appears only when the number
  * is negative (semantic) or as a small runway status dot. The figure counts to
  * its true value and stays honest; the full working lives in Money Pulse below.
+ *
+ * One line of context earns its place: today's allowance measured against the
+ * pace you actually spend at (`daily_discretionary`), because "₹800" means
+ * something different on a ₹400/day habit than on a ₹2,000/day one. Both
+ * figures are printed; the bar is only a second reading of them, and it does
+ * not appear unless both numbers are really there.
  */
 const PULSE_COLOR = {
   calm: accents.mint,
@@ -61,6 +68,8 @@ export default function SafeToSpendHero({ projection, pulse, loading }) {
               }.`}
       </Typography>
 
+      <PaceRow safe={safe} typical={projection?.daily_discretionary} tone={negative ? accents.red : status} />
+
       {projection?.runway_days != null && (
         <Box sx={{ mt: 2, display: 'inline-flex', alignItems: 'center', gap: 0.75, px: 1.5, py: 0.5, borderRadius: 999, border: '1px solid', borderColor: 'divider' }}>
           <Box aria-hidden sx={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: status, flexShrink: 0 }} />
@@ -69,6 +78,49 @@ export default function SafeToSpendHero({ projection, pulse, loading }) {
           </Typography>
         </Box>
       )}
+    </Box>
+  );
+}
+
+/**
+ * Today's allowance against your usual daily pace. The track is two days of the
+ * usual pace wide, so "the same as usual" sits at the halfway mark and is
+ * readable without a legend; a marker pins the pace itself. Both real figures
+ * are printed either side. Nothing is drawn if either is missing.
+ */
+function PaceRow({ safe, typical, tone }) {
+  const s = Number(safe), t = Number(typical);
+  if (!Number.isFinite(s) || !Number.isFinite(t) || t <= 0) return null;
+  const scale = t * 2;                                   // full track = two typical days
+  const fill = Math.max(0, Math.min(1, s / scale));      // an over-spent day reads as empty
+  return (
+    <Box sx={{ mt: 2.5, maxWidth: 340, mx: 'auto' }}>
+      <Box sx={{ position: 'relative', height: 4, borderRadius: 999, backgroundColor: 'action.hover', overflow: 'visible' }}>
+        <Box sx={{
+          position: 'absolute', inset: 0, borderRadius: 999, overflow: 'hidden',
+        }}>
+          <Box sx={{
+            height: '100%', width: `${fill * 100}%`, backgroundColor: tone, borderRadius: 999,
+            transformOrigin: 'left',
+            animation: `paceGrow ${motionTokens.slow}ms ${motionTokens.ease} both`,
+            '@keyframes paceGrow': { from: { transform: 'scaleX(0)' }, to: { transform: 'scaleX(1)' } },
+            '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+          }} />
+        </Box>
+        {/* the pace mark: exactly one typical day */}
+        <Box aria-hidden sx={{
+          position: 'absolute', left: '50%', top: -3, width: '1px', height: 10,
+          backgroundColor: 'text.disabled',
+        }} />
+      </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75 }}>
+        <Typography variant="caption" color="text.secondary">
+          {s >= t ? 'above' : 'below'} your usual pace
+        </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+          usually {moneySmart(t)}/day
+        </Typography>
+      </Box>
     </Box>
   );
 }

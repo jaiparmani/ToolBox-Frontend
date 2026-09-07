@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box } from '@mui/material';
 import { useReducedMotion } from 'framer-motion';
+import { accents, motion as motionTokens } from '../../theme/tokens';
 
 /**
  * Ambient cursor light — a soft radial glow that trails the pointer to give the
@@ -14,7 +15,15 @@ import { useReducedMotion } from 'framer-motion';
  * touch) and a no-op under prefers-reduced-motion. Sits behind the content
  * (zIndex 0); interactive surfaces are opaque, so it reads only in the gaps.
  */
-export default function CursorGlow({ color = '55, 201, 138' /* green rgb */ }) {
+/** "#rrggbb" → "r, g, b" so a caller can still pass a bare rgb triple. */
+const rgbTriple = (hex) => {
+  if (typeof hex !== 'string' || hex[0] !== '#') return hex;
+  const n = parseInt(hex.slice(1), 16);
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+};
+
+export default function CursorGlow({ color = accents.mint }) {
+  const tint = rgbTriple(color);
   const ref = React.useRef(null);
   const reduce = useReducedMotion();
 
@@ -44,11 +53,12 @@ export default function CursorGlow({ color = '55, 201, 138' /* green rgb */ }) {
       aria-hidden
       sx={{
         position: 'fixed', top: 0, left: 0, width: 0, height: 0, zIndex: 0,
-        pointerEvents: 'none', opacity: 0, transition: 'opacity 600ms ease', willChange: 'transform',
+        pointerEvents: 'none', opacity: 0,
+        transition: `opacity ${motionTokens.slower}ms ${motionTokens.ease}`, willChange: 'transform',
         '&::before': {
           content: '""', position: 'absolute', top: 0, left: 0,
           width: 640, height: 640, marginLeft: '-320px', marginTop: '-320px', borderRadius: '50%',
-          background: `radial-gradient(circle, rgba(255,255,255,0.045) 0%, rgba(${color},0.07) 26%, transparent 62%)`,
+          background: `radial-gradient(circle, rgba(255,255,255,0.045) 0%, rgba(${tint},0.07) 26%, transparent 62%)`,
         },
       }}
     />

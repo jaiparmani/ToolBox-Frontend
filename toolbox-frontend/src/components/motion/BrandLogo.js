@@ -1,4 +1,5 @@
 import React from 'react';
+import { accents } from '../../theme/tokens';
 
 /**
  * The app's mark. A rounded-square money node with an orbiting split line,
@@ -8,12 +9,12 @@ import React from 'react';
 export default function BrandLogo({ size = 30 }) {
   const id = React.useId();
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-label="ToolBox">
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" role="img" aria-label="Money OS">
       <defs>
         <linearGradient id={`${id}-g`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#0A84FF" />
-          <stop offset="0.55" stopColor="#BF5AF2" />
-          <stop offset="1" stopColor="#FF375F" />
+          <stop offset="0" stopColor={accents.blue} />
+          <stop offset="0.55" stopColor={accents.purple} />
+          <stop offset="1" stopColor={accents.red} />
         </linearGradient>
       </defs>
       <rect x="4" y="4" width="24" height="24" rx="8" fill={`url(#${id}-g)`} />

@@ -63,7 +63,7 @@ import CursorGlow from '../motion/CursorGlow';
 import AssistantOrb from '../ui/AssistantOrb';
 import { accents, color, motion, radius, type } from '../../theme/tokens';
 import { useTheme } from '@mui/material/styles';
-import { AnimatePresence, motion as framerMotion } from 'framer-motion';
+import { AnimatePresence, motion as framerMotion, useReducedMotion } from 'framer-motion';
 
 // Color palette for categories
 const categoryColors = [
@@ -153,6 +153,35 @@ export default function ExpenseTrackerPage() {
  const [error, setError] = useState(null);
  const [success, setSuccess] = useState(null);
  const [activeTab, setActiveTab] = useState(0);
+ // Which way along the tab row the last change travelled (+1 right, -1 left),
+ // so the incoming panel can enter from that side.
+ const [tabDir, setTabDir] = useState(0);
+ const tabIndexRef = React.useRef(0);
+ const reduceMotion = useReducedMotion();
+ const selectTab = React.useCallback((next) => {
+   setTabDir(next > tabIndexRef.current ? 1 : next < tabIndexRef.current ? -1 : 0);
+   tabIndexRef.current = next;
+   setActiveTab(next);
+ }, []);
+ /**
+  * Apple Design §7/§8: the four sections sit in a row, so moving between them
+  * should read as travel along that row. The arriving panel starts offset on
+  * the side you moved toward and settles to zero — the in-between frames point
+  * at the outcome instead of blinking there. There is no exit animation on
+  * purpose: waiting for the old panel to leave would put latency on the tap
+  * (§1). Reduced motion keeps the same cue as a plain cross-fade.
+  */
+ const tabEnter = React.useMemo(() => (reduceMotion
+   ? {
+     initial: { opacity: 0 },
+     animate: { opacity: 1 },
+     transition: { duration: motion.fast / 1000 },
+   }
+   : {
+     initial: { opacity: 0, x: tabDir * 24 },
+     animate: { opacity: 1, x: 0 },
+     transition: { type: 'spring', stiffness: 480, damping: 42 },
+   }), [reduceMotion, tabDir]);
  // Which half of the Labels tab is showing. Categories first: every expense
  // has one, tags are the optional second cut.
  const [labelSegment, setLabelSegment] = useState('categories');
@@ -260,7 +289,7 @@ export default function ExpenseTrackerPage() {
  const drillIntoCategory = (categoryId) => {
    setFilters(prev => ({ ...prev, category: String(categoryId) }));
    setPagination(prev => ({ ...prev, page: 0 }));
-   setActiveTab(0);
+   selectTab(0);
    feedback('open');
  };
  // Filters start closed on a phone, open on desktop where there's room.
@@ -329,19 +358,62 @@ export default function ExpenseTrackerPage() {
 
  const loadExpenses = async () => {
    try {
-     const response = await getExpenses({
-       search: filters.search,
-       category: filters.category,
-       dateFrom: filters.dateFrom,
-       dateTo: filters.dateTo,
-       amountMin: filters.amountMin,
-       amountMax: filters.amountMax,
-       tags: filters.tags,
-       ordering: sortBy,
-       page: pagination.page + 1,
-       pageSize: pagination.pageSize
+     // A share somebody else billed you lives on THEIR expense, so it never
+     // appears in this list - yet once you accept it, it counts in your
+     // spending. That left it felt but invisible. Accepted shares are fetched
+     // alongside and merged in, so the item shows up where its effect is.
+     const [response, shares] = await Promise.all([
+       getExpenses({
+         search: filters.search,
+         category: filters.category,
+         dateFrom: filters.dateFrom,
+         dateTo: filters.dateTo,
+         amountMin: filters.amountMin,
+         amountMax: filters.amountMax,
+         tags: filters.tags,
+         ordering: sortBy,
+         page: pagination.page + 1,
+         pageSize: pagination.pageSize
+       }),
+       getSplits({ direction: 'you_owe', included: true }).catch(() => []),
+     ]);
+
+     const rows = response.results || [];
+     // Scope them to the same window the list is showing, or the day groups
+     // would carry dates the rest of the page has filtered out.
+     const inScope = (d) => {
+       if (!d) return false;
+       const day = String(d).slice(0, 10);
+       if (filters.dateFrom && day < filters.dateFrom) return false;
+       if (filters.dateTo && day > filters.dateTo) return false;
+       return true;
+     };
+     const shareRows = (shares || [])
+       .filter((sp) => inScope(sp.date))
+       .map((sp) => ({
+         // Namespaced so it can never collide with an expense id, since these
+         // two sets of ids come from different tables.
+         id: `share-${sp.id}`,
+         splitId: sp.id,
+         date: sp.date,
+         description: sp.description,
+         amount: sp.amount,
+         yourShare: sp.amount,
+         transaction_type: 'expense',
+         category: null,
+         isSharedWithMe: true,
+         paidBy: sp.paidBy,
+       }));
+
+     const merged = [...rows, ...shareRows].sort((a, b) => {
+       const da = String(a.date || '').slice(0, 10);
+       const db = String(b.date || '').slice(0, 10);
+       return da < db ? 1 : da > db ? -1 : 0;
      });
-     setExpenses(response.results || []);
+
+     setExpenses(merged);
+     // The count stays the server's: shares are not part of its pagination, so
+     // claiming otherwise would make the pager lie about how many pages exist.
      setPagination(prev => ({ ...prev, total: response.count || 0 }));
    } catch (error) {
      throw error;
@@ -1178,13 +1250,21 @@ export default function ExpenseTrackerPage() {
          border: '1px solid',
          borderColor: 'divider',
          borderRadius: '18px',
+         // `clip` rather than `hidden`: both trim the panel to its corners, but
+         // `hidden` makes this a scroll container, which silently killed the
+         // day headers' `position: sticky` — they stuck to a box that never
+         // scrolls instead of to the viewport. `clip` creates no scrollport, so
+         // the headers pin under the app bar as intended. Browsers without it
+         // fall back to the (still correct) plain clip of `hidden`.
          overflow: 'hidden',
+         overflowX: 'clip',
+         overflowY: 'clip',
          bgcolor: 'background.paper',
        }}
      >
        <SectionNav
          value={activeTab}
-         onChange={setActiveTab}
+         onChange={selectTab}
          sections={[
            { label: 'Expenses', icon: DashboardIcon, color: accents.blue },
            { label: 'Labels', icon: LabelsIcon, color: accents.purple },
@@ -1195,7 +1275,7 @@ export default function ExpenseTrackerPage() {
 
        {/* Expenses Tab */}
        {activeTab === 0 && (
-         <Box sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
+         <MotionBox key="tab-0" {...tabEnter} sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
            {/* Ask result — the question is asked from the one Assistant (⌘K);
                when it answers, the reading lands here as its own card. */}
            {ask.answer && (
@@ -1447,12 +1527,12 @@ export default function ExpenseTrackerPage() {
              onRowsPerPageChange={(e) => setPagination(prev => ({ ...prev, pageSize: parseInt(e.target.value, 10), page: 0 }))}
              rowsPerPageOptions={[5, 10, 25, 50]}
            />
-         </Box>
+         </MotionBox>
        )}
 
        {/* Labels Tab — categories and tags, one screen */}
        {activeTab === 1 && (
-         <Box sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
+         <MotionBox key="tab-1" {...tabEnter} sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
            <ActivityLabelsPanel
              categories={categories}
              tags={tags}
@@ -1468,12 +1548,12 @@ export default function ExpenseTrackerPage() {
              onDeleteTag={askDeleteTag}
              onSelectCategory={drillIntoCategory}
            />
-         </Box>
+         </MotionBox>
        )}
 
        {/* Insights Tab */}
        {activeTab === 2 && (
-         <Box sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
+         <MotionBox key="tab-2" {...tabEnter} sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
            <ActivityInsightsPanel
              breakdown={summary?.categoryBreakdown}
              categories={categories}
@@ -1482,12 +1562,12 @@ export default function ExpenseTrackerPage() {
              onGenerate={runInsight}
              onSelectCategory={drillIntoCategory}
            />
-         </Box>
+         </MotionBox>
        )}
 
        {/* Splits Tab */}
        {activeTab === 3 && (
-         <Box sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
+         <MotionBox key="tab-3" {...tabEnter} sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
            <ActivitySplitsPanel
              splits={splits}
              splitOnlyBills={splitOnlyBills}
@@ -1507,7 +1587,7 @@ export default function ExpenseTrackerPage() {
              onSettleSingle={askSettleSingle}
              onAddToExpenses={handleAddToExpenses}
            />
-         </Box>
+         </MotionBox>
        )}
      </Paper>
 

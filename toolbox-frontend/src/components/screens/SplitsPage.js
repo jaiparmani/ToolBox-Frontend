@@ -13,8 +13,9 @@ import DoneAllIcon from '@mui/icons-material/DoneAll';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import SouthWestIcon from '@mui/icons-material/SouthWest';
-import NorthEastIcon from '@mui/icons-material/NorthEast';
+import MoveToInboxIcon from '@mui/icons-material/MoveToInbox';
+import PaymentsIcon from '@mui/icons-material/Payments';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 import MoneyConstellation from '../ui/MoneyConstellation';
 import Reveal from '../ui/Reveal';
@@ -29,8 +30,12 @@ import { feedback } from '../ui/feedback';
 import GroupStrip from '../ui/GroupStrip';
 import SettleConfirmSheet from '../ui/SettleConfirmSheet';
 import ConfirmDialog from '../ui/ConfirmDialog';
+import SplitAmount from '../ui/SplitAmount';
+import SplitEditDialog from '../ui/SplitEditDialog';
+import SplitSettleDialog from '../ui/SplitSettleDialog';
 import {
   getSplitBalances, settleUpWith, getSplits, updateSplit, deleteSplit,
+  setSplitInExpenses, getCategories,
   getGroups, createGroup, getGroupBalances, getGroupExpenses, splitInGroup,
   addGroupMembers, searchSplitUsers,
 } from '../rest/expenseTrackerApis';
@@ -81,54 +86,6 @@ function optimisticSettle(prev, person) {
 }
 
 /**
- * Which way one split runs, said four ways at once.
- *
- * The same ExpenseSplit row is "owed to you" for whoever paid and "you owe" for
- * the account the person is linked to, and getting that backwards is the worst
- * mistake this screen can make. So direction is carried by colour (mint in, red
- * out), an arrow, a sign and a word - colour is never the only signal, which is
- * also what keeps it readable for anyone who can't separate the two hues.
- */
-const DIRECTION = {
-  owed_to_you: {
-    color: accents.mint, sign: '+', label: 'owed to you',
-    Arrow: SouthWestIcon, arrowLabel: 'Money coming to you',
-  },
-  you_owe: {
-    color: accents.red, sign: '−', label: 'you owe',
-    Arrow: NorthEastIcon, arrowLabel: 'Money you owe',
-  },
-  // A third member's debt, seen by someone who is neither end of it. Red and
-  // mint both claim "this is your money"; this is not, so it stays neutral and
-  // says who it is actually owed to.
-  owed_to_owner: {
-    color: 'text.secondary', sign: '', label: 'owed to the group',
-    Arrow: SouthWestIcon, arrowLabel: 'Owed to the group owner',
-  },
-};
-
-function SplitAmount({ direction, amount, size = 'body2' }) {
-  const dir = DIRECTION[direction] || DIRECTION.owed_to_you;
-  const { Arrow } = dir;
-  return (
-    <Box sx={{ textAlign: 'right' }}>
-      <Box display="flex" alignItems="center" justifyContent="flex-end" gap={0.4}>
-        <Arrow titleAccess={dir.arrowLabel} sx={{ fontSize: 14, color: dir.color }} />
-        <Typography
-          variant={size}
-          sx={{ fontWeight: 700, color: dir.color, fontVariantNumeric: 'tabular-nums' }}
-        >
-          {dir.sign}{money(Math.abs(amount))}
-        </Typography>
-      </Box>
-      <Typography variant="caption" sx={{ color: dir.color, opacity: 0.85 }}>
-        {dir.label}
-      </Typography>
-    </Box>
-  );
-}
-
-/**
  * Splitting lives on its own page now.
  *
  * As a tab inside the expense tracker it was buried under that page's own
@@ -155,9 +112,19 @@ export default function SplitsPage() {
   const [settle, setSettle] = useState({
     open: false, person: null, settling: false, done: false, doneTotal: 0, error: null,
   });
-  // Editing one share, from either side of it.
-  const [editSplit, setEditSplit] = useState({ open: false, item: null, amount: '', saving: false });
+  // Editing one bill, from either side of it. The dialog reopens on the whole
+  // thing - description, date, category, total, shares - not just an amount.
+  const [editSplit, setEditSplit] = useState({ open: false, item: null, saving: false });
   const [removeTarget, setRemoveTarget] = useState({ open: false, item: null, saving: false });
+  // Part-paying one share, rather than clearing a whole person's balance.
+  const [partial, setPartial] = useState({ open: false, item: null, saving: false, error: null });
+  const [categories, setCategories] = useState([]);
+
+  // Bills other people split with you. They live here and nowhere else until
+  // you say they are yours: a split someone else made never becomes an expense
+  // on your books on its own, which is what it used to do silently.
+  const [shared, setShared] = useState({ loading: true, items: [] });
+  const [including, setIncluding] = useState(null);
 
   // Groups. `openGroup` switches the page into that group's own view rather
   // than navigating away, so the constellation can simply re-scope itself.
@@ -195,9 +162,28 @@ export default function SplitsPage() {
     }
   }, []);
 
+  // Everything you owe, in one call - the shares other people billed you for,
+  // whichever account each is owed to.
+  const loadShared = useCallback(async () => {
+    try {
+      setShared({ loading: false, items: await getSplits({ direction: 'you_owe', settled: 'false' }) });
+    } catch (err) {
+      setShared({ loading: false, items: [] });
+    }
+  }, []);
+
   useEffect(() => {
-    if (isAuthenticated) { load(); loadGroups(); }
-  }, [isAuthenticated, load, loadGroups]);
+    if (isAuthenticated) { load(); loadGroups(); loadShared(); }
+  }, [isAuthenticated, load, loadGroups, loadShared]);
+
+  // The edit dialog needs the category list; fetch it once, quietly, and let
+  // the dialog say so if it hasn't arrived.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    getCategories({ type: 'expense' })
+      .then(data => setCategories(Array.isArray(data) ? data : data?.results || []))
+      .catch(() => setCategories([]));
+  }, [isAuthenticated]);
 
   const enterGroup = async (group) => {
     setOpenGroup(group);
@@ -330,23 +316,72 @@ export default function SplitsPage() {
   }, []);
 
   /**
-   * Change a share. Either party may: the person being billed is usually the
-   * one who notices the figure is wrong, and the server notifies the other side
-   * so it is never a silent edit. The payer's own share absorbs the difference,
-   * so raising a share to the whole bill leaves the payer owing nothing on it.
+   * Change a shared bill. Either party may: the person being billed is usually
+   * the one who notices something is wrong, and the server notifies the other
+   * side so it is never a silent edit. The payer's own share absorbs an amount
+   * change, so raising a share to the whole bill leaves them owing nothing on
+   * it; only the payer may change who is on the bill, because the people on it
+   * live in their contact list.
    */
-  const saveSplitEdit = async () => {
-    const amount = parseFloat(editSplit.amount);
-    if (!amount || amount <= 0) { setError("A share has to be more than zero"); return; }
+  const saveSplitEdit = async (fields) => {
     setEditSplit(prev => ({ ...prev, saving: true }));
     try {
-      await updateSplit(editSplit.item.id, { amount });
-      setEditSplit({ open: false, item: null, amount: '', saving: false });
-      setSuccess('Share updated');
-      await Promise.all([load(), openPerson(selected)]);
+      await updateSplit(editSplit.item.id, fields);
+      setEditSplit({ open: false, item: null, saving: false });
+      setSuccess('Bill updated');
+      feedback('success');
+      await Promise.all([load(), loadShared(), openPerson(selected)]);
     } catch (err) {
       setEditSplit(prev => ({ ...prev, saving: false }));
-      setError(err.message || 'Could not update that share');
+      setError(err.message || 'Could not update that bill');
+    }
+  };
+
+  /**
+   * Pay off part of one share. Money rarely arrives in the shape of the debt,
+   * and the alternative was leaving the whole thing standing or wiping it. The
+   * server returns what it actually applied and what is left, so the message
+   * below never claims a figure it wasn't given.
+   */
+  const settlePartial = async (amount) => {
+    setPartial(prev => ({ ...prev, saving: true, error: null }));
+    try {
+      const result = await settleUpWith({ splitIds: [partial.item.id], amount });
+      feedback('success');
+      setPartial({ open: false, item: null, saving: false, error: null });
+      setSuccess(result.remaining > 0
+        ? `Recorded ${money(result.total)} — ${money(result.remaining)} still outstanding`
+        : `Settled ${money(result.total)}`);
+      await Promise.all([load(), loadShared(), openPerson(selected)]);
+    } catch (err) {
+      setPartial(prev => ({
+        ...prev, saving: false, error: err.message || 'Could not record that payment',
+      }));
+    }
+  };
+
+  /**
+   * Say whether a share somebody else billed you for counts as your own
+   * spending. This is the consent that used to be assumed: the split stays
+   * exactly where it is either way, and only your totals move.
+   */
+  const toggleInExpenses = async (item) => {
+    setIncluding(item.id);
+    try {
+      const result = await setSplitInExpenses(item.id, !item.includeInExpenses);
+      setShared(prev => ({
+        ...prev,
+        items: prev.items.map(s => (
+          s.id === item.id ? { ...s, includeInExpenses: result.includeInExpenses } : s)),
+      }));
+      feedback('success');
+      setSuccess(result.includeInExpenses
+        ? `${item.description} now counts in your expenses`
+        : `${item.description} is shared only — out of your expenses`);
+    } catch (err) {
+      setError(err.message || 'Could not change where this counts');
+    } finally {
+      setIncluding(null);
     }
   };
 
@@ -356,7 +391,7 @@ export default function SplitsPage() {
       await deleteSplit(removeTarget.item.id);
       setRemoveTarget({ open: false, item: null, saving: false });
       setSuccess('Split removed');
-      await Promise.all([load(), openPerson(selected)]);
+      await Promise.all([load(), loadShared(), openPerson(selected)]);
     } catch (err) {
       setRemoveTarget(prev => ({ ...prev, saving: false }));
       setError(err.message || 'Could not remove that split');
@@ -396,6 +431,7 @@ export default function SplitsPage() {
         setTimeout(() => setSettle(prev => (prev.done ? { ...prev, open: false } : prev)), 1600);
       }
       load(); // reconcile the board with the server's truth
+      loadShared();
     } catch (err) {
       setState(snapshot); // put them back exactly as they were
       feedback('error');
@@ -841,17 +877,36 @@ export default function SplitsPage() {
                                   {item.direction === 'you_owe'
                                     ? `${item.counterparty} paid`
                                     : 'you paid'}
+                                  {/* A part-paid share says so, with both real
+                                      figures — the amount shown alongside is
+                                      what is left, not the original. */}
+                                  {item.settledAmount > 0
+                                    ? ` · ${money(item.settledAmount)} of ${money(item.amount)} paid`
+                                    : ''}
                                 </Typography>
                               </Box>
                               <Box display="flex" alignItems="center" gap={0.25} sx={{ flexShrink: 0 }}>
-                                <SplitAmount direction={item.direction} amount={item.amount} />
+                                <SplitAmount
+                                  direction={item.direction}
+                                  amount={item.outstanding}
+                                  label={item.settledAmount > 0
+                                    ? (item.direction === 'you_owe' ? 'still to pay' : 'still owed')
+                                    : undefined}
+                                />
+                                <IconButton
+                                  size="small"
+                                  aria-label={`Record a payment on ${item.description}`}
+                                  onClick={() => setPartial({ open: true, item, saving: false, error: null })}
+                                >
+                                  <PaymentsIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
                                 {item.canEdit && (
                                   <>
                                     <IconButton
                                       size="small"
-                                      aria-label={`Edit the ${item.description} share`}
+                                      aria-label={`Edit the ${item.description} bill`}
                                       onClick={() => setEditSplit({
-                                        open: true, item, amount: String(item.amount), saving: false,
+                                        open: true, item, saving: false,
                                       })}
                                     >
                                       <EditIcon sx={{ fontSize: 16 }} />
@@ -887,6 +942,105 @@ export default function SplitsPage() {
           </>
         )}
 
+        {/* Bills other people split with you.
+            A split someone else created used to reach straight into this
+            account's spending totals — felt in the balance, invisible as an
+            item. It lands here instead, and stays here until you say it is
+            yours. Nothing is copied either way: the "add to my expenses" toggle
+            flips a flag on the one shared row. */}
+        {!openGroup && shared.items.length > 0 && (
+          <Reveal index={2}>
+            <Paper
+              elevation={0}
+              sx={{ p: { xs: 2, sm: 2.5 }, mt: 3, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}
+            >
+              <Box display="flex" alignItems="center" gap={1}>
+                <MoveToInboxIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 650 }}>
+                  Shared with you
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1.5 }}>
+                Bills someone else split with you. None of it counts as your spending
+                until you add it.
+              </Typography>
+
+              <Stack spacing={1.25}>
+                {shared.items.map((item) => (
+                  <Box
+                    key={item.id}
+                    sx={{
+                      p: 1.5, borderRadius: 3, border: '1px solid', borderColor: 'divider',
+                    }}
+                  >
+                    <Box display="flex" alignItems="flex-start" justifyContent="space-between" gap={1.5}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                          {item.description}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {item.counterparty} paid {money(item.expenseTotal)} · {relativeDay(item.date)}
+                          {item.settledAmount > 0
+                            ? ` · ${money(item.settledAmount)} of ${money(item.amount)} paid`
+                            : ''}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ flexShrink: 0 }}>
+                        <SplitAmount direction="you_owe" amount={item.outstanding} />
+                      </Box>
+                    </Box>
+
+                    <Stack
+                      direction="row" spacing={0.5} alignItems="center"
+                      sx={{ mt: 1, flexWrap: 'wrap' }}
+                    >
+                      {item.canInclude && (
+                        item.includeInExpenses ? (
+                          <Chip
+                            icon={<CheckCircleIcon />}
+                            label="In your expenses"
+                            size="small"
+                            onClick={() => toggleInExpenses(item)}
+                            disabled={including === item.id}
+                            sx={{ color: accents.mint, borderColor: accents.mint }}
+                            variant="outlined"
+                          />
+                        ) : (
+                          <Button
+                            size="small" startIcon={<AddIcon />}
+                            onClick={() => toggleInExpenses(item)}
+                            disabled={including === item.id}
+                            sx={{ fontWeight: 600 }}
+                          >
+                            {including === item.id ? 'Adding…' : 'Add to my expenses'}
+                          </Button>
+                        )
+                      )}
+                      <Box sx={{ flex: 1 }} />
+                      <Button
+                        size="small" startIcon={<PaymentsIcon />}
+                        onClick={() => setPartial({ open: true, item, saving: false, error: null })}
+                        sx={{ color: accents.mint, fontWeight: 600 }}
+                      >
+                        Pay
+                      </Button>
+                      {item.canEdit && (
+                        <IconButton
+                          size="small"
+                          aria-label={`Edit the ${item.description} bill`}
+                          onClick={() => setEditSplit({ open: true, item, saving: false })}
+                        >
+                          <EditIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      )}
+                    </Stack>
+                  </Box>
+                ))}
+              </Stack>
+            </Paper>
+          </Reveal>
+        )}
+
         {/* A distinct AI surface, scoped to lending only — kept apart from the
             app's spending analysis. Lives on the everyone view, not inside a
             group. */}
@@ -900,42 +1054,33 @@ export default function SplitsPage() {
           onClose={closeSettle}
         />
 
-        {/* Either party can correct a share - the payer, or the person being
-            billed. The other side is notified by the server, so nothing here
-            changes quietly behind someone's back. */}
-        <Dialog
+        {/* The same dialog that creates a shared bill, reopened on an existing
+            one: description, date, category, total and shares. Either party can
+            correct it - the payer, or the person being billed - and the server
+            notifies the other side, so nothing changes quietly behind anyone's
+            back. */}
+        <SplitEditDialog
           open={editSplit.open}
+          item={editSplit.item}
+          categories={categories}
+          saving={editSplit.saving}
           onClose={() => setEditSplit(prev => ({ ...prev, open: false }))}
-          maxWidth="xs" fullWidth
-        >
-          <DialogTitle sx={{ fontWeight: 650 }}>Edit this share</DialogTitle>
-          <DialogContent>
-            {editSplit.item && (
-              <>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  {editSplit.item.description} · {editSplit.item.direction === 'you_owe'
-                    ? `${editSplit.item.counterparty} paid ${money(editSplit.item.expenseTotal)}`
-                    : `you paid ${money(editSplit.item.expenseTotal)}`}
-                </Typography>
-                <TextField
-                  autoFocus fullWidth type="number" label="Share"
-                  value={editSplit.amount}
-                  onChange={(e) => setEditSplit(prev => ({ ...prev, amount: e.target.value }))}
-                  onKeyDown={(e) => { if (e.key === 'Enter') saveSplitEdit(); }}
-                  helperText="Raise it to the whole bill and the payer owes nothing on it."
-                />
-              </>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setEditSplit(prev => ({ ...prev, open: false }))} color="inherit">
-              Cancel
-            </Button>
-            <Button onClick={saveSplitEdit} variant="contained" disabled={editSplit.saving}>
-              {editSplit.saving ? 'Saving…' : 'Save'}
-            </Button>
-          </DialogActions>
-        </Dialog>
+          onSave={saveSplitEdit}
+        />
+
+        {/* Part of a debt, or all of it. */}
+        <SplitSettleDialog
+          open={partial.open}
+          outstanding={partial.item?.outstanding || 0}
+          alreadyPaid={partial.item?.settledAmount || 0}
+          direction={partial.item?.direction || 'owed_to_you'}
+          counterparty={partial.item?.counterparty}
+          description={partial.item?.description}
+          saving={partial.saving}
+          error={partial.error}
+          onClose={() => setPartial({ open: false, item: null, saving: false, error: null })}
+          onConfirm={settlePartial}
+        />
 
         <ConfirmDialog
           open={removeTarget.open}

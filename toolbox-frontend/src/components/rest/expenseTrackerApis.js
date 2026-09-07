@@ -435,18 +435,28 @@ export const getSplitBalances = async () => {
 /**
  * Record that the money moved. Either side can do it: pass person_id when
  * someone has paid you back, or owed_to_user_id when you have paid them.
+ *
+ * `amount` makes it a part-payment: money rarely arrives in exactly the shape
+ * of the debt. The server applies it oldest bill first and returns what is
+ * genuinely left, so `remaining` is a computed figure and never an assumption.
  */
-export const settleUpWith = async ({ personId, owedToUserId, splitIds }) => {
+export const settleUpWith = async ({ personId, owedToUserId, splitIds, amount }) => {
     try {
         const body = splitIds ? { split_ids: splitIds }
                    : personId ? { person_id: personId }
                    : { owed_to_user_id: owedToUserId };
+        if (amount !== undefined && amount !== null && amount !== '') body.amount = amount;
         const response = await authenticatedFetch(`${API_BASE_URL}/splits/settle/`, {
             method: 'POST',
             body: JSON.stringify(body)
         });
         const data = await response.json();
-        return { count: data.settled_count || 0, total: parseFloat(data.settled_total || 0) };
+        return {
+            count: data.settled_count || 0,
+            partialCount: data.partial_count || 0,
+            total: parseFloat(data.settled_total || 0),
+            remaining: parseFloat(data.remaining || 0),
+        };
     } catch (error) {
         throw handleApiError(error, 'settle up');
     }
@@ -516,12 +526,16 @@ export const createSplitManually = async ({ amount, description, categoryId, dat
  * contact list, so you have no id for it). Every row comes back with
  * `direction`, which is the server's answer rather than a guess from names.
  */
-export const getSplits = async ({ personId, owedToUserId, settled } = {}) => {
+export const getSplits = async ({ personId, owedToUserId, settled, direction, included } = {}) => {
     try {
         const params = new URLSearchParams();
         if (personId) params.append('person', personId);
         if (owedToUserId) params.append('owed_to', owedToUserId);
         if (settled) params.append('settled', settled);
+        // 'you_owe' asks for every share you owe without having to name each
+        // account it is owed to - what a Shared section needs in one call.
+        if (direction) params.append('direction', direction);
+        if (included !== undefined) params.append('included', String(included));
         const query = params.toString() ? `?${params}` : '';
         const response = await authenticatedFetch(`${API_BASE_URL}/splits/${query}`);
         const data = await response.json();
@@ -542,6 +556,21 @@ export const getSplits = async ({ personId, owedToUserId, settled } = {}) => {
             canEdit: s.can_edit !== false,
             isSettled: s.is_settled,
             splitOnly: s.expense_split_only || false,
+            // Partial settlement: what has been paid, and what is really left.
+            settledAmount: parseFloat(s.settled_amount || 0),
+            outstanding: parseFloat(s.outstanding ?? s.amount),
+            // Whether this share counts as the reader's own spending. A split
+            // somebody else made is shared until they opt in; canInclude says
+            // whether the reader is the side that owns that choice.
+            includeInExpenses: !!s.include_in_expenses,
+            canInclude: !!s.can_include,
+            // Enough of the bill to reopen the composer on it.
+            categoryId: s.category ?? null,
+            categoryName: s.category_name || null,
+            participants: (s.participants || []).map(p => ({
+                splitId: p.split_id, personId: p.person_id, name: p.name,
+                amount: parseFloat(p.amount), isYou: !!p.is_you,
+            })),
         }));
     } catch (error) {
         throw handleApiError(error, 'load the splits');
@@ -557,17 +586,43 @@ export const addSplitToExpenses = async (expenseId) => {
 };
 
 /**
- * Update a split's amount. Only the amount is editable, and either party can do
- * it - the person being billed is usually the one who spots a wrong figure.
- * The payer's own share absorbs the change first (it may fall to zero, which is
- * what covering somebody's whole share looks like); the bill itself only grows
- * once the shares would exceed it. Both sides are notified.
+ * Update a split, and the bill behind it.
+ *
+ * Everything the create dialog collects can be corrected here - description,
+ * date, category, the bill total, this share, and who is on it - because a
+ * shared bill entered wrongly used to have no way back. Every field is
+ * optional; passing only `amount` behaves exactly as it always did.
+ *
+ * Either party may edit, and the server notifies the other side: the person
+ * being billed is usually the one who spots a wrong figure. `participants` is
+ * the exception - the people on a bill live in the payer's contact list, so
+ * only the payer can change who is on it. The payer's own share absorbs an
+ * amount change first (it may fall to zero, which is what covering somebody's
+ * whole share looks like); the bill only grows once the shares would exceed it.
  */
-export const updateSplit = async (splitId, { amount }) => {
+export const updateSplit = async (splitId, {
+    amount, description, date, categoryId, expenseAmount, participants,
+} = {}) => {
     try {
+        const body = {};
+        if (amount !== undefined && amount !== null && amount !== '') body.amount = amount;
+        if (description !== undefined) body.description = description;
+        if (date) body.date = date;
+        if (categoryId) body.category_id = categoryId;
+        if (expenseAmount !== undefined && expenseAmount !== null && expenseAmount !== '') {
+            body.expense_amount = expenseAmount;
+        }
+        if (participants) {
+            body.participants = participants.map(p => ({
+                person_id: p.personId || undefined,
+                user_id: p.personId ? undefined : p.userId || undefined,
+                name: p.personId || p.userId ? undefined : p.name,
+                amount: p.amount,
+            }));
+        }
         const response = await authenticatedFetch(`${API_BASE_URL}/splits/${splitId}/`, {
             method: 'PATCH',
-            body: JSON.stringify({ amount })
+            body: JSON.stringify(body)
         });
         const data = await response.json();
         return {
@@ -581,6 +636,29 @@ export const updateSplit = async (splitId, { amount }) => {
         };
     } catch (error) {
         throw handleApiError(error, 'update the split');
+    }
+};
+
+/**
+ * Count (or stop counting) a share somebody else billed you for as your own
+ * spending.
+ *
+ * A split created by someone else lands in Shared and nowhere else: it never
+ * silently becomes an expense on your books. This is the explicit yes. Only the
+ * person who owes the share may call it - the payer's equivalent is
+ * `addSplitToExpenses` on their own expense - and it flips a flag on the one
+ * shared row rather than writing a second copy anywhere.
+ */
+export const setSplitInExpenses = async (splitId, include) => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/splits/${splitId}/`, {
+            method: 'PATCH',
+            body: JSON.stringify({ include_in_expenses: !!include })
+        });
+        const data = await response.json();
+        return { id: data.id, includeInExpenses: !!data.include_in_expenses };
+    } catch (error) {
+        throw handleApiError(error, 'update where this split counts');
     }
 };
 

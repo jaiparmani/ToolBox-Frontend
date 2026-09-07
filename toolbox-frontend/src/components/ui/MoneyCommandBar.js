@@ -1,11 +1,14 @@
 import React from 'react';
-import { Box, InputBase, Typography, useTheme } from '@mui/material';
+import { Box, InputBase, Typography } from '@mui/material';
+import { useReducedMotion } from 'framer-motion';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import CancelRoundedIcon from '@mui/icons-material/CancelRounded';
-import { accents, motion as motionTokens } from '../../theme/tokens';
+import { accents, motion as motionTokens, radius } from '../../theme/tokens';
 import { askAffordability } from '../rest/expenseTrackerApis';
+import AssistantButton from './AssistantButton';
+import { feedback } from './feedback';
 import { money } from './money';
 
 /**
@@ -14,7 +17,11 @@ import { money } from './money';
  * The verdict animates in; every figure shown traces to the user's data. Works
  * even without AI configured (the backend falls back to a regex parse).
  *
- * All motion is gated on prefers-reduced-motion.
+ * Accessibility pass: the send control is a real button (it was a `<div
+ * role="button">` — no tab stop, no Enter/Space), the verdict lands in a polite
+ * live region so a screen reader hears it without watching for it, and the bar
+ * reports `aria-busy` while it thinks. All motion is gated on a live
+ * prefers-reduced-motion subscription rather than a value read once at mount.
  */
 const PROMPTS = [
   'Can I afford a ₹500 dinner Friday?',
@@ -28,8 +35,7 @@ function fmtDate(iso) {
 }
 
 export default function MoneyCommandBar({ sx }) {
-  const theme = useTheme();
-  const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const reduce = !!useReducedMotion();
   const [q, setQ] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [result, setResult] = React.useState(null);
@@ -40,6 +46,7 @@ export default function MoneyCommandBar({ sx }) {
     const question = q.trim();
     if (!question || loading) return;
     setLoading(true); setError(null); setResult(null);
+    feedback('send');
     try {
       setResult(await askAffordability(question));
     } catch (e) {
@@ -55,47 +62,57 @@ export default function MoneyCommandBar({ sx }) {
     <Box sx={sx}>
       {/* Input */}
       <Box
+        aria-busy={loading}
         sx={{
-          display: 'flex', alignItems: 'center', gap: 1.25, px: 2, py: 1.25, borderRadius: 3,
+          display: 'flex', alignItems: 'center', gap: 1.25, px: 2, py: 1, borderRadius: `${radius.lg}px`,
           border: '1px solid', borderColor: loading ? `${accents.violet}88` : 'divider',
           backgroundImage: `radial-gradient(120% 160% at 0% 0%, ${accents.violet}14, transparent 60%)`,
-          transition: `border-color ${motionTokens.normal}ms ${motionTokens.ease}`,
+          transition: `border-color ${motionTokens.normal}ms ${motionTokens.ease}, box-shadow ${motionTokens.fast}ms ${motionTokens.ease}`,
+          '&:focus-within': { borderColor: accents.violet, boxShadow: `0 0 0 3px ${accents.violet}22` },
         }}
       >
-        <AutoAwesomeRoundedIcon sx={{
+        <AutoAwesomeRoundedIcon aria-hidden sx={{
           color: accents.violet, fontSize: 20, flexShrink: 0,
           ...(loading && !reduce ? { animation: 'cbSpin 1.1s linear infinite', '@keyframes cbSpin': { to: { transform: 'rotate(360deg)' } } } : {}),
         }} />
         <InputBase
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') ask(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); ask(); } }}
           placeholder={placeholder}
           fullWidth
-          aria-label="Ask whether you can afford something"
+          inputProps={{ 'aria-label': 'Ask whether you can afford something', enterKeyHint: 'send' }}
           sx={{ fontSize: '1rem', fontWeight: 500 }}
         />
-        <Box
-          role="button"
-          aria-label="Ask"
+        <AssistantButton
           onClick={ask}
+          disabled={!q.trim() || loading}
+          aria-label="Ask"
+          round
+          tone={accents.violet}
+          variant="solid"
           sx={{
-            flexShrink: 0, width: 34, height: 34, borderRadius: '50%', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            backgroundColor: q.trim() ? accents.violet : 'action.disabledBackground',
-            color: q.trim() ? '#fff' : 'text.disabled',
-            transition: `background-color ${motionTokens.fast}ms ${motionTokens.ease}`,
+            width: 34, flexShrink: 0,
+            backgroundColor: q.trim() && !loading ? accents.violet : 'action.disabledBackground',
           }}
         >
           <ArrowUpwardRoundedIcon sx={{ fontSize: 18 }} />
-        </Box>
+        </AssistantButton>
       </Box>
 
-      {/* Result / error */}
-      {(result || error) && (
+      {/* The verdict lives inside a region that is always mounted, so inserting
+          the card announces it politely — one copy of the sentence, not a
+          visually-hidden duplicate for the reader to trip over twice. */}
+      <Box role="status" aria-live="polite">
+        {loading && (
+          <Box component="span" sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+            Working that out…
+          </Box>
+        )}
+        {(result || error) && (
         <Box
           sx={{
-            mt: 1.25, p: 2, borderRadius: 3, position: 'relative', overflow: 'hidden',
+            mt: 1.25, p: 2, borderRadius: `${radius.lg}px`, position: 'relative', overflow: 'hidden',
             border: '1px solid', borderColor: `${error ? accents.amber : tone}55`,
             background: `linear-gradient(120deg, ${error ? accents.amber : tone}18, transparent 78%)`,
             ...(reduce ? {} : {
@@ -109,10 +126,10 @@ export default function MoneyCommandBar({ sx }) {
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
               {result.affordable
-                ? <CheckCircleRoundedIcon sx={{ color: tone, fontSize: 30, flexShrink: 0 }} />
-                : <CancelRoundedIcon sx={{ color: tone, fontSize: 30, flexShrink: 0 }} />}
+                ? <CheckCircleRoundedIcon aria-hidden sx={{ color: tone, fontSize: 30, flexShrink: 0 }} />
+                : <CancelRoundedIcon aria-hidden sx={{ color: tone, fontSize: 30, flexShrink: 0 }} />}
               <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ fontWeight: 750, fontSize: '1.15rem', color: tone, lineHeight: 1.15 }}>
+                <Typography sx={{ fontWeight: 750, fontSize: '1.15rem', color: tone, lineHeight: 1.15, letterSpacing: '-0.015em' }}>
                   {result.affordable ? 'Yes, you can.' : 'Not comfortably.'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -128,7 +145,8 @@ export default function MoneyCommandBar({ sx }) {
             </Box>
           )}
         </Box>
-      )}
+        )}
+      </Box>
     </Box>
   );
 }

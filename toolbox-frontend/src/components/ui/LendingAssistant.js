@@ -5,7 +5,7 @@ import {
 import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import Reveal from './Reveal';
-import { accents, type, motion } from '../../theme/tokens';
+import { accents, motion } from '../../theme/tokens';
 import { feedback } from './feedback';
 import { askLending } from '../rest/expenseTrackerApis';
 
@@ -15,6 +15,12 @@ import { askLending } from '../rest/expenseTrackerApis';
  * server does the reading and the arithmetic; we only show its plain-language
  * answer. Restrained by design: one mint accent for the AI voice, hairline
  * surfaces, transform/opacity motion only.
+ *
+ * Accessibility: the answer and the failure both land inside one always-mounted
+ * polite live region, so a screen reader is told the result once — the surface
+ * announces itself instead of waiting to be re-read. The card reports aria-busy
+ * while the server is thinking, and the example prompts are labelled with what
+ * they will do rather than reading as bare fragments.
  */
 const EXAMPLES = [
   'Who owes me the most?',
@@ -46,6 +52,9 @@ export default function LendingAssistant() {
     <Reveal index={2}>
       <Paper
         elevation={0}
+        component="section"
+        aria-label="Ask about lending"
+        aria-busy={status.loading}
         sx={{ p: { xs: 2, sm: 2.5 }, mb: 2, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}
       >
         {/* Voice line — this is the lending assistant, not the spending one */}
@@ -117,63 +126,69 @@ export default function LendingAssistant() {
                 size="small"
                 variant="outlined"
                 onClick={() => run(ex)}
+                aria-label={`Ask: ${ex}`}
                 sx={{
                   borderRadius: 2, cursor: 'pointer', height: 'auto', py: 0.5,
                   '& .MuiChip-label': { whiteSpace: 'normal' },
                   transition: `border-color ${motion.fast}ms ${motion.ease}`,
                   '&:hover': { borderColor: accents.mint, color: accents.mint },
+                  '&:focus-visible': { outline: `2px solid ${accents.mint}`, outlineOffset: 2 },
                 }}
               />
             ))}
           </Stack>
         )}
 
-        {/* Loading */}
-        {status.loading && (
-          <Box sx={{ mt: 1.75 }}>
-            <LinearProgress
-              sx={{
-                borderRadius: 999, height: 3,
-                bgcolor: 'rgba(48,214,165,0.15)',
-                '& .MuiLinearProgress-bar': { bgcolor: accents.mint },
-              }}
-            />
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Reading your balances…
-            </Typography>
-          </Box>
-        )}
-
-        {/* Answer */}
-        {status.answer && !status.loading && (
-          <Reveal>
-            <Box
-              sx={{
-                mt: 1.75, p: { xs: 1.5, sm: 2 }, borderRadius: 3,
-                border: '1px solid', borderColor: 'divider',
-                bgcolor: 'action.hover',
-                borderLeft: '2px solid', borderLeftColor: accents.mint,
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontVariantNumeric: 'tabular-nums' }}
-              >
-                {status.answer}
+        {/* Loading, answer and failure all share one always-mounted polite
+            region — inserted into an existing region, so each is announced once
+            and there is never a second hidden copy of the sentence. */}
+        <Box role="status" aria-live="polite">
+          {status.loading && (
+            <Box sx={{ mt: 1.75 }}>
+              <LinearProgress
+                aria-hidden
+                sx={{
+                  borderRadius: 999, height: 3,
+                  bgcolor: 'rgba(48,214,165,0.15)',
+                  '& .MuiLinearProgress-bar': { bgcolor: accents.mint },
+                }}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                Reading your balances…
               </Typography>
             </Box>
-          </Reveal>
-        )}
+          )}
 
-        {/* Error — real failure, never a fabricated answer */}
-        {status.error && !status.loading && (
-          <Typography
-            variant="caption"
-            sx={{ mt: 1.5, display: 'block', color: accents.red, fontWeight: 500 }}
-          >
-            {status.error}
-          </Typography>
-        )}
+          {status.answer && !status.loading && (
+            <Reveal>
+              <Box
+                sx={{
+                  mt: 1.75, p: { xs: 1.5, sm: 2 }, borderRadius: 3,
+                  border: '1px solid', borderColor: 'divider',
+                  bgcolor: 'action.hover',
+                  borderLeft: '2px solid', borderLeftColor: accents.mint,
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontVariantNumeric: 'tabular-nums' }}
+                >
+                  {status.answer}
+                </Typography>
+              </Box>
+            </Reveal>
+          )}
+
+          {/* A real failure, never a fabricated answer */}
+          {status.error && !status.loading && (
+            <Typography
+              variant="caption"
+              sx={{ mt: 1.5, display: 'block', color: accents.red, fontWeight: 500 }}
+            >
+              {status.error}
+            </Typography>
+          )}
+        </Box>
       </Paper>
     </Reveal>
   );

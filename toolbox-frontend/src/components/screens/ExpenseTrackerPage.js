@@ -1107,7 +1107,10 @@ export default function ExpenseTrackerPage() {
        maxWidth="xl"
        sx={{
          mt: { xs: 1.5, sm: 2 },
-         px: { xs: 2, sm: 3 },
+         // The app shell already pays a 12px gutter on a phone, so this only
+         // needs enough to lift the panel off it — a second 16px inset just
+         // starved the Activity rows of the width their descriptions need.
+         px: { xs: 1.25, sm: 3 },
          position: 'relative',
          // Room for the fixed bottom nav (and the home indicator under it).
          pb: { xs: 'calc(72px + env(safe-area-inset-bottom))', md: 4 },
@@ -1192,7 +1195,7 @@ export default function ExpenseTrackerPage() {
 
        {/* Expenses Tab */}
        {activeTab === 0 && (
-         <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
+         <Box sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
            {/* Ask result — the question is asked from the one Assistant (⌘K);
                when it answers, the reading lands here as its own card. */}
            {ask.answer && (
@@ -1449,7 +1452,7 @@ export default function ExpenseTrackerPage() {
 
        {/* Labels Tab — categories and tags, one screen */}
        {activeTab === 1 && (
-         <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
+         <Box sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
            <ActivityLabelsPanel
              categories={categories}
              tags={tags}
@@ -1470,7 +1473,7 @@ export default function ExpenseTrackerPage() {
 
        {/* Insights Tab */}
        {activeTab === 2 && (
-         <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
+         <Box sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
            <ActivityInsightsPanel
              breakdown={summary?.categoryBreakdown}
              categories={categories}
@@ -1484,7 +1487,7 @@ export default function ExpenseTrackerPage() {
 
        {/* Splits Tab */}
        {activeTab === 3 && (
-         <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
+         <Box sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
            <ActivitySplitsPanel
              splits={splits}
              splitOnlyBills={splitOnlyBills}

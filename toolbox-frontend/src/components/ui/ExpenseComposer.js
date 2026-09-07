@@ -10,7 +10,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { accents, motion as motionTokens, type, radius, color } from '../../theme/tokens';
 import { money } from './money';
 
@@ -28,12 +28,31 @@ import { money } from './money';
  * batch waits behind "Add all". Full-screen sheet on a phone, dialog on desktop.
  */
 
-const TYPES = [
-  { id: 'expense', label: 'Expense', color: accents.red },
-  { id: 'income', label: 'Income', color: accents.green },
-  { id: 'debt', label: 'Debt', color: accents.amber },
-  { id: 'credit', label: 'Credit', color: accents.blue },
-];
+/**
+ * Every kind a row can be, with the label and tint to render it in.
+ *
+ * The add path only ever *chooses* between two of these (see CHOOSABLE): an
+ * expense is the whole point of the screen, so it's the default and needs no
+ * control at all, and income lives one level deeper under More details —
+ * without it the dashboard's money-in/out card and `total_income` would be
+ * permanently zero, which would be killing a working feature rather than
+ * simplifying one (Apple Design §16: common path first, the rest one level
+ * down).
+ *
+ * Debt and credit are gone from the add path — but they're real values on rows
+ * already in the database, so they keep their entry here. Opening an old debt
+ * for edit still shows it as a Debt, tinted amber, and saves it back as a debt;
+ * the composer just won't mint new ones.
+ */
+const TYPE_META = {
+  expense: { id: 'expense', label: 'Expense', color: accents.red },
+  income: { id: 'income', label: 'Income', color: accents.green },
+  debt: { id: 'debt', label: 'Debt', color: accents.amber },
+  credit: { id: 'credit', label: 'Credit', color: accents.blue },
+};
+const DEFAULT_TYPE = TYPE_META.expense;
+/** The only kinds the composer lets you pick. */
+const CHOOSABLE = ['expense', 'income'];
 
 const SlideUp = React.forwardRef((props, ref) => <Slide direction="up" ref={ref} {...props} />);
 
@@ -81,9 +100,16 @@ export default function ExpenseComposer({
   const [nlError, setNlError] = React.useState(null);
   const [committing, setCommitting] = React.useState(false);
   const [addingIdx, setAddingIdx] = React.useState(null);
+  const bodyRef = React.useRef(null);
+  const reduce = useReducedMotion();
 
-  const activeType = TYPES.find(t => t.id === (data.transactionType || 'expense')) || TYPES[0];
+  const typeId = data.transactionType || 'expense';
+  const activeType = TYPE_META[typeId] || DEFAULT_TYPE;
   const heroColor = activeType.color;
+  const isIncome = typeId === 'income';
+  // An existing debt/credit row. Its kind is shown, never offered — nothing in
+  // here may quietly rewrite what that record already is.
+  const legacyType = !CHOOSABLE.includes(typeId);
   // Categories are typed on the backend, and it rejects a save whose type and
   // category type disagree. So only offer categories that match the chosen type
   // — otherwise you could pick an expense category for an income and get a 400.
@@ -109,6 +135,19 @@ export default function ExpenseComposer({
   const selectedTags = new Set(data.tagIds || []);
 
   const matchCat = (name) => categories.find(c => (c.name || '').toLowerCase() === (name || '').toLowerCase())?.id || '';
+
+  // Flip between expense and income. The backend rejects a save whose type and
+  // category type disagree, so a category that no longer matches is dropped —
+  // and because that quietly changes the section further up the sheet, we take
+  // the reader back to the top, where the new tint, title and category chips
+  // are (Apple Design §16 wayfinding). Reduced motion gets the same jump
+  // without the travel.
+  const setType = (id) => {
+    const cur = categories.find(c => c.id === data.categoryId);
+    const keep = cur && (cur.transaction_type || 'expense') === id;
+    set(keep ? { transactionType: id } : { transactionType: id, categoryId: '' });
+    bodyRef.current?.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+  };
 
   // Parse the natural-language line; one item fills the form, many become a batch.
   const runParse = async () => {
@@ -211,7 +250,9 @@ export default function ExpenseComposer({
               color: 'text.secondary',
             }}
           >
-            {batchMode ? `Add ${batch.length} transactions` : editing ? 'Edit expense' : 'New expense'}
+            {batchMode
+              ? `Add ${batch.length} transactions`
+              : `${editing ? 'Edit' : 'New'} ${activeType.label.toLowerCase()}`}
           </Typography>
           <Box sx={{ width: 36 }} />
         </Box>
@@ -289,42 +330,27 @@ export default function ExpenseComposer({
           </Box>
         ) : (
           <>
-            {/* ── Type pills ── */}
-            <Stack
-              direction="row" spacing={0.75}
-              sx={{
-                mb: 3, overflowX: 'auto', pb: 0.5,
-                '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none',
-              }}
-            >
-              {TYPES.map((t) => {
-                const active = t.id === activeType.id;
-                return (
-                  <Chip
-                    key={t.id} label={t.label}
-                    onClick={() => {
-                      // Drop a category that no longer matches the new type, so
-                      // the payload never carries a mismatched pair.
-                      const cur = categories.find(c => c.id === data.categoryId);
-                      const keep = cur && (cur.transaction_type || 'expense') === t.id;
-                      set(keep ? { transactionType: t.id } : { transactionType: t.id, categoryId: '' });
-                    }}
-                    sx={{
-                      flexShrink: 0, fontWeight: 600, fontSize: 13,
-                      height: 34, px: 0.5,
-                      borderRadius: `${radius.pill}px`,
-                      border: '1px solid',
-                      borderColor: active ? t.color : color.hairline.dark,
-                      color: active ? '#fff' : 'text.secondary',
-                      bgcolor: active ? t.color : 'transparent',
-                      transition: `all ${motionTokens.fast}ms ${motionTokens.ease}`,
-                      '&:hover': { bgcolor: active ? t.color : `${t.color}0d` },
-                      '&:active': { transform: 'scale(0.95)' },
-                    }}
-                  />
-                );
-              })}
-            </Stack>
+            {/* ── Kind, only when it isn't the plain expense this sheet is for.
+                   A label, not a control: an income says so, and an old debt or
+                   credit keeps its own name and tint while you edit it. ── */}
+            {(isIncome || legacyType) && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                <Typography
+                  component="p"
+                  sx={{
+                    fontSize: 11, fontWeight: 650, letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    px: 1.25, py: 0.4,
+                    borderRadius: `${radius.pill}px`,
+                    border: '1px solid', borderColor: `${heroColor}44`,
+                    color: heroColor, bgcolor: `${heroColor}12`,
+                    transition: `color ${motionTokens.slow}ms ${motionTokens.ease}`,
+                  }}
+                >
+                  {activeType.label}
+                </Typography>
+              </Box>
+            )}
 
             {/* ── The hero amount ── */}
             <Box
@@ -375,7 +401,7 @@ export default function ExpenseComposer({
       <Box sx={{ height: '1px', bgcolor: color.hairline.dark }} />
 
       {/* ── Body ─────────────────────────────────────────────────────── */}
-      <Box sx={{ px: 2.5, pt: 2.5, pb: 2, overflowY: 'auto', overflowX: 'hidden', flex: 1, minWidth: 0 }}>
+      <Box ref={bodyRef} sx={{ px: 2.5, pt: 2.5, pb: 2, overflowY: 'auto', overflowX: 'hidden', flex: 1, minWidth: 0 }}>
         {batchMode ? (
           /* ── Batch review list ── */
           <>
@@ -551,28 +577,83 @@ export default function ExpenseComposer({
               }}
             >
               <Box
+                role="button" tabIndex={0} aria-expanded={showMore}
                 onClick={() => setShowMore(s => !s)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowMore(s => !s); }
+                }}
                 sx={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1,
                   cursor: 'pointer', px: 2, py: 1.5,
                   transition: `background ${motionTokens.fast}ms ${motionTokens.ease}`,
                   '&:hover': { bgcolor: color.sunken.dark },
+                  '&:focus-visible': { outline: `2px solid ${heroColor}`, outlineOffset: -2 },
                 }}
               >
-                <Eyebrow>More details</Eyebrow>
-                <ExpandMoreIcon
-                  sx={{
-                    fontSize: 20,
-                    color: 'text.disabled',
-                    transform: showMore ? 'rotate(180deg)' : 'none',
-                    transition: `transform ${motionTokens.normal}ms ${motionTokens.emphasis}`,
-                  }}
-                />
+                <Eyebrow sx={{ flexShrink: 0 }}>More details</Eyebrow>
+                {/* Say what's behind the disclosure, so the one kind that
+                    moved down here is still findable without opening it. */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+                  {!showMore && (
+                    <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }} noWrap>
+                      {legacyType ? 'Date, tags, location' : 'Date, income, tags'}
+                    </Typography>
+                  )}
+                  <ExpandMoreIcon
+                    sx={{
+                      fontSize: 20, flexShrink: 0,
+                      color: 'text.disabled',
+                      transform: showMore ? 'rotate(180deg)' : 'none',
+                      transition: `transform ${motionTokens.normal}ms ${motionTokens.emphasis}`,
+                      '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+                    }}
+                  />
+                </Box>
               </Box>
               <Collapse in={showMore}>
                 <Stack spacing={2} sx={{ px: 2, pt: 0.5, pb: 2, minWidth: 0, overflow: 'hidden' }}>
                   {/* Hairline between toggle and content */}
                   <Box sx={{ height: '1px', bgcolor: color.hairline.dark, mx: -2, width: 'calc(100% + 32px)' }} />
+
+                  {/* The one other kind you can still add. Kept down here, not
+                      on the amount screen, because adding an expense is what
+                      this sheet is for — but income has to stay reachable or
+                      the dashboard's money-in figure can never move. */}
+                  {!legacyType && (
+                    <Box
+                      sx={{
+                        borderRadius: `${radius.md}px`, border: '1px solid',
+                        borderColor: isIncome ? `${accents.green}44` : color.hairline.dark,
+                        px: 2,
+                        transition: `border-color ${motionTokens.fast}ms ${motionTokens.ease}`,
+                      }}
+                    >
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={isIncome}
+                            onChange={(e) => setType(e.target.checked ? 'income' : 'expense')}
+                            inputProps={{ 'aria-label': 'Record this as income instead of an expense' }}
+                            sx={{
+                              '& .MuiSwitch-switchBase.Mui-checked': { color: accents.green },
+                              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: accents.green },
+                            }}
+                          />
+                        }
+                        label={
+                          <Box>
+                            <Typography sx={{ fontSize: 14, fontWeight: 550, color: 'text.secondary' }}>
+                              This is money in
+                            </Typography>
+                            <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }}>
+                              Counts as income, not spending
+                            </Typography>
+                          </Box>
+                        }
+                        sx={{ py: 0.75, mr: 0 }}
+                      />
+                    </Box>
+                  )}
 
                   <TextField
                     fullWidth size="small" type="date" label="Date"

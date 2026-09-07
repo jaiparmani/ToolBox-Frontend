@@ -69,7 +69,13 @@ function ExpenseRow({ expense, prominent, onEdit, onDelete, onOpen }) {
   return (
     <Box
       sx={{
-        display: 'flex', alignItems: 'center', gap: 1.5, px: { xs: 0.75, sm: 1 }, py: 1.15,
+        // On a phone the gutters are the scarce resource, not the row: the
+        // description and the amount both want that width, and the overflow
+        // button carries ~6px of its own inset inside a 32px box, so the row's
+        // right padding can come off without the icon touching the edge.
+        // Height is untouched — the row stays a comfortable ~55px target.
+        display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 },
+        pl: { xs: 0.75, sm: 1 }, pr: { xs: 0.25, sm: 1 }, py: 1.15,
         borderRadius: 2, cursor: onOpen ? 'pointer' : 'default',
         WebkitTapHighlightColor: 'transparent',
         transition: `background-color ${motionTokens.fast}ms ${motionTokens.ease}`,

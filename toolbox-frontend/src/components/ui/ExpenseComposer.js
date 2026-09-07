@@ -78,7 +78,7 @@ const MotionBox = motion.create(Box);
 const fieldSx = (heroColor) => ({
   '& .MuiOutlinedInput-root': {
     borderRadius: `${radius.md}px`,
-    '& fieldset': { borderColor: color.hairline.dark },
+    '& fieldset': { borderColor: (t) => color.hairline[t.palette.mode] },
     '&:hover fieldset': { borderColor: 'text.disabled' },
     '&.Mui-focused fieldset': { borderColor: `${heroColor}66`, borderWidth: 1 },
   },
@@ -237,9 +237,9 @@ export default function ExpenseComposer({
             onClick={onClose} size="small"
             sx={{
               ml: -0.5, width: 36, height: 36,
-              bgcolor: color.sunken.dark, border: '1px solid', borderColor: color.hairline.dark,
+              bgcolor: (t) => color.sunken[t.palette.mode], border: '1px solid', borderColor: (t) => color.hairline[t.palette.mode],
               color: 'text.secondary',
-              '&:hover': { bgcolor: color.raised.dark },
+              '&:hover': { bgcolor: (t) => color.raised[t.palette.mode] },
             }}
           >
             <CloseIcon sx={{ fontSize: 18 }} />
@@ -264,8 +264,8 @@ export default function ExpenseComposer({
               sx={{
                 display: 'flex', alignItems: 'center', gap: 1, pl: 1.5, pr: 0.5, py: 0.5,
                 borderRadius: `${radius.xl}px`, border: '1px solid',
-                borderColor: color.hairline.dark,
-                bgcolor: color.sunken.dark,
+                borderColor: (t) => color.hairline[t.palette.mode],
+                bgcolor: (t) => color.sunken[t.palette.mode],
                 transition: `border-color ${motionTokens.fast}ms ${motionTokens.ease}, box-shadow ${motionTokens.fast}ms ${motionTokens.ease}`,
                 '&:focus-within': {
                   borderColor: `${accents.violet}55`,
@@ -398,7 +398,7 @@ export default function ExpenseComposer({
       </Box>
 
       {/* ── Hairline separator ── */}
-      <Box sx={{ height: '1px', bgcolor: color.hairline.dark }} />
+      <Box sx={{ height: '1px', bgcolor: (t) => color.hairline[t.palette.mode] }} />
 
       {/* ── Body ─────────────────────────────────────────────────────── */}
       <Box ref={bodyRef} sx={{ px: 2.5, pt: 2.5, pb: 2, overflowY: 'auto', overflowX: 'hidden', flex: 1, minWidth: 0 }}>
@@ -420,7 +420,7 @@ export default function ExpenseComposer({
             </Box>
             <Box
               sx={{
-                border: '1px solid', borderColor: color.hairline.dark,
+                border: '1px solid', borderColor: (t) => color.hairline[t.palette.mode],
                 borderRadius: `${radius.lg}px`, overflow: 'hidden',
               }}
             >
@@ -438,9 +438,9 @@ export default function ExpenseComposer({
                         display: 'flex', alignItems: 'center', gap: 1.25,
                         px: 2, py: 1.5,
                         borderBottom: i < batch.length - 1 ? '1px solid' : 'none',
-                        borderColor: color.hairline.dark,
+                        borderColor: (t) => color.hairline[t.palette.mode],
                         transition: `background ${motionTokens.fast}ms ${motionTokens.ease}`,
-                        '&:hover': { bgcolor: color.sunken.dark },
+                        '&:hover': { bgcolor: (t) => color.sunken[t.palette.mode] },
                       }}
                     >
                       {/* Type color dot */}
@@ -463,7 +463,7 @@ export default function ExpenseComposer({
                                 fontSize: 11, fontWeight: 550, color: 'text.disabled',
                                 px: 0.75, py: 0.15,
                                 borderRadius: `${radius.sm}px`,
-                                bgcolor: color.sunken.dark,
+                                bgcolor: (t) => color.sunken[t.palette.mode],
                               }}
                             >
                               {it.category_name}
@@ -516,8 +516,8 @@ export default function ExpenseComposer({
               sx={{
                 mb: 3, px: 1.75, py: 0.25,
                 borderRadius: `${radius.lg}px`,
-                border: '1px solid', borderColor: color.hairline.dark,
-                bgcolor: color.sunken.dark,
+                border: '1px solid', borderColor: (t) => color.hairline[t.palette.mode],
+                bgcolor: (t) => color.sunken[t.palette.mode],
                 transition: `border-color ${motionTokens.fast}ms ${motionTokens.ease}, box-shadow ${motionTokens.fast}ms ${motionTokens.ease}`,
                 '&:focus-within': {
                   borderColor: `${heroColor}44`,
@@ -550,7 +550,7 @@ export default function ExpenseComposer({
                         fontWeight: 600, fontSize: 12.5, height: 32, px: 0.25,
                         borderRadius: `${radius.pill}px`,
                         border: '1px solid',
-                        borderColor: active ? chipColor : color.hairline.dark,
+                        borderColor: active ? chipColor : (t) => color.hairline[t.palette.mode],
                         bgcolor: active ? chipColor : 'transparent',
                         color: active ? '#fff' : 'text.secondary',
                         transition: `all ${motionTokens.fast}ms ${motionTokens.ease}`,
@@ -571,7 +571,7 @@ export default function ExpenseComposer({
             {/* ── More details collapsible ── */}
             <Box
               sx={{
-                border: '1px solid', borderColor: color.hairline.dark,
+                border: '1px solid', borderColor: (t) => color.hairline[t.palette.mode],
                 borderRadius: `${radius.lg}px`,
                 overflow: 'hidden',
               }}
@@ -586,7 +586,7 @@ export default function ExpenseComposer({
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1,
                   cursor: 'pointer', px: 2, py: 1.5,
                   transition: `background ${motionTokens.fast}ms ${motionTokens.ease}`,
-                  '&:hover': { bgcolor: color.sunken.dark },
+                  '&:hover': { bgcolor: (t) => color.sunken[t.palette.mode] },
                   '&:focus-visible': { outline: `2px solid ${heroColor}`, outlineOffset: -2 },
                 }}
               >
@@ -613,7 +613,7 @@ export default function ExpenseComposer({
               <Collapse in={showMore}>
                 <Stack spacing={2} sx={{ px: 2, pt: 0.5, pb: 2, minWidth: 0, overflow: 'hidden' }}>
                   {/* Hairline between toggle and content */}
-                  <Box sx={{ height: '1px', bgcolor: color.hairline.dark, mx: -2, width: 'calc(100% + 32px)' }} />
+                  <Box sx={{ height: '1px', bgcolor: (t) => color.hairline[t.palette.mode], mx: -2, width: 'calc(100% + 32px)' }} />
 
                   {/* The one other kind you can still add. Kept down here, not
                       on the amount screen, because adding an expense is what
@@ -623,7 +623,7 @@ export default function ExpenseComposer({
                     <Box
                       sx={{
                         borderRadius: `${radius.md}px`, border: '1px solid',
-                        borderColor: isIncome ? `${accents.green}44` : color.hairline.dark,
+                        borderColor: isIncome ? `${accents.green}44` : (t) => color.hairline[t.palette.mode],
                         px: 2,
                         transition: `border-color ${motionTokens.fast}ms ${motionTokens.ease}`,
                       }}
@@ -689,7 +689,7 @@ export default function ExpenseComposer({
                                 height: 28, fontSize: 12, fontWeight: 550,
                                 borderRadius: `${radius.pill}px`,
                                 border: '1px solid',
-                                borderColor: on ? tagColor : color.hairline.dark,
+                                borderColor: on ? tagColor : (t) => color.hairline[t.palette.mode],
                                 bgcolor: on ? tagColor : 'transparent',
                                 color: on ? '#fff' : 'text.secondary',
                                 transition: `all ${motionTokens.fast}ms ${motionTokens.ease}`,
@@ -721,7 +721,7 @@ export default function ExpenseComposer({
                   <Box
                     sx={{
                       borderRadius: `${radius.md}px`, border: '1px solid',
-                      borderColor: color.hairline.dark, px: 2,
+                      borderColor: (t) => color.hairline[t.palette.mode], px: 2,
                     }}
                   >
                     <FormControlLabel
@@ -773,7 +773,7 @@ export default function ExpenseComposer({
                 transform: 'translateY(-1px)',
               },
               '&:active': { transform: 'translateY(0) scale(0.99)' },
-              '&.Mui-disabled': { bgcolor: color.raised.dark, color: 'text.disabled', boxShadow: 'none' },
+              '&.Mui-disabled': { bgcolor: (t) => color.raised[t.palette.mode], color: 'text.disabled', boxShadow: 'none' },
             }}
           >
             {committing ? 'Adding…' : batch.length === 1 ? 'Add it' : `Add all ${batch.length}`}
@@ -796,7 +796,7 @@ export default function ExpenseComposer({
                 transform: 'translateY(-1px)',
               } : {},
               '&:active': { transform: 'translateY(0) scale(0.99)' },
-              '&.Mui-disabled': { bgcolor: color.raised.dark, color: 'text.disabled', boxShadow: 'none' },
+              '&.Mui-disabled': { bgcolor: (t) => color.raised[t.palette.mode], color: 'text.disabled', boxShadow: 'none' },
             }}
           >
             {saving ? 'Saving…' : editing ? 'Save changes' : `Add ${activeType.label.toLowerCase()}`}

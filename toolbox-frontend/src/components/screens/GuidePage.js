@@ -11,7 +11,6 @@ import AutorenewIcon from '@mui/icons-material/AutorenewRounded';
 import AutoGraphIcon from '@mui/icons-material/InsightsRounded';
 import CallSplitIcon from '@mui/icons-material/CallSplitRounded';
 import BubbleChartIcon from '@mui/icons-material/BubbleChartRounded';
-import FavoriteIcon from '@mui/icons-material/FavoriteRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 
@@ -565,9 +564,6 @@ export default function GuidePage() {
             On <strong>Shared</strong>. It reads &ldquo;Settle&rdquo; when they owe you and
             &ldquo;Mark paid&rdquo; when you owe them.
           </Item>
-          <Item title="Swipe a health entry left to delete">
-            On <strong>Health</strong>.
-          </Item>
           <Item title="Drag the ring on Shared">
             The constellation of people spins like a dial and springs back to rest. Tap a person
             to filter the detail below to just them.
@@ -666,9 +662,6 @@ export default function GuidePage() {
             </MapRow>
             <MapRow icon={CallSplitIcon} tone={accents.amber} label="Shared" to="/splits" onGo={navigate}>
               Who owes whom, as a picture and as a list, plus your groups.
-            </MapRow>
-            <MapRow icon={FavoriteIcon} tone={accents.red} label="Health" to="/health-tracker" onGo={navigate}>
-              Weight, water, sleep and steps &mdash; one metric at a time, with its trend.
             </MapRow>
           </Box>
         </Section>

@@ -14,7 +14,6 @@ import AutorenewIcon from '@mui/icons-material/AutorenewRounded';
 import AutoGraphIcon from '@mui/icons-material/InsightsRounded';
 import CallSplitIcon from '@mui/icons-material/CallSplitRounded';
 import BubbleChartIcon from '@mui/icons-material/BubbleChartRounded';
-import FavoriteIcon from '@mui/icons-material/FavoriteRounded';
 import SettingsIcon from '@mui/icons-material/SettingsRounded';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import LogoutIcon from '@mui/icons-material/LogoutRounded';
@@ -48,7 +47,6 @@ const NAV = [
   { seg: 'reports', label: 'Insights', icon: AutoGraphIcon, tone: accents.purple },
   { seg: 'universe', label: 'Universe', icon: BubbleChartIcon, tone: accents.violet },
   { seg: 'splits', label: 'Shared', icon: CallSplitIcon, tone: accents.amber },
-  { seg: 'health-tracker', label: 'Health', icon: FavoriteIcon, tone: accents.red },
 ];
 
 // Not a money section, so it sits below the hairline rather than under the

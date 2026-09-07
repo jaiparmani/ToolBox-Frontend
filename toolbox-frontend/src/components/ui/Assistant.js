@@ -55,7 +55,7 @@ const CAPABILITIES = [
 const NAV = {
   home: '/dashboard', dashboard: '/dashboard', activity: '/expense-tracker',
   expenses: '/expense-tracker', inbox: '/inbox', insights: '/reports', reports: '/reports',
-  shared: '/splits', splits: '/splits', recurring: '/recurring', health: '/health-tracker',
+  shared: '/splits', splits: '/splits', recurring: '/recurring',
   settings: '/profile',
 };
 

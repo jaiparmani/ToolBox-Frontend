@@ -409,7 +409,7 @@ export default function UserProfilePage() {
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Danger zone</Typography>
               </Box>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Permanently delete all your expenses, splits, groups and health logs. This can't be undone.
+                Permanently delete all your expenses, splits and groups. This can't be undone.
               </Typography>
               <Stack direction="row" spacing={1.5}>
                 <Button color="error" variant="outlined" startIcon={<DeleteSweepIcon />} onClick={() => setConfirmClear(true)}>
@@ -426,7 +426,7 @@ export default function UserProfilePage() {
         <ConfirmDialog
           open={confirmClear}
           title="Delete everything?"
-          message="This permanently deletes all your expenses, splits, groups and health logs. It can't be undone."
+          message="This permanently deletes all your expenses, splits and groups. It can't be undone."
           confirmLabel="Yes, delete everything"
           destructive
           loading={clearing}

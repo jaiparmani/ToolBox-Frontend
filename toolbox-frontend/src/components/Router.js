@@ -4,7 +4,6 @@ import { authUtils } from './rest/authUtils'
 import DashboardLayoutBasic from './DashboardLayout'
 import ExpenseTrackerPage from './screens/ExpenseTrackerPage'
 import ReportsPage from './screens/ReportsPage'
-import HealthTrackerPage from './screens/HealthTrackerPage'
 import LoginPage from './screens/LoginPage'
 import UserRegistrationPage from './screens/UserRegistrationPage'
 import UserProfilePage from './screens/UserProfilePage'
@@ -89,13 +88,13 @@ export default function Router() {
         <Route path="/expense-tracker" element={<ExpenseTrackerPage />} />
         <Route path="/universe" element={<MoneyUniversePage />} />
         <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/health-tracker" element={<HealthTrackerPage />} />
         <Route path="/splits" element={<SplitsPage />} />
         {/* The app's own manual — how to drive the parts you can't see. */}
         <Route path="/how-to" element={<GuidePage />} />
         {/* API Keys is admin-only tooling — reachable by URL, kept out of the nav */}
         <Route path="/api-keys" element={<ApiKeysPage />} />
-        {/* Retired toy tools (hobby, array-sum, qr) redirect home */}
+        {/* Retired sections (health, hobby, array-sum, qr) redirect home */}
+        <Route path="/health-tracker" element={<Navigate to="/" replace />} />
         <Route path="/hobby-tracker" element={<Navigate to="/" replace />} />
         <Route path="/array-sum" element={<Navigate to="/" replace />} />
         <Route path="/qr-generator" element={<Navigate to="/" replace />} />

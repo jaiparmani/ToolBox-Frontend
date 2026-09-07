@@ -120,22 +120,6 @@ const getTheme = (mode) => createTheme({
         },
       },
     },
-    MuiDialog: {
-      styleOverrides: {
-        paper: {
-          borderRadius: 22,
-          // Full-width sheet on a phone, centred dialog with room above on desktop.
-          '@media (max-width:600px)': {
-            margin: 12,
-            width: 'calc(100% - 24px)',
-            maxHeight: 'calc(100% - 24px)',
-          },
-        },
-      },
-    },
-    MuiChip: {
-      styleOverrides: { root: { fontWeight: 550 } },
-    },
     MuiTooltip: {
       defaultProps: { enterTouchDelay: 400 },
     },
@@ -193,6 +177,14 @@ const getTheme = (mode) => createTheme({
           backgroundImage: 'none',
           backgroundColor: mode === 'dark' ? '#1c1c1e' : '#ffffff',
           boxShadow: mode === 'dark' ? '0 24px 70px rgba(0,0,0,0.6)' : '0 24px 70px rgba(0,0,0,0.18)',
+          // Full-width sheet on a phone, centred dialog with room above on
+          // desktop. This lived in a second MuiDialog key that the later
+          // duplicate silently won over, so it had never actually applied.
+          '@media (max-width:600px)': {
+            margin: 12,
+            width: 'calc(100% - 24px)',
+            maxHeight: 'calc(100% - 24px)',
+          },
         },
       },
     },

@@ -2,13 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  Box, Container, Typography, Paper, Grid, Card, CardContent,
-  Button, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Alert, Snackbar, Chip, IconButton, Tooltip,
-  Fab, Switch, FormControlLabel, Tab, Tabs,
-  Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, TablePagination, InputAdornment, Menu, MenuItem,
-  ListItemIcon, ListItemText, LinearProgress, Autocomplete,
+  Box, Container, Typography, Paper,
+  Button, Dialog, TextField, Alert, Snackbar, Chip, IconButton, Tooltip,
+  Fab, Switch, FormControlLabel,
+  Table, TableBody, TableCell, TableContainer,
+  TableRow, TablePagination, InputAdornment, Autocomplete,
   useMediaQuery, Collapse, Slide, Stack, InputBase
 } from '@mui/material';
 import {
@@ -17,21 +15,13 @@ import {
   Delete as DeleteIcon,
   Search as SearchIcon,
   FilterList as FilterIcon,
-  MoreVert as MoreVertIcon,
   Dashboard as DashboardIcon,
-  Category as CategoryIcon,
-  Tag as TagIcon,
+  LocalOffer as LabelsIcon,
   Refresh as RefreshIcon,
   Close as CloseIcon,
-  AutoAwesome as AutoAwesomeIcon,
   Insights as InsightsIcon,
-  Lightbulb as LightbulbIcon,
-  WarningAmber as WarningAmberIcon,
-  HelpOutline as HelpOutlineIcon,
-  QuestionAnswer as QuestionAnswerIcon,
   CallSplit as CallSplitIcon,
   Person as PersonIcon,
-  DoneAll as DoneAllIcon,
   ExpandMore as ExpandMoreIcon
 } from '@mui/icons-material';
 
@@ -57,13 +47,17 @@ import ActivityCategoryChips from '../ui/ActivityCategoryChips';
 import ActivityGlance from '../ui/ActivityGlance';
 import ExpenseComposer from '../ui/ExpenseComposer';
 import QuickCapture from '../ui/QuickCapture';
-import ThinkingHint from '../ui/ThinkingHint';
 import ErrorBanner from '../ui/ErrorBanner';
 import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { money } from '../ui/money';
 import Reveal from '../ui/Reveal';
 import { feedback } from '../ui/feedback';
 import usePressSpring from '../ui/usePressSpring';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import ActivityInsightsPanel from '../ui/ActivityInsightsPanel';
+import ActivityLabelsPanel from '../ui/ActivityLabelsPanel';
+import ActivityLabelDialog from '../ui/ActivityLabelDialog';
+import ActivitySplitsPanel from '../ui/ActivitySplitsPanel';
 import { TransactionStoryDrawer, buildStoryFromExpense, PageHeader } from '../ui';
 import CursorGlow from '../motion/CursorGlow';
 import AssistantOrb from '../ui/AssistantOrb';
@@ -159,6 +153,13 @@ export default function ExpenseTrackerPage() {
  const [error, setError] = useState(null);
  const [success, setSuccess] = useState(null);
  const [activeTab, setActiveTab] = useState(0);
+ // Which half of the Labels tab is showing. Categories first: every expense
+ // has one, tags are the optional second cut.
+ const [labelSegment, setLabelSegment] = useState('categories');
+ // The one pending confirmation on the page. `window.confirm` blocks the whole
+ // tab, can't be themed, and on iOS reads as a browser warning rather than as
+ // this app asking — every destructive step now routes through ConfirmDialog.
+ const [confirm, setConfirm] = useState(null);
 
  // Expense form state
  const [expenseForm, setExpenseForm] = useState({
@@ -243,13 +244,30 @@ export default function ExpenseTrackerPage() {
    setFilters(prev => ({ ...prev, dateFrom, dateTo }));
    setPagination(prev => ({ ...prev, page: 0 }));
  };
+ // The scope in words. Insights and Labels both quote real totals, so they
+ // have to name the window those totals cover — a figure with no period is a
+ // figure you can't trust (Apple Design §16.6, wayfinding).
+ const scopeLabel = React.useMemo(() => {
+   if (!scope || scope.mode === 'all') return 'All time';
+   if (scope.mode === 'last30') return 'Last 30 days';
+   const now = new Date();
+   if (scope.year === now.getFullYear() && scope.month === now.getMonth()) return 'This month';
+   return new Date(scope.year, scope.month, 1)
+     .toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+ }, [scope]);
+
+ // A category row anywhere on the page opens exactly those transactions.
+ const drillIntoCategory = (categoryId) => {
+   setFilters(prev => ({ ...prev, category: String(categoryId) }));
+   setPagination(prev => ({ ...prev, page: 0 }));
+   setActiveTab(0);
+   feedback('open');
+ };
  // Filters start closed on a phone, open on desktop where there's room.
  const isCompact = useMediaQuery((theme) => theme.breakpoints.down('md'));
  const [filtersOpen, setFiltersOpen] = useState(false);
  useEffect(() => { setFiltersOpen(!isCompact); }, [isCompact]);
  const clearFiltersPress = usePressSpring({ pressScale: 0.88 });
- const [anchorEl, setAnchorEl] = useState(null);
- const [menuType, setMenuType] = useState(null);
 
  // Quick Add (free-text, parsed by the LLM router endpoint) state
  const [story, setStory] = useState(null);
@@ -618,7 +636,10 @@ export default function ExpenseTrackerPage() {
  const loadSplitOnlyBills = async () => {
    try {
      const all = await getSplits({ settled: 'false' });
-     setSplitOnlyBills(all.filter(s => s.splitOnly));
+     // getSplits returns both directions now. A split-only bill somebody ELSE
+     // paid isn't ours to promote: "Add to expenses" PATCHes an expense owned
+     // by them and 404s. Only bills owed *to* us belong in this section.
+     setSplitOnlyBills(all.filter(s => s.splitOnly && s.direction === 'owed_to_you'));
    } catch (e) { /* silent */ }
  };
 
@@ -649,8 +670,14 @@ export default function ExpenseTrackerPage() {
    }
  };
 
- const handleSettleSingle = async (splitId, personName, amount) => {
-   if (!window.confirm(`Mark ${formatCurrency(amount)} from ${personName} as paid?`)) return;
+ const askSettleSingle = (s) => setConfirm({
+   title: 'Mark this as paid?',
+   message: `${formatCurrency(s.amount)} from ${s.personName} for "${s.description}" will be settled.`,
+   confirmLabel: 'Mark paid',
+   onConfirm: () => handleSettleSingle(s.id, s.amount),
+ });
+
+ const handleSettleSingle = async (splitId, amount) => {
    setSplits(prev => ({ ...prev, settling: `s${splitId}` }));
    try {
      await settleUpWith({ splitIds: [splitId] });
@@ -686,8 +713,15 @@ export default function ExpenseTrackerPage() {
    }
  };
 
- const handleDeleteSplit = async (splitId, personName, amount) => {
-   if (!window.confirm(`Remove ${personName}'s ${formatCurrency(amount)} split?`)) return;
+ const askDeleteSplit = (s) => setConfirm({
+   title: 'Remove this split?',
+   message: `${s.personName}'s ${formatCurrency(s.amount)} share of "${s.description}" stops being tracked. The expense itself stays.`,
+   confirmLabel: 'Remove',
+   destructive: true,
+   onConfirm: () => handleDeleteSplit(s.id),
+ });
+
+ const handleDeleteSplit = async (splitId) => {
    try {
      await deleteSplit(splitId);
      setSuccess('Split removed');
@@ -720,13 +754,23 @@ export default function ExpenseTrackerPage() {
    }
  };
 
+ // The unified people list carries its own direction, so the panel hands the
+ // whole entry back rather than the caller having to remember which way round
+ // this person was.
+ const askSettle = (entry) => {
+   const owedByMe = entry.direction === 'you_owe';
+   setConfirm({
+     title: owedByMe ? `Paid ${entry.name} back?` : `Settle up with ${entry.name}?`,
+     message: owedByMe
+       ? `The ${formatCurrency(entry.owed)} you owe ${entry.name} across ${entry.unsettledCount} ${entry.unsettledCount === 1 ? 'bill' : 'bills'} will be marked paid.`
+       : `${entry.name}'s ${formatCurrency(entry.owed)} across ${entry.unsettledCount} ${entry.unsettledCount === 1 ? 'bill' : 'bills'} will be marked settled.`,
+     confirmLabel: owedByMe ? 'Mark paid' : 'Settle',
+     onConfirm: () => handleSettle(entry.raw, owedByMe ? 'i_owe' : 'owed_to_me'),
+   });
+ };
+
  const handleSettle = async (balance, direction = 'owed_to_me') => {
    const owedByMe = direction === 'i_owe';
-   const prompt = owedByMe
-     ? `Mark the ${formatCurrency(balance.owed)} you owe ${balance.name} as paid?`
-     : `Mark ${balance.name}'s ${formatCurrency(balance.owed)} as settled?`;
-   if (!window.confirm(prompt)) return;
-
    const key = owedByMe ? `u${balance.userId}` : balance.personId;
    setSplits(prev => ({ ...prev, settling: key }));
    try {
@@ -794,9 +838,13 @@ export default function ExpenseTrackerPage() {
  };
 
  // The menu delete keeps a confirm; the swipe gesture is its own confirmation.
- const deleteExpenseHandler = (expenseId) => {
-   if (window.confirm('Delete this expense?')) deleteExpenseDirect(expenseId);
- };
+ const deleteExpenseHandler = (expenseId) => setConfirm({
+   title: 'Delete this expense?',
+   message: 'It disappears from the timeline and from every total on this page.',
+   confirmLabel: 'Delete',
+   destructive: true,
+   onConfirm: () => deleteExpenseDirect(expenseId),
+ });
 
  // Category handlers
  const openCategoryForm = (category = null) => {
@@ -850,9 +898,15 @@ export default function ExpenseTrackerPage() {
    }
  };
 
- const deleteCategoryHandler = async (categoryId) => {
-   if (!window.confirm('Are you sure you want to delete this category?')) return;
+ const askDeleteCategory = (category) => setConfirm({
+   title: `Delete "${category.name}"?`,
+   message: 'Expenses already filed under it keep their amounts, but lose this grouping.',
+   confirmLabel: 'Delete',
+   destructive: true,
+   onConfirm: () => deleteCategoryHandler(category.id),
+ });
 
+ const deleteCategoryHandler = async (categoryId) => {
    setLoading(true);
    try {
      await deleteCategory(categoryId);
@@ -914,9 +968,15 @@ export default function ExpenseTrackerPage() {
    }
  };
 
- const deleteTagHandler = async (tagId) => {
-   if (!window.confirm('Are you sure you want to delete this tag?')) return;
+ const askDeleteTag = (tag) => setConfirm({
+   title: `Delete "${tag.name}"?`,
+   message: 'The tag comes off every expense carrying it. Nothing else changes.',
+   confirmLabel: 'Delete',
+   destructive: true,
+   onConfirm: () => deleteTagHandler(tag.id),
+ });
 
+ const deleteTagHandler = async (tagId) => {
    setLoading(true);
    try {
      await deleteTag(tagId);
@@ -932,13 +992,13 @@ export default function ExpenseTrackerPage() {
  // Pull the stored review the first time the Insights tab is opened, so the
  // panel isn't empty before the user has spent a model call.
  useEffect(() => {
-   if (activeTab === 3 && !insight.loaded && isAuthenticated) {
+   if (activeTab === 2 && !insight.loaded && isAuthenticated) {
      loadLatestInsight();
    }
  }, [activeTab, insight.loaded, isAuthenticated]);
 
  useEffect(() => {
-   if (activeTab === 4 && !splits.loaded && isAuthenticated) {
+   if (activeTab === 3 && !splits.loaded && isAuthenticated) {
      loadBalances();
      loadSplitOnlyBills();
    }
@@ -963,17 +1023,6 @@ export default function ExpenseTrackerPage() {
    });
  };
 
- // Menu handlers
- const handleMenuOpen = (event, type, item) => {
-   setAnchorEl(event.currentTarget);
-   setMenuType({ type, item });
- };
-
- const handleMenuClose = () => {
-   setAnchorEl(null);
-   setMenuType(null);
- };
-
  // Shown next to the Filters heading so a filter hidden behind the fold can't
  // silently explain why the list looks short.
  const activeFilterCount = [
@@ -991,15 +1040,9 @@ export default function ExpenseTrackerPage() {
    return `${sameCat.length} ${expense.category.name} expenses shown, ${formatCurrency(total)} in total.`;
  };
 
- const formatCurrency = (amount) => {
-   // Amounts are stored and returned by the server in rupees - it formats them
-   // as such in amount_display - so showing them as dollars here misreported
-   // every figure on the page.
-   return new Intl.NumberFormat('en-IN', {
-     style: 'currency',
-     currency: 'INR'
-   }).format(amount || 0);
- };
+ // One formatter for the whole app: the panels below print the same figures
+ // this page does, and two Intl instances is two chances to disagree.
+ const formatCurrency = (amount) => money(amount);
 
  const formatDate = (date) => {
    return new Date(date).toLocaleDateString();
@@ -1140,11 +1183,10 @@ export default function ExpenseTrackerPage() {
          value={activeTab}
          onChange={setActiveTab}
          sections={[
-           { label: 'Expenses', icon: DashboardIcon, color: '#0A84FF' },
-           { label: 'Categories', icon: CategoryIcon, color: '#BF5AF2' },
-           { label: 'Tags', icon: TagIcon, color: '#FF9F0A' },
-           { label: 'Insights', icon: InsightsIcon, color: '#30D158' },
-           { label: 'Splits', icon: CallSplitIcon, color: '#FF9F0A' },
+           { label: 'Expenses', icon: DashboardIcon, color: accents.blue },
+           { label: 'Labels', icon: LabelsIcon, color: accents.purple },
+           { label: 'Insights', icon: InsightsIcon, color: accents.mint },
+           { label: 'Splits', icon: CallSplitIcon, color: accents.amber },
          ]}
        />
 
@@ -1405,597 +1447,66 @@ export default function ExpenseTrackerPage() {
          </Box>
        )}
 
-       {/* Categories Tab */}
+       {/* Labels Tab — categories and tags, one screen */}
        {activeTab === 1 && (
          <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
-           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-             <Typography variant="h6" sx={{ fontWeight: 600 }}>Categories</Typography>
-             <Button
-               variant="contained"
-               startIcon={<AddIcon />}
-               onClick={() => openCategoryForm()}
-             >
-               Add Category
-             </Button>
-           </Box>
-           <Grid container spacing={2}>
-             {categories.map((category) => (
-               <Grid item xs={12} sm={6} md={4} key={category.id}>
-                 <Card
-                   elevation={0}
-                   sx={{
-                     border: '1px solid',
-                     borderColor: 'divider',
-                     borderRadius: '14px',
-                     bgcolor: 'background.paper',
-                     transition: 'border-color 0.15s ease',
-                     '&:hover': { borderColor: 'text.disabled' },
-                   }}
-                 >
-                   <CardContent>
-                     <Box display="flex" justifyContent="space-between" alignItems="center">
-                       <Box display="flex" alignItems="center" gap={1.5}>
-                         <Box
-                           sx={{
-                             width: 34, height: 34, borderRadius: '10px',
-                             bgcolor: `${category.color}1f`,
-                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                             flexShrink: 0,
-                           }}
-                         >
-                           <CategoryIcon sx={{ color: category.color, fontSize: 18 }} />
-                         </Box>
-                         <Box>
-                           <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{category.name}</Typography>
-                           <Typography variant="body2" color="text.secondary">
-                             {category.description}
-                           </Typography>
-                         </Box>
-                       </Box>
-                       <IconButton
-                         size="small"
-                         onClick={(e) => handleMenuOpen(e, 'category', category)}
-                         sx={{ color: 'text.disabled', '&:hover': { color: 'text.primary' } }}
-                       >
-                         <MoreVertIcon fontSize="small" />
-                       </IconButton>
-                     </Box>
-                   </CardContent>
-                 </Card>
-               </Grid>
-             ))}
-           </Grid>
-         </Box>
-       )}
-
-       {/* Tags Tab */}
-       {activeTab === 2 && (
-         <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
-           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-             <Typography variant="h6" sx={{ fontWeight: 600 }}>Tags</Typography>
-             <Button
-               variant="contained"
-               startIcon={<AddIcon />}
-               onClick={() => openTagForm()}
-             >
-               Add Tag
-             </Button>
-           </Box>
-           <Grid container spacing={2}>
-             {tags.map((tag) => (
-               <Grid item xs={12} sm={6} md={4} key={tag.id}>
-                 <Card
-                   elevation={0}
-                   sx={{
-                     border: '1px solid',
-                     borderColor: 'divider',
-                     borderRadius: '14px',
-                     bgcolor: 'background.paper',
-                     transition: 'border-color 0.15s ease',
-                     '&:hover': { borderColor: 'text.disabled' },
-                   }}
-                 >
-                   <CardContent>
-                     <Box display="flex" justifyContent="space-between" alignItems="center">
-                       <Box display="flex" alignItems="center" gap={1.5}>
-                         <Box
-                           sx={{
-                             width: 34, height: 34, borderRadius: '10px',
-                             bgcolor: `${tag.color}1f`,
-                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                             flexShrink: 0,
-                           }}
-                         >
-                           <TagIcon sx={{ color: tag.color, fontSize: 18 }} />
-                         </Box>
-                         <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{tag.name}</Typography>
-                       </Box>
-                       <IconButton
-                         size="small"
-                         onClick={(e) => handleMenuOpen(e, 'tag', tag)}
-                         sx={{ color: 'text.disabled', '&:hover': { color: 'text.primary' } }}
-                       >
-                         <MoreVertIcon fontSize="small" />
-                       </IconButton>
-                     </Box>
-                   </CardContent>
-                 </Card>
-               </Grid>
-             ))}
-           </Grid>
+           <ActivityLabelsPanel
+             categories={categories}
+             tags={tags}
+             breakdown={summary?.categoryBreakdown}
+             scopeLabel={scopeLabel}
+             segment={labelSegment}
+             onSegmentChange={setLabelSegment}
+             onAddCategory={() => openCategoryForm()}
+             onEditCategory={(c) => openCategoryForm(c)}
+             onDeleteCategory={askDeleteCategory}
+             onAddTag={() => openTagForm()}
+             onEditTag={(t) => openTagForm(t)}
+             onDeleteTag={askDeleteTag}
+             onSelectCategory={drillIntoCategory}
+           />
          </Box>
        )}
 
        {/* Insights Tab */}
-       {activeTab === 3 && (
+       {activeTab === 2 && (
          <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
-           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
-             <Box>
-               <Typography variant="h6" sx={{ fontWeight: 600 }}>Spending Review</Typography>
-               <Typography variant="body2" color="text.secondary">
-                 An AI read of your last 30 days
-               </Typography>
-             </Box>
-             <Button
-               variant="contained"
-               startIcon={<AutoAwesomeIcon />}
-               onClick={() => window.dispatchEvent(new Event('toolbox:command-palette'))}
-             >
-               Ask ToolBox
-             </Button>
-           </Box>
-
-           {insight.loading && <LinearProgress sx={{ mb: 2 }} />}
-
-           {!insight.data && !insight.loading && (
-             <Paper
-               elevation={0}
-               sx={{
-                 p: 4, borderRadius: '14px', textAlign: 'center',
-                 border: '1px dashed', borderColor: 'divider',
-               }}
-             >
-               <InsightsIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
-               <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                 No review yet
-               </Typography>
-               <Typography variant="body2" color="text.secondary">
-                 Generate one to see where your money went and what stands out.
-               </Typography>
-             </Paper>
-           )}
-
-           {insight.data && (
-             <Box>
-               <Paper
-                 elevation={0}
-                 sx={{
-                   p: 3, mb: 3, borderRadius: '14px',
-                   border: '1px solid', borderColor: 'divider',
-                   bgcolor: 'background.paper',
-                 }}
-               >
-                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                   {insight.data.headline}
-                 </Typography>
-                 <Typography variant="body2" color="text.secondary">
-                   {insight.data.summary}
-                 </Typography>
-                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-                   {insight.data.period_start} to {insight.data.period_end}
-                   {insight.data.payload?.entries_analysed != null &&
-                     ` - ${insight.data.payload.entries_analysed} transactions`}
-                 </Typography>
-               </Paper>
-
-               <Grid container spacing={2}>
-                 {[
-                   { key: 'observations', label: 'What the numbers show', icon: InsightsIcon, color: '#0A84FF' },
-                   { key: 'concerns', label: 'Worth attention', icon: WarningAmberIcon, color: '#FF9F0A' },
-                   { key: 'suggestions', label: 'Suggestions', icon: LightbulbIcon, color: '#30D158' },
-                   { key: 'data_gaps', label: 'Not enough data', icon: HelpOutlineIcon, color: '#8E8E93' },
-                 ].map((section) => {
-                   const items = insight.data.payload?.[section.key] || [];
-                   if (!items.length) return null;
-                   return (
-                     <Grid item xs={12} md={6} key={section.key}>
-                       <Card
-                         elevation={0}
-                         sx={{
-                           height: '100%', borderRadius: '14px',
-                           border: '1px solid', borderColor: 'divider',
-                         }}
-                       >
-                         <CardContent>
-                           <Box display="flex" alignItems="center" gap={1} mb={1.5}>
-                             <Box
-                               sx={{
-                                 width: 26, height: 26, borderRadius: '8px',
-                                 backgroundColor: `${section.color}1f`,
-                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                               }}
-                             >
-                               <section.icon sx={{ color: section.color, fontSize: 15 }} />
-                             </Box>
-                             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                               {section.label}
-                             </Typography>
-                           </Box>
-                           <Box component="ul" sx={{ pl: 2.5, m: 0 }}>
-                             {items.map((item, i) => (
-                               <Typography component="li" variant="body2" key={i} sx={{ mb: 0.75 }}>
-                                 {item}
-                               </Typography>
-                             ))}
-                           </Box>
-                         </CardContent>
-                       </Card>
-                     </Grid>
-                   );
-                 })}
-               </Grid>
-             </Box>
-           )}
+           <ActivityInsightsPanel
+             breakdown={summary?.categoryBreakdown}
+             categories={categories}
+             scopeLabel={scopeLabel}
+             insight={insight}
+             onGenerate={runInsight}
+             onSelectCategory={drillIntoCategory}
+           />
          </Box>
        )}
 
        {/* Splits Tab */}
-       {activeTab === 4 && (
+       {activeTab === 3 && (
          <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
-           <Box mb={3}>
-             <Typography variant="h6" sx={{ fontWeight: 600 }}>Shared expenses</Typography>
-             <Typography variant="body2" color="text.secondary">
-               Log a bill you paid for a group and track what comes back to you
-             </Typography>
-           </Box>
-
-           {/* Add a shared bill */}
-           <Paper
-             elevation={0}
-             sx={{
-               p: 2.5, mb: 3, borderRadius: '14px', border: '1px solid', borderColor: 'divider',
-               bgcolor: 'background.paper',
-             }}
-           >
-             <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
-               <TextField
-                 fullWidth
-                 size="small"
-                 sx={{ flex: 1, minWidth: 260 }}
-                 placeholder='e.g. "split 1200 dinner with raj and priya"'
-                 value={splits.text}
-                 onChange={(e) => setSplits(prev => ({ ...prev, text: e.target.value }))}
-                 disabled={splits.loading}
-                 onKeyDown={(e) => { if (e.key === 'Enter') handleSplitAdd(); }}
-               />
-               <Button
-                 variant="contained"
-                 onClick={handleSplitAdd}
-                 disabled={splits.loading || !splits.text.trim()}
-                 startIcon={<AutoAwesomeIcon />}
-               >
-                 {splits.loading ? 'Splitting...' : 'Split'}
-               </Button>
-               <Button
-                 variant="outlined"
-                 onClick={openSplitForm}
-                 startIcon={<AddIcon />}
-               >
-                 Enter manually
-               </Button>
-             </Box>
-             {splits.loading && <LinearProgress sx={{ mt: 2 }} />}
-             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
-               The full amount is recorded as your expense; each person's share is tracked
-               as owed to you. Say "paid 500 for raj's ticket" when you didn't share the cost.
-             </Typography>
-           </Paper>
-
-           {/* You owe - the other side of a split somebody else paid for */}
-           {splits.youOwe.length > 0 && (
-             <Paper
-               elevation={0}
-               sx={{
-                 p: 2.5, mb: 3, borderRadius: '14px', border: '1px solid',
-                 borderColor: `${accents.red}66`,
-                 bgcolor: 'background.paper',
-               }}
-             >
-               <Typography variant="overline" color="text.secondary">You owe</Typography>
-               <Typography variant="h4" sx={{ fontWeight: 600, color: accents.red, mb: 1.5 }}>
-                 {formatCurrency(splits.totalYouOwe)}
-               </Typography>
-               {splits.youOwe.map((debt) => (
-                 <Box
-                   key={debt.userId}
-                   display="flex" alignItems="center" justifyContent="space-between"
-                   gap={2} flexWrap="wrap"
-                   sx={{ py: 1, borderTop: '1px solid', borderColor: 'divider' }}
-                 >
-                   <Box>
-                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{debt.name}</Typography>
-                     <Typography variant="caption" color="text.secondary">
-                       {debt.unsettledCount} shared {debt.unsettledCount === 1 ? 'bill' : 'bills'} they paid for
-                     </Typography>
-                   </Box>
-                   <Box display="flex" alignItems="center" gap={2}>
-                     <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                       {formatCurrency(debt.owed)}
-                     </Typography>
-                     <Button
-                       size="small"
-                       variant="outlined"
-                       startIcon={<DoneAllIcon />}
-                       onClick={() => handleSettle(debt, 'i_owe')}
-                       disabled={splits.settling === `u${debt.userId}`}
-                     >
-                       {splits.settling === `u${debt.userId}` ? 'Settling...' : 'Mark paid'}
-                     </Button>
-                   </Box>
-                 </Box>
-               ))}
-             </Paper>
-           )}
-
-           {/* Owed to you */}
-           {splits.totalOwed > 0 && (
-             <Paper
-               elevation={0}
-               sx={{
-                 p: 3, mb: 3, borderRadius: '14px', border: '1px solid', borderColor: 'divider',
-                 bgcolor: 'background.paper',
-               }}
-             >
-               <Typography variant="overline" color="text.secondary">Owed to you</Typography>
-               <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                 {formatCurrency(splits.totalOwed)}
-               </Typography>
-             </Paper>
-           )}
-
-           {splitOnlyBills.length > 0 && (
-             <Paper
-               elevation={0}
-               sx={{ p: 2.5, mb: 3, borderRadius: '14px', border: '1px dashed', borderColor: 'divider', bgcolor: 'background.paper' }}
-             >
-               <Typography variant="overline" color="text.secondary">Split only — not in expenses</Typography>
-               {splitOnlyBills.map((s) => (
-                 <Box
-                   key={s.id}
-                   display="flex" alignItems="center" justifyContent="space-between"
-                   gap={2} flexWrap="wrap"
-                   sx={{ py: 1, borderTop: '1px solid', borderColor: 'divider' }}
-                 >
-                   <Box sx={{ minWidth: 0 }}>
-                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{s.description}</Typography>
-                     <Typography variant="caption" color="text.secondary">
-                       {s.personName} owes {formatCurrency(s.amount)}{s.paidBy ? ` · paid by ${s.paidBy}` : ''}
-                     </Typography>
-                   </Box>
-                   <Button
-                     size="small"
-                     variant="outlined"
-                     onClick={() => handleAddToExpenses(s.expenseId)}
-                   >
-                     Add to expenses
-                   </Button>
-                 </Box>
-               ))}
-             </Paper>
-           )}
-
-           {splits.balances.length === 0 && splits.youOwe.length === 0 && splitOnlyBills.length === 0 ? (
-             <Paper
-               elevation={0}
-               sx={{ p: 4, borderRadius: '14px', textAlign: 'center', border: '1px dashed', borderColor: 'divider' }}
-             >
-               <CallSplitIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
-               <Typography variant="body1" sx={{ fontWeight: 500 }}>No shared expenses yet</Typography>
-               <Typography variant="body2" color="text.secondary">
-                 Split a bill above and whoever owes you will show up here.
-               </Typography>
-             </Paper>
-           ) : (
-             <Grid container spacing={2}>
-               {splits.balances.map((balance) => {
-                 const isExpanded = expandedPerson === balance.personId;
-                 return (
-                 <Grid item xs={12} sm={6} md={4} key={balance.personId}>
-                   <Card
-                     elevation={0}
-                     sx={{
-                       borderRadius: '14px', border: '1px solid',
-                       borderColor: balance.owed > 0 ? `${accents.amber}66` : 'divider',
-                     }}
-                   >
-                     <CardContent>
-                       <Box
-                         display="flex" alignItems="center" gap={2} mb={1.5}
-                         sx={{ cursor: balance.unsettledCount > 0 ? 'pointer' : 'default' }}
-                         onClick={() => balance.unsettledCount > 0 && togglePersonSplits(balance.personId)}
-                       >
-                         <Box
-                           sx={{
-                             width: 38, height: 38, borderRadius: '50%',
-                             bgcolor: balance.owed > 0 ? `${accents.amber}1f` : `${accents.mint}1f`,
-                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                             flexShrink: 0,
-                           }}
-                         >
-                           <PersonIcon sx={{ color: balance.owed > 0 ? accents.amber : accents.mint, fontSize: 19 }} />
-                         </Box>
-                         <Box sx={{ minWidth: 0, flex: 1 }}>
-                           <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>
-                             {balance.name}
-                           </Typography>
-                           <Typography variant="caption" color="text.secondary" noWrap>
-                             {balance.unsettledCount === 0
-                               ? 'all settled'
-                               : `${balance.unsettledCount} unsettled`}
-                             {balance.linkedUsername ? ' · has an account' : ''}
-                           </Typography>
-                         </Box>
-                         {balance.unsettledCount > 0 && (
-                           <ExpandMoreIcon
-                             sx={{
-                               fontSize: 20, color: 'text.disabled',
-                               transform: isExpanded ? 'rotate(180deg)' : 'none',
-                               transition: 'transform .2s ease',
-                             }}
-                           />
-                         )}
-                       </Box>
-                       <Typography
-                         variant="h5"
-                         sx={{ fontWeight: 600 }}
-                         color={balance.owed > 0 ? 'warning.main' : 'text.secondary'}
-                       >
-                         {formatCurrency(balance.owed)}
-                       </Typography>
-
-                       <Collapse in={isExpanded}>
-                         <Box sx={{ mt: 1.5, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-                           {personSplits.length === 0 ? (
-                             <Typography variant="caption" color="text.disabled">Loading…</Typography>
-                           ) : personSplits.map((s) => (
-                             <Box
-                               key={s.id}
-                               display="flex" alignItems="center" justifyContent="space-between"
-                               gap={1} sx={{ py: 0.75 }}
-                             >
-                               <Box sx={{ minWidth: 0, flex: 1 }}>
-                                 <Typography variant="body2" sx={{ fontWeight: 550, fontSize: 13 }} noWrap>
-                                   {s.description}
-                                 </Typography>
-                                 <Typography variant="caption" color="text.secondary" noWrap>
-                                   {s.date}{s.paidBy ? ` · paid by ${s.paidBy}` : ''}
-                                 </Typography>
-                               </Box>
-                               {editingSplit?.id === s.id ? (
-                                 <>
-                                   <TextField
-                                     size="small"
-                                     type="number"
-                                     value={editingSplit.amount}
-                                     onChange={(e) => setEditingSplit(prev => ({ ...prev, amount: e.target.value }))}
-                                     onKeyDown={(e) => {
-                                       if (e.key === 'Enter') handleEditSplit(s.id, editingSplit.amount);
-                                       if (e.key === 'Escape') setEditingSplit(null);
-                                     }}
-                                     autoFocus
-                                     InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
-                                     sx={{ width: 110 }}
-                                   />
-                                   <IconButton
-                                     size="small"
-                                     onClick={() => handleEditSplit(s.id, editingSplit.amount)}
-                                     sx={{ color: accents.mint, p: 0.5 }}
-                                   >
-                                     <DoneAllIcon sx={{ fontSize: 16 }} />
-                                   </IconButton>
-                                   <IconButton
-                                     size="small"
-                                     onClick={() => setEditingSplit(null)}
-                                     sx={{ color: 'text.disabled', p: 0.5 }}
-                                   >
-                                     <CloseIcon sx={{ fontSize: 16 }} />
-                                   </IconButton>
-                                 </>
-                               ) : (
-                                 <>
-                                   <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                     {formatCurrency(s.amount)}
-                                   </Typography>
-                                   <Tooltip title="Edit amount">
-                                     <IconButton
-                                       size="small"
-                                       onClick={() => setEditingSplit({ id: s.id, amount: s.amount })}
-                                       sx={{ color: 'text.disabled', p: 0.5, '&:hover': { color: 'text.primary' } }}
-                                     >
-                                       <EditIcon sx={{ fontSize: 14 }} />
-                                     </IconButton>
-                                   </Tooltip>
-                                   <Tooltip title="Remove split">
-                                     <IconButton
-                                       size="small"
-                                       onClick={() => handleDeleteSplit(s.id, s.personName, s.amount)}
-                                       sx={{ color: 'text.disabled', p: 0.5, '&:hover': { color: accents.red } }}
-                                     >
-                                       <DeleteIcon sx={{ fontSize: 14 }} />
-                                     </IconButton>
-                                   </Tooltip>
-                                   <Button
-                                     size="small"
-                                     variant="text"
-                                     sx={{ minWidth: 0, px: 1, fontSize: 11 }}
-                                     onClick={() => handleSettleSingle(s.id, s.personName, s.amount)}
-                                     disabled={splits.settling === `s${s.id}`}
-                                   >
-                                     {splits.settling === `s${s.id}` ? '…' : 'Paid'}
-                                   </Button>
-                                 </>
-                               )}
-                             </Box>
-                           ))}
-                         </Box>
-                       </Collapse>
-
-                       {balance.owed > 0 && (
-                         <Button
-                           fullWidth
-                           size="small"
-                           variant="outlined"
-                           startIcon={<DoneAllIcon />}
-                           sx={{ mt: 1.5 }}
-                           onClick={() => handleSettle(balance)}
-                           disabled={splits.settling === balance.personId}
-                         >
-                           {splits.settling === balance.personId ? 'Settling...' : 'Settle all'}
-                         </Button>
-                       )}
-                     </CardContent>
-                   </Card>
-                 </Grid>
-                 );
-               })}
-             </Grid>
-           )}
+           <ActivitySplitsPanel
+             splits={splits}
+             splitOnlyBills={splitOnlyBills}
+             expandedPerson={expandedPerson}
+             personSplits={personSplits}
+             editingSplit={editingSplit}
+             onTextChange={(text) => setSplits(prev => ({ ...prev, text }))}
+             onSplitAdd={handleSplitAdd}
+             onOpenManual={openSplitForm}
+             onTogglePerson={togglePersonSplits}
+             onSettle={askSettle}
+             onStartEditSplit={(s) => setEditingSplit({ id: s.id, amount: s.amount })}
+             onEditSplitChange={(amount) => setEditingSplit(prev => ({ ...prev, amount }))}
+             onCancelEditSplit={() => setEditingSplit(null)}
+             onEditSplit={handleEditSplit}
+             onDeleteSplit={askDeleteSplit}
+             onSettleSingle={askSettleSingle}
+             onAddToExpenses={handleAddToExpenses}
+           />
          </Box>
        )}
      </Paper>
-
-     {/* Context Menu */}
-     <Menu
-       anchorEl={anchorEl}
-       open={!!anchorEl}
-       onClose={handleMenuClose}
-       PaperProps={{ sx: { minWidth: 160 } }}
-     >
-       {menuType?.type === 'category' && (
-         <>
-           <MenuItem onClick={() => { handleMenuClose(); openCategoryForm(menuType.item); }}>
-             <ListItemIcon><EditIcon fontSize="small" sx={{ color: '#0A84FF' }} /></ListItemIcon>
-             <ListItemText>Edit</ListItemText>
-           </MenuItem>
-           <MenuItem onClick={() => { handleMenuClose(); deleteCategoryHandler(menuType.item.id); }} sx={{ color: '#FF453A' }}>
-             <ListItemIcon><DeleteIcon fontSize="small" sx={{ color: '#FF453A' }} /></ListItemIcon>
-             <ListItemText>Delete</ListItemText>
-           </MenuItem>
-         </>
-       )}
-       {menuType?.type === 'tag' && (
-         <>
-           <MenuItem onClick={() => { handleMenuClose(); openTagForm(menuType.item); }}>
-             <ListItemIcon><EditIcon fontSize="small" sx={{ color: '#0A84FF' }} /></ListItemIcon>
-             <ListItemText>Edit</ListItemText>
-           </MenuItem>
-           <MenuItem onClick={() => { handleMenuClose(); deleteTagHandler(menuType.item.id); }} sx={{ color: '#FF453A' }}>
-             <ListItemIcon><DeleteIcon fontSize="small" sx={{ color: '#FF453A' }} /></ListItemIcon>
-             <ListItemText>Delete</ListItemText>
-           </MenuItem>
-         </>
-       )}
-     </Menu>
 
      {/* Transaction story - the shared drawer, rich detail on tapping a row */}
      <TransactionStoryDrawer
@@ -2027,184 +1538,40 @@ export default function ExpenseTrackerPage() {
        onAddOne={addExpenseOne}
      />
 
-     {/* Category Form Dialog */}
-     <Dialog open={categoryForm.open} onClose={closeCategoryForm} maxWidth="sm" fullWidth>
-       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-         <Box
-           sx={{
-             width: 40, height: 40, borderRadius: '12px',
-             bgcolor: `${categoryForm.data.color}1f`,
-             display: 'flex', alignItems: 'center', justifyContent: 'center',
-             flexShrink: 0,
-             transition: 'background-color 0.2s ease',
-           }}
-         >
-           <CategoryIcon sx={{ color: categoryForm.data.color, fontSize: 20 }} />
-         </Box>
-         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-           <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
-             {categoryForm.editing ? 'Edit Category' : 'Add New Category'}
-           </Typography>
-           <Typography variant="body2" color="text.secondary">
-             Group expenses under a color-coded category
-           </Typography>
-         </Box>
-         <IconButton onClick={closeCategoryForm} size="small">
-           <CloseIcon fontSize="small" />
-         </IconButton>
-       </DialogTitle>
-       <DialogContent>
-         <Grid container spacing={3} sx={{ mt: 1 }}>
-           <Grid item xs={12}>
-             <TextField
-               fullWidth
-               label="Name *"
-               value={categoryForm.data.name}
-               onChange={(e) => setCategoryForm(prev => ({
-                 ...prev,
-                 data: { ...prev.data, name: e.target.value }
-               }))}
-             />
-           </Grid>
-           <Grid item xs={12}>
-             <TextField
-               fullWidth
-               label="Description"
-               multiline
-               rows={2}
-               value={categoryForm.data.description}
-               onChange={(e) => setCategoryForm(prev => ({
-                 ...prev,
-                 data: { ...prev.data, description: e.target.value }
-               }))}
-             />
-           </Grid>
-           <Grid item xs={12} md={6}>
-             <TextField
-               fullWidth
-               type="color"
-               label="Color"
-               value={categoryForm.data.color}
-               onChange={(e) => setCategoryForm(prev => ({
-                 ...prev,
-                 data: { ...prev.data, color: e.target.value }
-               }))}
-             />
-           </Grid>
-           <Grid item xs={12} md={6}>
-             <AutocompleteComponent
-               options={[
-                 { label: 'Expense', id: 'expense' },
-                 { label: 'Income', id: 'income' },
-                 { label: 'Both', id: 'both' }
-               ]}
-               label="Transaction Type"
-               value={categoryForm.data.transactionType}
-               onChange={(value) => setCategoryForm(prev => ({
-                 ...prev,
-                 data: { ...prev.data, transactionType: value }
-               }))}
-             />
-           </Grid>
-           {categoryForm.data.name && (
-             <Grid item xs={12}>
-               <Chip
-                 label={categoryForm.data.name}
-                 sx={{
-                   backgroundColor: categoryForm.data.color,
-                   color: '#fff',
-                   fontWeight: 600,
-                 }}
-               />
-             </Grid>
-           )}
-         </Grid>
-       </DialogContent>
-       <DialogActions>
-         <Button onClick={closeCategoryForm} color="inherit">Cancel</Button>
-         <Button onClick={saveCategory} variant="contained">
-           {categoryForm.editing ? 'Update' : 'Add'} Category
-         </Button>
-       </DialogActions>
-     </Dialog>
+     {/* One dialog for both kinds of label — same shape as the split composer */}
+     <ActivityLabelDialog
+       open={categoryForm.open}
+       kind="category"
+       editing={categoryForm.editing}
+       data={categoryForm.data}
+       saving={loading}
+       onClose={closeCategoryForm}
+       onChange={(patch) => setCategoryForm(prev => ({ ...prev, data: { ...prev.data, ...patch } }))}
+       onSave={saveCategory}
+     />
 
-     {/* Tag Form Dialog */}
-     <Dialog open={tagForm.open} onClose={closeTagForm} maxWidth="sm" fullWidth>
-       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-         <Box
-           sx={{
-             width: 40, height: 40, borderRadius: '12px',
-             bgcolor: `${tagForm.data.color}1f`,
-             display: 'flex', alignItems: 'center', justifyContent: 'center',
-             flexShrink: 0,
-             transition: 'background-color 0.2s ease',
-           }}
-         >
-           <TagIcon sx={{ color: tagForm.data.color, fontSize: 20 }} />
-         </Box>
-         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-           <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
-             {tagForm.editing ? 'Edit Tag' : 'Add New Tag'}
-           </Typography>
-           <Typography variant="body2" color="text.secondary">
-             Tags help you slice expenses across categories
-           </Typography>
-         </Box>
-         <IconButton onClick={closeTagForm} size="small">
-           <CloseIcon fontSize="small" />
-         </IconButton>
-       </DialogTitle>
-       <DialogContent>
-         <Grid container spacing={3} sx={{ mt: 1 }}>
-           <Grid item xs={12}>
-             <TextField
-               fullWidth
-               label="Name *"
-               value={tagForm.data.name}
-               onChange={(e) => setTagForm(prev => ({
-                 ...prev,
-                 data: { ...prev.data, name: e.target.value }
-               }))}
-             />
-           </Grid>
-           <Grid item xs={12} md={6}>
-             <TextField
-               fullWidth
-               type="color"
-               label="Color"
-               value={tagForm.data.color}
-               onChange={(e) => setTagForm(prev => ({
-                 ...prev,
-                 data: { ...prev.data, color: e.target.value }
-               }))}
-             />
-           </Grid>
-           {tagForm.data.name && (
-             <Grid item xs={12} md={6}>
-               <Box display="flex" alignItems="center" height="100%">
-                 <Chip
-                   label={tagForm.data.name}
-                   sx={{
-                     backgroundColor: tagForm.data.color,
-                     color: '#fff',
-                     fontWeight: 500,
-                   }}
-                 />
-               </Box>
-             </Grid>
-           )}
-         </Grid>
-       </DialogContent>
-       <DialogActions>
-         <Button onClick={closeTagForm} color="inherit">Cancel</Button>
-         <Button onClick={saveTag} variant="contained">
-           {tagForm.editing ? 'Update' : 'Add'} Tag
-         </Button>
-       </DialogActions>
-     </Dialog>
+     <ActivityLabelDialog
+       open={tagForm.open}
+       kind="tag"
+       editing={tagForm.editing}
+       data={tagForm.data}
+       saving={loading}
+       onClose={closeTagForm}
+       onChange={(patch) => setTagForm(prev => ({ ...prev, data: { ...prev.data, ...patch } }))}
+       onSave={saveTag}
+     />
 
-
-
+     {/* Every destructive or irreversible step goes through the one house
+         confirmation instead of a browser-chrome window.confirm. */}
+     <ConfirmDialog
+       open={!!confirm}
+       title={confirm?.title || ''}
+       message={confirm?.message}
+       confirmLabel={confirm?.confirmLabel || 'Confirm'}
+       destructive={confirm?.destructive}
+       onCancel={() => setConfirm(null)}
+       onConfirm={() => { const c = confirm; setConfirm(null); c?.onConfirm?.(); }}
+     />
 
      {/* Manual split - exact numbers, no model call */}
      <Dialog

@@ -17,6 +17,7 @@ import ResetPasswordPage from './screens/ResetPasswordPage'
 import ApiKeysPage from './screens/ApiKeysPage'
 import SplitsPage from './screens/SplitsPage'
 import MoneyUniversePage from './screens/MoneyUniversePage'
+import GuidePage from './screens/GuidePage'
 import { Box, CircularProgress, Typography } from '@mui/material'
 
 // Loading Component
@@ -90,6 +91,8 @@ export default function Router() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/health-tracker" element={<HealthTrackerPage />} />
         <Route path="/splits" element={<SplitsPage />} />
+        {/* The app's own manual — how to drive the parts you can't see. */}
+        <Route path="/how-to" element={<GuidePage />} />
         {/* API Keys is admin-only tooling — reachable by URL, kept out of the nav */}
         <Route path="/api-keys" element={<ApiKeysPage />} />
         {/* Retired toy tools (hobby, array-sum, qr) redirect home */}

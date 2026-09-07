@@ -22,6 +22,7 @@ import LightModeIcon from '@mui/icons-material/LightModeRounded';
 import DarkModeIcon from '@mui/icons-material/DarkModeRounded';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweepRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
+import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 
 import { authUtils } from './rest/authUtils';
 import { clearAllData } from './rest/userApis';
@@ -49,6 +50,15 @@ const NAV = [
   { seg: 'splits', label: 'Shared', icon: CallSplitIcon, tone: accents.amber },
   { seg: 'health-tracker', label: 'Health', icon: FavoriteIcon, tone: accents.red },
 ];
+
+// Not a money section, so it sits below the hairline rather than under the
+// "Money" heading — but it's the same NavItem, because it behaves the same.
+// Named for what's in it: a person looking for help is looking for "How to use".
+const LEARN = [
+  { seg: 'how-to', label: 'How to use', icon: MenuBookRoundedIcon, tone: accents.cyan },
+];
+
+const ALL_NAV = [...NAV, ...LEARN];
 
 const segOf = (pathname) => pathname.replace(/^\/+/, '').split('/')[0];
 
@@ -142,6 +152,11 @@ function RailContent({ pathname, onNavigate, onOpenAccount, accountRef, user }) 
           <NavItem key={item.seg} item={item} active={isActive(item, pathname)} reduce={reduce}
             onClick={() => onNavigate('/' + item.seg)} />
         ))}
+        <Box sx={{ height: '1px', bgcolor: 'divider', mx: 1.5, my: 1 }} aria-hidden />
+        {LEARN.map((item) => (
+          <NavItem key={item.seg} item={item} active={isActive(item, pathname)} reduce={reduce}
+            onClick={() => onNavigate('/' + item.seg)} />
+        ))}
       </Box>
 
       <Box sx={{ flex: 1 }} />
@@ -227,7 +242,7 @@ export default function AppShell() {
     window.location.href = '/login';
   };
 
-  const activeItem = NAV.find((i) => isActive(i, location.pathname));
+  const activeItem = ALL_NAV.find((i) => isActive(i, location.pathname));
   const pageTitle = activeItem?.label || (segOf(location.pathname) === 'profile' ? 'Settings' : '');
 
   return (

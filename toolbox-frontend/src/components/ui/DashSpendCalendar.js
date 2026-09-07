@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { accents, type } from '../../theme/tokens';
+import { dashCardSx } from './DashSurface';
 import { money, moneySmart } from './money';
 
 const GREEN = accents.mint;
@@ -69,7 +70,7 @@ export default function DashSpendCalendar({ dailyTotals = [] }) {
     <Box
       role="group"
       aria-label={`Daily spend across ${monthLabel}. Money went out on ${active} days; heaviest was ${heaviestDate} at ${money(heaviest.amount)}.`}
-      sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '14px', bgcolor: 'background.paper', p: { xs: 2, sm: 2.25 }, height: '100%' }}
+      sx={{ ...dashCardSx, height: '100%' }}
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 1.5, gap: 1 }}>
         <Eyebrow>Daily spend</Eyebrow>

@@ -2,9 +2,10 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { money } from './money';
 import { accents, type } from '../../theme/tokens';
+import { dashCardSx } from './DashSurface';
 
 const num = { fontFamily: type.displayFamily, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' };
-const cardSx = { border: '1px solid', borderColor: 'divider', borderRadius: '14px', bgcolor: 'background.paper', p: { xs: 2, sm: 2.5 } };
+const cardSx = { ...dashCardSx, p: { xs: 2, sm: 2.5 } };
 
 function daysUntil(iso) {
   const d = new Date(`${iso}T00:00:00`);

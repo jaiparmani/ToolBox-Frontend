@@ -2,10 +2,11 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { money } from './money';
 import { accents, type } from '../../theme/tokens';
+import { dashCardSx } from './DashSurface';
 
 const GREEN = accents.mint;
 const num = { fontFamily: type.displayFamily, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' };
-const cardSx = { border: '1px solid', borderColor: 'divider', borderRadius: '14px', bgcolor: 'background.paper', p: { xs: 2, sm: 2.25 } };
+const cardSx = dashCardSx;
 
 export default function DashCategoryMovers({ current = [], previous = [] }) {
   const movers = React.useMemo(() => {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { accents, type } from '../../theme/tokens';
+import { dashCardSx } from './DashSurface';
 import { money, moneySmart } from './money';
 import AnimatedNumber from './AnimatedNumber';
 
@@ -36,7 +37,7 @@ export default function DashMonthFlow({ income = 0, spent = 0, monthName = '' })
     <Box
       role="group"
       aria-label={`This month you've earned ${money(income)} and spent ${money(spent)}, leaving ${over ? `${money(Math.abs(left))} over budget` : money(left)}.`}
-      sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '14px', bgcolor: 'background.paper', p: { xs: 2, sm: 2.25 }, height: '100%', display: 'flex', flexDirection: 'column' }}
+      sx={{ ...dashCardSx, height: '100%', display: 'flex', flexDirection: 'column' }}
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
         <Eyebrow>{over ? 'Over budget this month' : 'Money left this month'}</Eyebrow>

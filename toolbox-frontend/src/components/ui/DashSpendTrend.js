@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { accents, type } from '../../theme/tokens';
+import { dashCardSx } from './DashSurface';
 import { money, moneySmart } from './money';
 import BarGrow from './BarGrow';
 
@@ -34,7 +35,7 @@ export default function DashSpendTrend({ months = [] }) {
     <Box
       role="group"
       aria-label={`Monthly spend over the last ${data.length} months. ${completed.length > 0 ? `Average ${money(avg)} per completed month.` : ''}`}
-      sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '14px', bgcolor: 'background.paper', p: { xs: 2, sm: 2.25 }, height: '100%' }}
+      sx={{ ...dashCardSx, height: '100%' }}
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 2, gap: 1 }}>
         <Eyebrow>6-month trend</Eyebrow>

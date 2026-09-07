@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { accents, type } from '../../theme/tokens';
+import { dashCardSx } from './DashSurface';
 import { money, moneySmart } from './money';
 import BarGrow from './BarGrow';
 
@@ -47,7 +48,7 @@ export default function DashWeekdayPattern({ dailyTotals = [] }) {
     <Box
       role="group"
       aria-label={`Spending by weekday this month. Heaviest on ${LABELS[heaviest.i]}, ${money(heaviest.amount)}.`}
-      sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '14px', bgcolor: 'background.paper', p: { xs: 2, sm: 2.25 } }}
+      sx={dashCardSx}
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 1.75 }}>
         <Eyebrow>Spending by weekday</Eyebrow>

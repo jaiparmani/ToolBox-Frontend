@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getMonthlyReport, getRecentExpenses, getLatestExpenseInsight,
   getCategories, getSplitBalances, getRecurring, getExpenseSummary,
@@ -9,7 +9,17 @@ import { computeSettle } from './settleSummary';
  * The month's numbers, fetched and derived once so every screen that tells
  * its story (Home, Today) reads the same figures — no drift between two
  * copies of the same math.
+ *
+ * It also reports *how the fetch is going*, because a dashboard that renders
+ * nothing until data lands reads as broken (Apple Design §16: expose ongoing
+ * status; status, warning and error are different kinds of feedback). The two
+ * waves are tracked separately — `status.primary` covers the main grid,
+ * `status.secondary` the income + 6-month history pass — so a screen can hold
+ * the right geometry for each and never reflow when the second one lands.
+ * These keys are purely additive; every figure below keeps its old shape.
  */
+const SLOW_AFTER_MS = 5000;
+
 export default function useMonthlyDashboard() {
   const [report, setReport] = useState(null);
   const [lastReport, setLastReport] = useState(null);
@@ -21,7 +31,25 @@ export default function useMonthlyDashboard() {
   const [monthIncome, setMonthIncome] = useState(null);
   const [history, setHistory] = useState([]);
 
+  // 'loading' → 'ready' | 'error' per wave. 'error' means *nothing* in that
+  // wave came back; a partial failure still counts as ready, because the cards
+  // that did get data are honest on their own.
+  const [primary, setPrimary] = useState('loading');
+  const [secondary, setSecondary] = useState('loading');
+  const [slow, setSlow] = useState(false);
+  const runRef = useRef(0);
+  const slowTimerRef = useRef(null);
+
   const load = useCallback(() => {
+    const run = ++runRef.current;
+    const live = () => runRef.current === run;
+    setPrimary('loading');
+    setSecondary('loading');
+    setSlow(false);
+    clearTimeout(slowTimerRef.current);
+    // Honest status, not a fake progress bar: past a few seconds we say so.
+    slowTimerRef.current = setTimeout(() => { if (live()) setSlow(true); }, SLOW_AFTER_MS);
+
     const now = new Date();
     const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     Promise.allSettled([
@@ -32,7 +60,10 @@ export default function useMonthlyDashboard() {
       getCategories({ type: 'expense' }),
       getSplitBalances(),
       getRecurring(),
-    ]).then(([r, l, rc, ins, cat, bal, rec]) => {
+    ]).then((results) => {
+      const [r, l, rc, ins, cat, bal, rec] = results;
+      if (!live()) return;
+      setPrimary(results.some((x) => x.status === 'fulfilled') ? 'ready' : 'error');
       if (r.status === 'fulfilled') setReport(r.value);
       if (l.status === 'fulfilled') setLastReport(l.value ?? null);
       if (rc.status === 'fulfilled') setRecent(Array.isArray(rc.value) ? rc.value : []);
@@ -53,6 +84,10 @@ export default function useMonthlyDashboard() {
       getExpenseSummary({ dateFrom: iso(monthStart), dateTo: iso(now) }),
       ...sixMonths.map((d) => getMonthlyReport(d.getFullYear(), d.getMonth() + 1)),
     ]).then(([sum, ...mReports]) => {
+      if (!live()) return;
+      setSecondary(
+        (sum.status === 'fulfilled' || mReports.some((m) => m.status === 'fulfilled')) ? 'ready' : 'error',
+      );
       if (sum.status === 'fulfilled') setMonthIncome(sum.value?.totalIncome ?? 0);
       setHistory(mReports.map((m, i) => ({
         label: sixMonths[i].toLocaleDateString('en-IN', { month: 'short' }),
@@ -63,6 +98,14 @@ export default function useMonthlyDashboard() {
     });
   }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => () => clearTimeout(slowTimerRef.current), []);
+  // Once both waves have settled there is nothing left to be slow about.
+  useEffect(() => {
+    if (primary !== 'loading' && secondary !== 'loading') {
+      clearTimeout(slowTimerRef.current);
+      setSlow(false);
+    }
+  }, [primary, secondary]);
 
   const now = new Date();
   const dayOfMonth = now.getDate();
@@ -125,5 +168,13 @@ export default function useMonthlyDashboard() {
     report, lastReport, recent, insight, insightText, categories, balances, recurring, monthIncome, history,
     dayOfMonth, daysInMonth, monthName, spent, count, trend, cats, topCat, delta, avgPerDay, rhythm, settle,
     reload: load,
+    // ── fetch status (additive; existing consumers can ignore it) ──
+    status: {
+      primary,                       // 'loading' | 'ready' | 'error'  → the main grid
+      secondary,                     // 'loading' | 'ready' | 'error'  → income + 6-month history
+      loading: primary === 'loading' || secondary === 'loading',
+      slow,                          // taking longer than usual — status, not an error
+      failed: primary === 'error',   // nothing at all came back
+    },
   };
 }

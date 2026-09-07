@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { accents, type } from '../../theme/tokens';
+import { dashCardSx } from './DashSurface';
 import { money } from './money';
 
 const GREEN = accents.mint;
@@ -34,7 +35,7 @@ export default function DashPace({ spent = 0, dayOfMonth, daysInMonth, lastMonth
     <Box
       role="group"
       aria-label={`Projected to spend ${money(projected)} by the end of ${monthName} at the current pace. ${money(spent)} spent so far over ${dayOfMonth} of ${daysInMonth} days.${hasLast ? ` Last month you spent ${money(lastMonthTotal)}.` : ''}`}
-      sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '14px', bgcolor: 'background.paper', p: { xs: 2, sm: 2.25 } }}
+      sx={dashCardSx}
     >
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
         <Box sx={{ minWidth: 0 }}>

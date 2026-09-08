@@ -13,6 +13,7 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { accents, motion as motionTokens, type, radius, color } from '../../theme/tokens';
 import { money } from './money';
+import { createCategory, createTag } from '../rest/expenseTrackerApis';
 
 /**
  * The add / edit expense composer.
@@ -84,9 +85,129 @@ const fieldSx = (heroColor) => ({
   },
 });
 
+/**
+ * Colours a label created from this sheet can take.
+ *
+ * The same accents the Labels dialog offers, so a category minted here looks
+ * like one minted there and the charts stay in the app's palette. Picked by a
+ * stable hash of the name rather than at random, so "Pet care" is the same
+ * violet whenever it's coined and two labels made in a row don't collide.
+ */
+const LABEL_COLORS = [
+  accents.blue, accents.violet, accents.cyan, accents.mint,
+  accents.amber, accents.red, accents.purple,
+];
+const colorForLabel = (name) => {
+  let h = 0;
+  for (let i = 0; i < name.length; i += 1) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return LABEL_COLORS[h % LABEL_COLORS.length];
+};
+
+/** A label name, tidied the way the server tidies model-suggested ones. */
+const cleanLabel = (name) => String(name || '').replace(/\s+/g, ' ').trim();
+const sameLabel = (a, b) => cleanLabel(a).toLowerCase() === cleanLabel(b).toLowerCase();
+
+/**
+ * Make a category or tag without leaving the sheet.
+ *
+ * Lives inside the chip row it belongs to and behaves like one more chip: it
+ * opens on click, takes a name, and commits on Enter. Escape closes it and
+ * hands focus back to the chip that opened it, so a keyboard never gets
+ * stranded inside a field the user didn't mean to open.
+ */
+function InlineLabelCreate({
+  openLabel, addLabel, placeholder, tone, value, onValue, onSubmit, onCancel,
+  busy, error, isOpen, onOpen, height = 32,
+}) {
+  const inputRef = React.useRef(null);
+  const triggerRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      const t = setTimeout(() => inputRef.current?.focus(), motionTokens.instant);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [isOpen]);
+
+  const cancel = () => { onCancel(); triggerRef.current?.focus(); };
+
+  if (!isOpen) {
+    return (
+      <Chip
+        ref={triggerRef}
+        label={addLabel}
+        icon={<AddRoundedIcon sx={{ fontSize: 15, color: `${tone} !important` }} />}
+        onClick={onOpen}
+        size="small"
+        aria-label={openLabel}
+        sx={{
+          fontWeight: 600, fontSize: height > 28 ? 12.5 : 12, height, px: 0.25,
+          borderRadius: `${radius.pill}px`,
+          border: '1px dashed', borderColor: `${tone}66`,
+          bgcolor: 'transparent', color: tone,
+          transition: `all ${motionTokens.fast}ms ${motionTokens.ease}`,
+          '&:hover': { bgcolor: `${tone}0d`, borderColor: tone },
+          '&:active': { transform: 'scale(0.95)' },
+          '&:focus-visible': { outline: `2px solid ${tone}`, outlineOffset: 2 },
+        }}
+      />
+    );
+  }
+
+  return (
+    <Box sx={{ width: '100%' }}>
+      <Box
+        sx={{
+          display: 'flex', alignItems: 'center', gap: 0.5, pl: 1.5, pr: 0.5, py: 0.25,
+          borderRadius: `${radius.pill}px`, border: '1px solid', borderColor: `${tone}66`,
+          bgcolor: (t) => color.sunken[t.palette.mode],
+        }}
+      >
+        <InputBase
+          inputRef={inputRef}
+          value={value}
+          placeholder={placeholder}
+          disabled={busy}
+          inputProps={{ 'aria-label': openLabel, maxLength: 40 }}
+          onChange={(e) => onValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); onSubmit(); }
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); }
+          }}
+          sx={{ fontSize: 13.5, flex: 1, minWidth: 0 }}
+        />
+        <IconButton
+          size="small" onClick={onSubmit} disabled={busy || !cleanLabel(value)}
+          aria-label={`Create ${cleanLabel(value) || 'label'}`}
+          sx={{
+            width: 26, height: 26, borderRadius: `${radius.sm}px`, color: tone,
+            '&.Mui-disabled': { color: 'text.disabled' },
+          }}
+        >
+          {busy
+            ? <CircularProgress size={13} sx={{ color: tone }} />
+            : <CheckIcon sx={{ fontSize: 15 }} />}
+        </IconButton>
+        <IconButton
+          size="small" onClick={cancel} disabled={busy} aria-label="Cancel"
+          sx={{ width: 26, height: 26, borderRadius: `${radius.sm}px`, color: 'text.disabled' }}
+        >
+          <CloseIcon sx={{ fontSize: 15 }} />
+        </IconButton>
+      </Box>
+      {error && (
+        <Typography role="alert" variant="caption" color="error" sx={{ display: 'block', mt: 0.5, px: 1, fontSize: 12 }}>
+          {error}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 export default function ExpenseComposer({
   open, editing, data, onChange, onClose, onSave, saving, categories = [], tags = [],
-  onSmartParse, onAddBatch, onAddOne,
+  onSmartParse, onAddBatch, onAddOne, onLabelsChanged,
 }) {
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
@@ -103,6 +224,18 @@ export default function ExpenseComposer({
   const bodyRef = React.useRef(null);
   const reduce = useReducedMotion();
 
+  // Labels made from inside this sheet. The parent owns the canonical lists and
+  // reloads them on its own schedule, so they're held here too — otherwise a
+  // category you just created would vanish from the row you created it in.
+  const [madeCats, setMadeCats] = React.useState([]);
+  const [madeTags, setMadeTags] = React.useState([]);
+  const [catDraft, setCatDraft] = React.useState(null);   // null = closed
+  const [tagDraft, setTagDraft] = React.useState(null);
+  const [makingCat, setMakingCat] = React.useState(false);
+  const [makingTag, setMakingTag] = React.useState(false);
+  const [catError, setCatError] = React.useState(null);
+  const [tagError, setTagError] = React.useState(null);
+
   const typeId = data.transactionType || 'expense';
   const activeType = TYPE_META[typeId] || DEFAULT_TYPE;
   const heroColor = activeType.color;
@@ -110,15 +243,29 @@ export default function ExpenseComposer({
   // An existing debt/credit row. Its kind is shown, never offered — nothing in
   // here may quietly rewrite what that record already is.
   const legacyType = !CHOOSABLE.includes(typeId);
+  // The parent's lists plus anything made in this sheet since it opened. Once
+  // the parent reloads its labels the same row arrives from both sides, so
+  // dedupe on id.
+  const allCats = React.useMemo(() => {
+    const known = new Set(categories.map(c => c.id));
+    return [...categories, ...madeCats.filter(c => !known.has(c.id))];
+  }, [categories, madeCats]);
+  const allTags = React.useMemo(() => {
+    const known = new Set(tags.map(t => t.id));
+    return [...tags, ...madeTags.filter(t => !known.has(t.id))];
+  }, [tags, madeTags]);
+
   // Categories are typed on the backend, and it rejects a save whose type and
   // category type disagree. So only offer categories that match the chosen type
   // — otherwise you could pick an expense category for an income and get a 400.
-  const visibleCats = categories.filter(c => (c.transaction_type || 'expense') === activeType.id);
+  const visibleCats = allCats.filter(c => (c.transaction_type || 'expense') === activeType.id);
 
   React.useEffect(() => {
     if (open) {
       setShowMore(false);
       setNlText(''); setBatch([]); setNlError(null); setParsing(false); setCommitting(false);
+      setMadeCats([]); setMadeTags([]);
+      setCatDraft(null); setTagDraft(null); setCatError(null); setTagError(null);
       const t = setTimeout(() => amountRef.current?.focus(), 250);
       return () => clearTimeout(t);
     }
@@ -134,7 +281,63 @@ export default function ExpenseComposer({
 
   const selectedTags = new Set(data.tagIds || []);
 
-  const matchCat = (name) => categories.find(c => (c.name || '').toLowerCase() === (name || '').toLowerCase())?.id || '';
+  /* ── Labels made on the spot ──────────────────────────────────────────
+     Match before creating, and match the way the server does: case- and
+     space-insensitively, and for categories only within the same transaction
+     type, since a name may legitimately exist as both an expense and an
+     income category. Anything already there is selected, never duplicated. */
+  const findCat = (name, typeId) => allCats.find(
+    (c) => sameLabel(c.name, name) && (c.transaction_type || 'expense') === typeId);
+  const findTag = (name) => allTags.find((t) => sameLabel(t.name, name));
+
+  const makeCategory = async (rawName, typeId) => {
+    const name = cleanLabel(rawName);
+    if (!name) return null;
+    const existing = findCat(name, typeId);
+    if (existing) return existing;
+    const created = await createCategory({
+      name, description: '', color: colorForLabel(name), icon: 'category',
+      transactionType: typeId,
+    });
+    setMadeCats((prev) => [...prev, created]);
+    onLabelsChanged?.();
+    return created;
+  };
+
+  const makeTag = async (rawName) => {
+    const name = cleanLabel(rawName);
+    if (!name) return null;
+    const existing = findTag(name);
+    if (existing) return existing;
+    const created = await createTag({ name, color: colorForLabel(name) });
+    setMadeTags((prev) => [...prev, created]);
+    onLabelsChanged?.();
+    return created;
+  };
+
+  const submitCat = async () => {
+    if (makingCat || !cleanLabel(catDraft)) return;
+    setMakingCat(true); setCatError(null);
+    try {
+      const cat = await makeCategory(catDraft, activeType.id);
+      set({ categoryId: cat.id });
+      setCatDraft(null);
+    } catch (e) {
+      setCatError(e?.message || 'Could not create that category.');
+    } finally { setMakingCat(false); }
+  };
+
+  const submitTag = async () => {
+    if (makingTag || !cleanLabel(tagDraft)) return;
+    setMakingTag(true); setTagError(null);
+    try {
+      const tag = await makeTag(tagDraft);
+      set({ tagIds: [...new Set([...(data.tagIds || []), tag.id])] });
+      setTagDraft(null);
+    } catch (e) {
+      setTagError(e?.message || 'Could not create that tag.');
+    } finally { setMakingTag(false); }
+  };
 
   // Flip between expense and income. The backend rejects a save whose type and
   // category type disagree, so a category that no longer matches is dropped —
@@ -160,11 +363,36 @@ export default function ExpenseComposer({
         setNlError(res?.detail || 'Couldn’t find an expense in that. Try “20 coffee”.');
       } else if (res.count === 1) {
         const it = res.items[0];
+        const typeId = it.transaction_type || 'expense';
+        // The parse is allowed to coin a category or tag the account doesn't
+        // have yet — every other write path creates it. This one used to drop
+        // the name on the floor, which left the sheet with no category and the
+        // save button switched off, so a good parse looked like a failed one.
+        let categoryId = findCat(it.category_name, typeId)?.id || '';
+        const tagIds = [];
+        try {
+          if (!categoryId) categoryId = (await makeCategory(it.category_name, typeId))?.id || '';
+          const names = Array.isArray(it.tags) ? it.tags : [];
+          for (let i = 0; i < names.length; i += 1) {
+            // Sequential on purpose: two new tags racing can't both read the
+            // same "does it exist yet" answer and create the name twice.
+            // eslint-disable-next-line no-await-in-loop
+            const tag = await makeTag(names[i]);
+            if (tag) tagIds.push(tag.id);
+          }
+        } catch (e) {
+          // A label that wouldn't save is not worth losing the parse over —
+          // the fields still land, the user picks the label by hand.
+          setNlError(e?.message || 'Added the details, but a new label could not be created.');
+        }
         onChange({
           amount: String(it.amount ?? ''), description: it.description || '',
-          transactionType: it.transaction_type || 'expense',
-          date: it.date || new Date(), categoryId: matchCat(it.category_name),
+          transactionType: typeId,
+          date: it.date || new Date(), categoryId, tagIds,
         });
+        // Tags live under More details; opening it is how you get to see what
+        // the parse actually attached rather than finding out after saving.
+        if (tagIds.length) setShowMore(true);
         setNlText(''); setBatch([]);
       } else {
         setBatch(res.items); setNlText('');
@@ -560,11 +788,23 @@ export default function ExpenseComposer({
                     />
                   );
                 })}
-                {visibleCats.length === 0 && (
-                  <Typography sx={{ fontSize: 13, color: 'text.disabled' }}>
-                    No {activeType.label.toLowerCase()} categories yet — add one first.
-                  </Typography>
-                )}
+                {/* Make the right one here rather than abandoning the sheet
+                    for the Labels tab. It lands selected, so the next tap is
+                    Save. */}
+                <InlineLabelCreate
+                  isOpen={catDraft !== null}
+                  onOpen={() => { setCatDraft(''); setCatError(null); }}
+                  onCancel={() => { setCatDraft(null); setCatError(null); }}
+                  openLabel={`New ${activeType.label.toLowerCase()} category`}
+                  addLabel={visibleCats.length === 0 ? 'Add a category' : 'New'}
+                  placeholder={`Name this ${activeType.label.toLowerCase()} category`}
+                  tone={heroColor}
+                  value={catDraft || ''}
+                  onValue={(v) => { setCatDraft(v); setCatError(null); }}
+                  onSubmit={submitCat}
+                  busy={makingCat}
+                  error={catError}
+                />
               </Box>
             </Box>
 
@@ -670,11 +910,13 @@ export default function ExpenseComposer({
                     }}
                   />
 
-                  {tags.length > 0 && (
-                    <Box>
-                      <Eyebrow sx={{ mb: 1 }}>Tags</Eyebrow>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                        {tags.map((tag) => {
+                  {/* Always here, even with nothing to show yet: the first tag
+                      has to be creatable from somewhere, and the sheet is
+                      where you notice you want one. */}
+                  <Box>
+                    <Eyebrow sx={{ mb: 1 }}>Tags</Eyebrow>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                        {allTags.map((tag) => {
                           const on = selectedTags.has(tag.id);
                           const tagColor = tag.color || heroColor;
                           return (
@@ -699,9 +941,23 @@ export default function ExpenseComposer({
                             />
                           );
                         })}
-                      </Box>
+                      <InlineLabelCreate
+                        isOpen={tagDraft !== null}
+                        onOpen={() => { setTagDraft(''); setTagError(null); }}
+                        onCancel={() => { setTagDraft(null); setTagError(null); }}
+                        openLabel="New tag"
+                        addLabel={allTags.length === 0 ? 'Add a tag' : 'New'}
+                        placeholder="Name this tag"
+                        tone={accents.violet}
+                        height={28}
+                        value={tagDraft || ''}
+                        onValue={(v) => { setTagDraft(v); setTagError(null); }}
+                        onSubmit={submitTag}
+                        busy={makingTag}
+                        error={tagError}
+                      />
                     </Box>
-                  )}
+                  </Box>
 
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                     <TextField

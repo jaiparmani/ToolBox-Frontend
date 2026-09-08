@@ -14,6 +14,11 @@ const FALLOFF = 2.4;
 /** Peak thickness multiplier under the finger. */
 const LIFT = 2.2;
 
+/** Apple's momentum projection (Designing Fluid Interfaces, WWDC 2018). */
+function project(velocity, decelerationRate = 0.998) {
+  return (velocity / 1000) * decelerationRate / (1 - decelerationRate);
+}
+
 /**
  * Progressive resistance past an edge — Apple Design §9.
  */
@@ -55,6 +60,8 @@ export default function ActivityDayRail({ days = [], maxDaySpend = 0, onJump, sx
   const bubbleRef = React.useRef(null);
   const activeRef = React.useRef(-1);
   const draggingRef = React.useRef(false);
+  // Position history along the rail, for the release velocity (§5/§6).
+  const historyRef = React.useRef([]);
   const [active, setActive] = React.useState(-1);
   const [focusIndex, setFocusIndex] = React.useState(0);
   const itemRefs = React.useRef([]);
@@ -109,6 +116,10 @@ export default function ActivityDayRail({ days = [], maxDaySpend = 0, onJump, sx
     if (bubbleRef.current && !reduce) {
       bubbleRef.current.style.transform = `translate3d(0, ${bubbleY - SLOT}px, 0)`;
     }
+    if (jump) {
+      historyRef.current.push({ y, t: performance.now() });
+      if (historyRef.current.length > 8) historyRef.current.shift();
+    }
     if (i !== activeRef.current) {
       activeRef.current = i;
       setActive(i);
@@ -119,10 +130,21 @@ export default function ActivityDayRail({ days = [], maxDaySpend = 0, onJump, sx
     }
   }, [count, days, indexAt, onJump, paint, reduce]);
 
+  /** Rail-space velocity in px/s, from the last few pointer samples. */
+  const velocityOf = () => {
+    const h = historyRef.current;
+    if (h.length < 2) return 0;
+    const recent = h.slice(-5);
+    const dt = recent[recent.length - 1].t - recent[0].t;
+    if (dt < 1) return 0;
+    return ((recent[recent.length - 1].y - recent[0].y) / dt) * 1000;
+  };
+
   const onPointerDown = (e) => {
     if (e.button != null && e.button !== 0) return;
     draggingRef.current = true;
     activeRef.current = -1;
+    historyRef.current = [];
     railRef.current?.setPointerCapture?.(e.pointerId);
     track(e.clientY, true);
   };
@@ -137,6 +159,23 @@ export default function ActivityDayRail({ days = [], maxDaySpend = 0, onJump, sx
     if (!draggingRef.current) return;
     draggingRef.current = false;
     railRef.current?.releasePointerCapture?.(e.pointerId);
+
+    // §6/§5: a flick should throw the list rather than drop it where the
+    // finger happened to stop. The release velocity projects a resting point
+    // down the rail with Apple's decay function, the day nearest that point
+    // wins, and the browser's own smooth scroll carries the remaining travel —
+    // so the glide continues at the speed the gesture had. A slow release
+    // projects less than half a slot and lands exactly where it already is.
+    const v = velocityOf();
+    const landing = (activeRef.current >= 0 ? activeRef.current : 0) * SLOT + SLOT / 2 + project(v);
+    const target = Math.max(0, Math.min(count - 1, Math.floor(landing / SLOT)));
+    if (!reduce && target !== activeRef.current && days[target]) {
+      activeRef.current = target;
+      setActive(target);
+      onJump?.(days[target].key, true);
+    }
+    historyRef.current = [];
+
     if (e.pointerType === 'touch') {
       activeRef.current = -1;
       setActive(-1);
@@ -170,6 +209,7 @@ export default function ActivityDayRail({ days = [], maxDaySpend = 0, onJump, sx
 
   return (
     <Box
+      data-no-page-drag
       sx={{
         position: 'sticky', top: { xs: 64, md: 76 }, flexShrink: 0, alignSelf: 'flex-start',
         width: 26, ...sx,

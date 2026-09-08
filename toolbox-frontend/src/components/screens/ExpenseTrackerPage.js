@@ -40,10 +40,10 @@ import {
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
 import AutocompleteComponent from '../ReusableComponents/AutocompleteComponent';
 import SummaryStrip from '../ui/SummaryStrip';
-import SectionNav from '../ui/SectionNav';
+import ActivityDeck from '../ui/ActivityDeck';
 import ExpenseTimeline from '../ui/ExpenseTimeline';
 import ActivityScopeBar, { scopeRange } from '../ui/ActivityScopeBar';
-import ActivityCategoryChips from '../ui/ActivityCategoryChips';
+import ActivityComposition from '../ui/ActivityComposition';
 import ActivityGlance from '../ui/ActivityGlance';
 import ExpenseComposer from '../ui/ExpenseComposer';
 import QuickCapture from '../ui/QuickCapture';
@@ -63,7 +63,7 @@ import CursorGlow from '../motion/CursorGlow';
 import AssistantOrb from '../ui/AssistantOrb';
 import { accents, color, motion, radius, type } from '../../theme/tokens';
 import { useTheme } from '@mui/material/styles';
-import { AnimatePresence, motion as framerMotion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion as framerMotion } from 'framer-motion';
 
 // Color palette for categories
 const categoryColors = [
@@ -153,35 +153,11 @@ export default function ExpenseTrackerPage() {
  const [error, setError] = useState(null);
  const [success, setSuccess] = useState(null);
  const [activeTab, setActiveTab] = useState(0);
- // Which way along the tab row the last change travelled (+1 right, -1 left),
- // so the incoming panel can enter from that side.
- const [tabDir, setTabDir] = useState(0);
- const tabIndexRef = React.useRef(0);
- const reduceMotion = useReducedMotion();
- const selectTab = React.useCallback((next) => {
-   setTabDir(next > tabIndexRef.current ? 1 : next < tabIndexRef.current ? -1 : 0);
-   tabIndexRef.current = next;
-   setActiveTab(next);
- }, []);
- /**
-  * Apple Design §7/§8: the four sections sit in a row, so moving between them
-  * should read as travel along that row. The arriving panel starts offset on
-  * the side you moved toward and settles to zero — the in-between frames point
-  * at the outcome instead of blinking there. There is no exit animation on
-  * purpose: waiting for the old panel to leave would put latency on the tap
-  * (§1). Reduced motion keeps the same cue as a plain cross-fade.
-  */
- const tabEnter = React.useMemo(() => (reduceMotion
-   ? {
-     initial: { opacity: 0 },
-     animate: { opacity: 1 },
-     transition: { duration: motion.fast / 1000 },
-   }
-   : {
-     initial: { opacity: 0, x: tabDir * 24 },
-     animate: { opacity: 1, x: 0 },
-     transition: { type: 'spring', stiffness: 480, damping: 42 },
-   }), [reduceMotion, tabDir]);
+ // The four sections now live in ActivityDeck, which owns both the tab row and
+ // the drag between panels — direction, momentum, the peek on the incoming
+ // edge and the entrance are all one piece of physics in there, so nothing but
+ // the index needs to live here.
+ const selectTab = React.useCallback((next) => setActiveTab(next), []);
  // Which half of the Labels tab is showing. Categories first: every expense
  // has one, tags are the optional second cut.
  const [labelSegment, setLabelSegment] = useState('categories');
@@ -324,6 +300,42 @@ export default function ExpenseTrackerPage() {
  const [personSplits, setPersonSplits] = useState([]);
  // Inline editing of a split amount.
  const [editingSplit, setEditingSplit] = useState(null); // { id, amount }
+
+ /**
+  * The four sections, and the one real figure each can put on the peek card
+  * that rides in behind a page drag (Apple Design §8). Every hint is a number
+  * this page already holds — the server's transaction count, the label counts,
+  * the categories the summary actually broke down, the people with a live
+  * balance. A section whose data has not loaded yet contributes no hint at all
+  * rather than a placeholder: the peek shows its name, and nothing more.
+  */
+ const deckSections = React.useMemo(() => [
+   {
+     label: 'Expenses', icon: DashboardIcon, color: accents.blue,
+     hint: pagination.total
+       ? `${pagination.total} ${pagination.total === 1 ? 'transaction' : 'transactions'} · ${scopeLabel}`
+       : undefined,
+   },
+   {
+     label: 'Labels', icon: LabelsIcon, color: accents.purple,
+     hint: categories.length || tags.length
+       ? `${categories.length} categories · ${tags.length} tags`
+       : undefined,
+   },
+   {
+     label: 'Insights', icon: InsightsIcon, color: accents.mint,
+     hint: summary?.categoryBreakdown?.length
+       ? `${summary.categoryBreakdown.length} categories · ${scopeLabel}`
+       : undefined,
+   },
+   {
+     label: 'Splits', icon: CallSplitIcon, color: accents.amber,
+     hint: splits.loaded && (splits.totalOwed || splits.totalYouOwe)
+       ? `${money(splits.totalOwed)} owed to you · ${money(splits.totalYouOwe)} you owe`
+       : undefined,
+   },
+ ], [pagination.total, scopeLabel, categories.length, tags.length, summary, splits.loaded, splits.totalOwed, splits.totalYouOwe]);
+
 
  // Manual split: exact numbers, no model call and no quota spent
  const [splitForm, setSplitForm] = useState({
@@ -1262,20 +1274,11 @@ export default function ExpenseTrackerPage() {
          bgcolor: 'background.paper',
        }}
      >
-       <SectionNav
-         value={activeTab}
-         onChange={selectTab}
-         sections={[
-           { label: 'Expenses', icon: DashboardIcon, color: accents.blue },
-           { label: 'Labels', icon: LabelsIcon, color: accents.purple },
-           { label: 'Insights', icon: InsightsIcon, color: accents.mint },
-           { label: 'Splits', icon: CallSplitIcon, color: accents.amber },
-         ]}
-       />
+       <ActivityDeck value={activeTab} onChange={selectTab} sections={deckSections}>
 
        {/* Expenses Tab */}
        {activeTab === 0 && (
-         <MotionBox key="tab-0" {...tabEnter} sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
+         <Box key="tab-0" sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
            {/* Ask result — the question is asked from the one Assistant (⌘K);
                when it answers, the reading lands here as its own card. */}
            {ask.answer && (
@@ -1486,10 +1489,16 @@ export default function ExpenseTrackerPage() {
            <ActivityGlance expenses={expenses} />
 
            {/* One-tap category narrowing, wired into the existing category filter. */}
-           <ActivityCategoryChips
+           {/* Where the period's money actually went — the server's own
+               per-category totals for this exact scope, as one bar you can put
+               a finger on. Releasing on a band sets the same filters.category
+               the chips used to set, so it narrows the stream below. */}
+           <ActivityComposition
+             breakdown={summary?.categoryBreakdown}
              categories={categories}
              selected={filters.category}
              onSelect={(id) => handleFilterChange('category', id)}
+             scopeLabel={scopeLabel}
            />
 
            {/* The list, as a chronological timeline grouped by day — each day a
@@ -1527,12 +1536,12 @@ export default function ExpenseTrackerPage() {
              onRowsPerPageChange={(e) => setPagination(prev => ({ ...prev, pageSize: parseInt(e.target.value, 10), page: 0 }))}
              rowsPerPageOptions={[5, 10, 25, 50]}
            />
-         </MotionBox>
+         </Box>
        )}
 
        {/* Labels Tab — categories and tags, one screen */}
        {activeTab === 1 && (
-         <MotionBox key="tab-1" {...tabEnter} sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
+         <Box key="tab-1" sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
            <ActivityLabelsPanel
              categories={categories}
              tags={tags}
@@ -1548,12 +1557,12 @@ export default function ExpenseTrackerPage() {
              onDeleteTag={askDeleteTag}
              onSelectCategory={drillIntoCategory}
            />
-         </MotionBox>
+         </Box>
        )}
 
        {/* Insights Tab */}
        {activeTab === 2 && (
-         <MotionBox key="tab-2" {...tabEnter} sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
+         <Box key="tab-2" sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
            <ActivityInsightsPanel
              breakdown={summary?.categoryBreakdown}
              categories={categories}
@@ -1562,12 +1571,12 @@ export default function ExpenseTrackerPage() {
              onGenerate={runInsight}
              onSelectCategory={drillIntoCategory}
            />
-         </MotionBox>
+         </Box>
        )}
 
        {/* Splits Tab */}
        {activeTab === 3 && (
-         <MotionBox key="tab-3" {...tabEnter} sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
+         <Box key="tab-3" sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
            <ActivitySplitsPanel
              splits={splits}
              splitOnlyBills={splitOnlyBills}
@@ -1587,8 +1596,9 @@ export default function ExpenseTrackerPage() {
              onSettleSingle={askSettleSingle}
              onAddToExpenses={handleAddToExpenses}
            />
-         </MotionBox>
+         </Box>
        )}
+       </ActivityDeck>
      </Paper>
 
      {/* Transaction story - the shared drawer, rich detail on tapping a row */}

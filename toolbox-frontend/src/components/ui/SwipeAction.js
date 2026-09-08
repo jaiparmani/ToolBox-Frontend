@@ -203,7 +203,12 @@ export default function SwipeAction({
   const showRight = revealDir === 'right' && onSecondaryAction;
 
   return (
-    <Box sx={{ position: 'relative', borderRadius: `${borderRadius}px`, overflow: 'hidden', ...sx }}>
+    <Box
+      // This row owns its horizontal axis. Any page-level pager wrapping it
+      // reads this and yields, so a swipe-to-delete is never stolen.
+      data-no-page-drag
+      sx={{ position: 'relative', borderRadius: `${borderRadius}px`, overflow: 'hidden', ...sx }}
+    >
       {/* Left action layer (swipe left = delete) */}
       {onAction && (
         <Box

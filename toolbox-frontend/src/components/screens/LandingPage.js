@@ -4,13 +4,12 @@ import { Box, Typography, Fab } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
-import SavingsRoundedIcon from '@mui/icons-material/SavingsRounded';
+import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { yourShareOf } from '../rest/expenseTrackerApis';
 import ProjectionChart from '../ui/ProjectionChart';
 import DashPace from '../ui/DashPace';
-import DashMonthFlow from '../ui/DashMonthFlow';
 import DashSpendTrend from '../ui/DashSpendTrend';
 import DashWeekdayPattern from '../ui/DashWeekdayPattern';
 import DashSpendCalendar from '../ui/DashSpendCalendar';
@@ -41,8 +40,8 @@ const num = { fontVariantNumeric: 'tabular-nums', fontFamily: type.displayFamily
 
 // One vertical rhythm for the whole page instead of a per-row guess.
 const ROW = { display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: { xs: 2, md: 2.5 } };
-// The income/history row is the *second* wave. Both its loading placeholder and
-// every real or empty outcome are pinned to this height, so when that wave
+// The six-month history row is the *second* wave. Both its loading placeholder
+// and every real or empty outcome are pinned to this height, so when that wave
 // lands the page does not move (Apple Design §7).
 const WAVE2_H = { xs: 182, sm: 196 };
 
@@ -72,7 +71,7 @@ export default function LandingPage() {
   const [addOpen, setAddOpen] = useState(false);
 
   const {
-    report, lastReport, recent, insightText, categories, recurring, monthIncome, history,
+    report, lastReport, recent, insightText, categories, recurring, history,
     dayOfMonth, daysInMonth, monthName, spent, count, trend, cats, topCat, delta, avgPerDay, rhythm, settle,
     reload, status,
   } = useMonthlyDashboard();
@@ -101,12 +100,11 @@ export default function LandingPage() {
   const secondWave = status.secondary === 'loading';
   const failed = status.failed;
 
-  // Mirrors of the two second-wave cards' own honesty gates, so the row knows
-  // whether anything real is coming before it decides what to hold.
+  // Mirror of the second-wave card's own honesty gate, so the row knows whether
+  // anything real is coming before it decides what to hold.
   const trendMonths = (history || []).filter((m) => m && m.ok !== false);
-  const monthFlowVisible = (monthIncome ?? 0) > 0;
   const spendTrendVisible = trendMonths.length >= 4 && trendMonths.filter((m) => m.total > 0).length >= 3;
-  const wave2Empty = !secondWave && !monthFlowVisible && !spendTrendVisible;
+  const wave2Empty = !secondWave && !spendTrendVisible;
 
   // Mirrors of the first-wave cards' own gates, so a section rail never labels
   // an empty stretch of page (§16 wayfinding: a heading must have contents).
@@ -240,39 +238,27 @@ export default function LandingPage() {
 
         {!failed && (
           <>
-            {/* ── money band ── income vs spend + 6-month context (second wave) ──
-                Held at one height across all three outcomes so this row can
-                never shove the page around when the slower wave lands. */}
+            {/* ── six-month band ── how this month sits against the last five
+                (second wave). Held at one height across all three outcomes so
+                this row can never shove the page around when it lands. */}
             <Box sx={ROW}>
               {secondWave ? (
-                <>
-                  <Box sx={wave2Slot}><FigureCardSkeleton /></Box>
-                  <Box sx={wave2Slot}><TrendCardSkeleton /></Box>
-                </>
+                <Box sx={wave2Slot}><TrendCardSkeleton /></Box>
               ) : wave2Empty ? (
                 <Box sx={{ ...wave2Slot, ...dashCardSx, display: 'grid', placeItems: 'center' }}>
                   <EmptyState
-                    dense icon={SavingsRoundedIcon} tone={GREEN}
-                    title="No income tracked yet"
-                    description="Log what comes in and this becomes what you have left, not just what you spent."
-                    actionLabel="Add income"
+                    dense icon={BarChartRoundedIcon} tone={GREEN}
+                    title="Not enough history yet"
+                    description="After a few months of spending, this becomes the run of months you can compare today against."
+                    actionLabel="Add an expense"
                     onAction={() => navigate('/expense-tracker')}
                     sx={{ py: 0 }}
                   />
                 </Box>
               ) : (
-                <>
-                  {monthFlowVisible && (
-                    <Reveal index={0} sx={wave2Slot}>
-                      <DashMonthFlow income={monthIncome ?? 0} spent={spent} monthName={monthName} />
-                    </Reveal>
-                  )}
-                  {spendTrendVisible && (
-                    <Reveal index={1} sx={wave2Slot}>
-                      <DashSpendTrend months={history} />
-                    </Reveal>
-                  )}
-                </>
+                <Reveal index={0} sx={wave2Slot}>
+                  <DashSpendTrend months={history} />
+                </Reveal>
               )}
             </Box>
 

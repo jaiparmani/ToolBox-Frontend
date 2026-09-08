@@ -6,7 +6,6 @@ import AutorenewRoundedIcon from '@mui/icons-material/AutorenewRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import SouthWestRoundedIcon from '@mui/icons-material/SouthWestRounded';
-import NorthEastRoundedIcon from '@mui/icons-material/NorthEastRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { useMoney } from '../../contexts/MoneyContext';
@@ -37,13 +36,13 @@ function fmtDate(d) {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
-const EMPTY_FORM = { transaction_type: 'expense', amount: '', description: '', cadence: 'monthly', interval: '1', anchor_date: today(), end_date: '', category: '' };
+const EMPTY_FORM = { amount: '', description: '', cadence: 'monthly', interval: '1', anchor_date: today(), end_date: '', category: '' };
 
 /**
- * Recurring — the income and bills that drive the whole forecast. These are the
- * inputs behind the Cash Flow River, Safe-to-Spend and the Money Pulse, so the
- * screen makes them visible and editable, and refreshes the shared money state
- * on every change so the effect is immediate elsewhere.
+ * Recurring — the bills and subscriptions that drive the whole forecast. These
+ * are the inputs behind the projections, so the screen makes them visible and
+ * editable, and refreshes the shared money state on every change so the effect
+ * is immediate elsewhere.
  */
 export default function RecurringPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -71,10 +70,7 @@ export default function RecurringPage() {
 
   useEffect(() => { if (isAuthenticated) load(); }, [isAuthenticated, load]);
 
-  const { income, bills } = useMemo(() => ({
-    income: rules.filter(r => r.transaction_type === 'income'),
-    bills: rules.filter(r => r.transaction_type === 'expense'),
-  }), [rules]);
+  const bills = useMemo(() => rules.filter(r => r.transaction_type === 'expense'), [rules]);
 
   const openForm = () => { setForm(EMPTY_FORM); setFormOpen(true); };
 
@@ -85,7 +81,7 @@ export default function RecurringPage() {
       await createRecurring({
         description: form.description.trim(),
         amount: form.amount,
-        transaction_type: form.transaction_type,
+        transaction_type: 'expense',
         cadence: form.cadence,
         interval: parseInt(form.interval, 10) || 1,
         anchor_date: form.anchor_date,
@@ -113,8 +109,7 @@ export default function RecurringPage() {
   };
 
   if (isLoading || !isAuthenticated) return null;
-  const isIncome = form.transaction_type === 'income';
-  const tone = isIncome ? accents.mint : accents.blue;
+  const tone = accents.blue;
 
   return (
     <Container maxWidth="sm" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 10 }}>
@@ -123,7 +118,7 @@ export default function RecurringPage() {
         <PageHeader
           icon={AutorenewRoundedIcon}
           title="Recurring"
-          subtitle="The income & bills behind your forecast"
+          subtitle="The bills & subscriptions behind your forecast"
           actions={
             <Button variant="contained" size="small" startIcon={<AddRoundedIcon />} onClick={openForm}>
               Add
@@ -150,42 +145,20 @@ export default function RecurringPage() {
           </Panel>
         </Reveal>
       ) : (
-        <>
-          {income.length > 0 && (
-            <Box sx={{ mb: 3 }}>
-              <Reveal index={1}><SectionHeader title="Income" count={income.length} /></Reveal>
-              <Stack spacing={1.25}>
-                {income.map((r, i) => (
-                  <Reveal key={r.id} index={2 + i}><RuleRow rule={r} onDelete={() => setConfirmDel(r)} /></Reveal>
-                ))}
-              </Stack>
-            </Box>
-          )}
-          {bills.length > 0 && (
-            <Box>
-              <Reveal index={2}><SectionHeader title="Bills & subscriptions" count={bills.length} /></Reveal>
-              <Stack spacing={1.25}>
-                {bills.map((r, i) => (
-                  <Reveal key={r.id} index={3 + i}><RuleRow rule={r} onDelete={() => setConfirmDel(r)} /></Reveal>
-                ))}
-              </Stack>
-            </Box>
-          )}
-        </>
+        <Box>
+          <Reveal index={1}><SectionHeader title="Bills & subscriptions" count={bills.length} /></Reveal>
+          <Stack spacing={1.25}>
+            {bills.map((r, i) => (
+              <Reveal key={r.id} index={2 + i}><RuleRow rule={r} onDelete={() => setConfirmDel(r)} /></Reveal>
+            ))}
+          </Stack>
+        </Box>
       )}
 
       {/* Add form */}
       <BottomSheet open={formOpen} onClose={() => setFormOpen(false)}>
-        <Typography variant="h6" sx={{ fontWeight: 650, mb: 2 }}>New recurring item</Typography>
+        <Typography variant="h6" sx={{ fontWeight: 650, mb: 2 }}>New recurring bill</Typography>
         <Stack spacing={2}>
-          <SegmentedControl
-            value={form.transaction_type}
-            onChange={(v) => setForm(f => ({ ...f, transaction_type: v }))}
-            options={[
-              { id: 'expense', label: 'Bill / subscription', color: accents.blue },
-              { id: 'income', label: 'Income', color: accents.mint },
-            ]}
-          />
           <TextField
             label="Amount" type="number" value={form.amount} fullWidth
             onChange={(e) => setForm(f => ({ ...f, amount: e.target.value }))}
@@ -193,7 +166,7 @@ export default function RecurringPage() {
           />
           <TextField
             label="Description" value={form.description} fullWidth
-            placeholder={isIncome ? 'Salary' : 'Rent, Netflix…'}
+            placeholder="Rent, Netflix…"
             onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
           />
           <Box>
@@ -229,7 +202,7 @@ export default function RecurringPage() {
           />
           <Button variant="contained" size="large" onClick={save} disabled={saving}
             sx={{ backgroundColor: tone, '&:hover': { backgroundColor: tone } }}>
-            {saving ? 'Saving…' : `Add ${isIncome ? 'income' : 'bill'}`}
+            {saving ? 'Saving…' : 'Add bill'}
           </Button>
         </Stack>
       </BottomSheet>
@@ -249,16 +222,14 @@ export default function RecurringPage() {
 }
 
 function RuleRow({ rule, onDelete }) {
-  const isIncome = rule.transaction_type === 'income';
-  const Icon = isIncome ? NorthEastRoundedIcon : SouthWestRoundedIcon;
   return (
     <Panel sx={{ p: 1.75, display: 'flex', alignItems: 'center', gap: 1.5 }}>
       <Box sx={{
         width: 40, height: 40, borderRadius: '12px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: isIncome ? `${accents.mint}1f` : 'action.hover',
-        border: isIncome ? 'none' : '1px solid', borderColor: 'divider',
+        backgroundColor: 'action.hover',
+        border: '1px solid', borderColor: 'divider',
       }}>
-        <Icon sx={{ color: isIncome ? accents.mint : 'text.secondary', fontSize: 20 }} />
+        <SouthWestRoundedIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
       </Box>
       <Box sx={{ minWidth: 0, flex: 1 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>{rule.description}</Typography>
@@ -268,9 +239,8 @@ function RuleRow({ rule, onDelete }) {
         </Typography>
       </Box>
       <AmountDisplay
-        value={isIncome ? Number(rule.amount) : -Number(rule.amount)}
+        value={-Number(rule.amount)}
         tone="default" showSign size="md"
-        sx={isIncome ? { color: accents.mint } : undefined}
       />
       <IconButton size="small" aria-label={`Remove ${rule.description}`} onClick={onDelete} sx={{ color: 'text.disabled', '&:hover': { color: accents.red } }}>
         <DeleteOutlineRoundedIcon fontSize="small" />

@@ -336,7 +336,7 @@ export function DashLoadingStatus({ loading, slow, secondary }) {
     : slow
       ? 'Still loading — the server is taking longer than usual.'
       : secondary
-        ? 'Loading income and six-month history…'
+        ? 'Loading six-month history…'
         : 'Loading your month…';
 
   return (

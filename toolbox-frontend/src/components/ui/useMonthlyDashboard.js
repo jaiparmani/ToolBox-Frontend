@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getMonthlyReport, getRecentExpenses, getLatestExpenseInsight,
-  getCategories, getSplitBalances, getRecurring, getExpenseSummary,
+  getCategories, getSplitBalances, getRecurring,
 } from '../rest/expenseTrackerApis';
 import { computeSettle } from './settleSummary';
 
@@ -14,7 +14,7 @@ import { computeSettle } from './settleSummary';
  * nothing until data lands reads as broken (Apple Design §16: expose ongoing
  * status; status, warning and error are different kinds of feedback). The two
  * waves are tracked separately — `status.primary` covers the main grid,
- * `status.secondary` the income + 6-month history pass — so a screen can hold
+ * `status.secondary` the 6-month history pass — so a screen can hold
  * the right geometry for each and never reflow when the second one lands.
  * These keys are purely additive; every figure below keeps its old shape.
  */
@@ -28,7 +28,6 @@ export default function useMonthlyDashboard() {
   const [categories, setCategories] = useState([]);
   const [balances, setBalances] = useState(null);
   const [recurring, setRecurring] = useState([]);
-  const [monthIncome, setMonthIncome] = useState(null);
   const [history, setHistory] = useState([]);
 
   // 'loading' → 'ready' | 'error' per wave. 'error' means *nothing* in that
@@ -73,22 +72,15 @@ export default function useMonthlyDashboard() {
       if (rec.status === 'fulfilled') setRecurring(Array.isArray(rec.value) ? rec.value : (rec.value?.results || []));
     });
 
-    // month-to-date income + 6-month spend history — kept in a separate pass so the
-    // main grid never waits on the extra monthly-report calls.
-    const pad2 = (n) => String(n).padStart(2, '0');
-    const iso = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    // 6-month spend history — kept in a separate pass so the main grid never
+    // waits on the extra monthly-report calls.
     const sixMonths = [];
     for (let i = 5; i >= 0; i--) sixMonths.push(new Date(now.getFullYear(), now.getMonth() - i, 1));
-    Promise.allSettled([
-      getExpenseSummary({ dateFrom: iso(monthStart), dateTo: iso(now) }),
-      ...sixMonths.map((d) => getMonthlyReport(d.getFullYear(), d.getMonth() + 1)),
-    ]).then(([sum, ...mReports]) => {
+    Promise.allSettled(
+      sixMonths.map((d) => getMonthlyReport(d.getFullYear(), d.getMonth() + 1)),
+    ).then((mReports) => {
       if (!live()) return;
-      setSecondary(
-        (sum.status === 'fulfilled' || mReports.some((m) => m.status === 'fulfilled')) ? 'ready' : 'error',
-      );
-      if (sum.status === 'fulfilled') setMonthIncome(sum.value?.totalIncome ?? 0);
+      setSecondary(mReports.some((m) => m.status === 'fulfilled') ? 'ready' : 'error');
       setHistory(mReports.map((m, i) => ({
         label: sixMonths[i].toLocaleDateString('en-IN', { month: 'short' }),
         total: m.status === 'fulfilled' ? (Number(m.value?.total_amount) || 0) : 0,
@@ -165,13 +157,13 @@ export default function useMonthlyDashboard() {
   const insightText = insight ? (insight.summary || insight.text || insight.body || insight.message || (typeof insight === 'string' ? insight : null)) : null;
 
   return {
-    report, lastReport, recent, insight, insightText, categories, balances, recurring, monthIncome, history,
+    report, lastReport, recent, insight, insightText, categories, balances, recurring, history,
     dayOfMonth, daysInMonth, monthName, spent, count, trend, cats, topCat, delta, avgPerDay, rhythm, settle,
     reload: load,
     // ── fetch status (additive; existing consumers can ignore it) ──
     status: {
       primary,                       // 'loading' | 'ready' | 'error'  → the main grid
-      secondary,                     // 'loading' | 'ready' | 'error'  → income + 6-month history
+      secondary,                     // 'loading' | 'ready' | 'error'  → the 6-month history
       loading: primary === 'loading' || secondary === 'loading',
       slow,                          // taking longer than usual — status, not an error
       failed: primary === 'error',   // nothing at all came back

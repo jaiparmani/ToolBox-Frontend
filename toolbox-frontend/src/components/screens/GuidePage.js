@@ -619,7 +619,7 @@ export default function GuidePage() {
         <Section id="forecast" index={6} eyebrow="Recurring and Inbox" title="How the forecast is made">
           <P>
             <strong>Recurring</strong> is the input for everything predictive in the app. Add your
-            salary as income and your rent and subscriptions as bills, each with a cadence
+            rent and subscriptions as recurring bills, each with a cadence
             (daily, weekly, monthly, yearly), an interval, and a start date. Removing a rule stops
             it driving the forecast; the transactions it already produced stay where they are.
           </P>
@@ -650,7 +650,7 @@ export default function GuidePage() {
               you search, filter and edit.
             </MapRow>
             <MapRow icon={AutorenewIcon} tone={accents.violet} label="Recurring" to="/recurring" onGo={navigate}>
-              The income and bills behind the forecast.
+              The bills and subscriptions behind the forecast.
             </MapRow>
             <MapRow icon={AutoGraphIcon} tone={accents.purple} label="Insights" to="/reports" onGo={navigate}>
               One month at a time: where it went, when it left, and the biggest line items. Step

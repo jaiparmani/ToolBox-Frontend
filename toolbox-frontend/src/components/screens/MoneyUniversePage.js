@@ -12,8 +12,8 @@ import { accents } from '../../theme/tokens';
 
 /**
  * Money Universe — the immersive, opt-in view of your month as a spatial scene:
- * a net-position star orbited by income, spending categories and bills, each
- * body sized by its real amount. Lives on its own tab now (the Home dashboard
+ * spending categories and bills as orbiting bodies, each sized by its real
+ * amount. Lives on its own tab now (the Home dashboard
  * is the calm command center); this is where the "data as a world" spectacle
  * belongs, for when you want to explore rather than scan.
  */
@@ -36,7 +36,7 @@ export default function MoneyUniversePage() {
   }, []);
 
   // Render the scene whenever anything's loaded — the component draws the net
-  // star + any bills/income even in a quiet month; only a total absence of both
+  // star + any bills even in a quiet month; only a total absence of both
   // reads (a failed/empty account) falls back to the guidance state.
   const hasData = !!expense || !!projection;
 
@@ -248,7 +248,7 @@ function UniverseEmpty({ navigate, dark }) {
       <EmptyState
         icon={BubbleChartRoundedIcon}
         title="Nothing to map yet"
-        description="Log some income and spending and your month takes shape here — a star for your net position, orbited by where the money went."
+        description="Log some spending and your month takes shape here — every category orbits as a body sized by its real amount."
         actionLabel="Open Expense Tracker"
         onAction={() => navigate('/expense-tracker')}
       />

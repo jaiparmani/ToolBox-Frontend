@@ -20,7 +20,6 @@ import StorySection, { storyItem } from '../ui/StorySection';
 import CategoryDonut from '../ui/CategoryDonut';
 import ProjectionChart from '../ui/ProjectionChart';
 import DashPace from '../ui/DashPace';
-import DashMonthFlow from '../ui/DashMonthFlow';
 import DashSpendTrend from '../ui/DashSpendTrend';
 import DashWeekdayPattern from '../ui/DashWeekdayPattern';
 import DashSpendCalendar from '../ui/DashSpendCalendar';
@@ -117,7 +116,7 @@ export default function StoryPage() {
   const finaleFiredRef = useRef(false);
 
   const {
-    report, lastReport, recent, insightText, categories, recurring, monthIncome, history,
+    report, lastReport, recent, insightText, categories, recurring, history,
     dayOfMonth, daysInMonth, monthName, spent, count, trend, cats, topCat, delta, avgPerDay, rhythm, settle,
     reload,
   } = useMonthlyDashboard();
@@ -132,10 +131,9 @@ export default function StoryPage() {
   const moversVisible = (report?.category_totals?.length ?? 0) > 0 && (lastReport?.category_totals?.length ?? 0) > 0;
   const activeDaysCount = (report?.daily_totals || []).filter((d) => (Number(d.total) || 0) > 0).length;
   const billsVisible = (recurring || []).some((r) => r.transaction_type === 'expense' && r.is_active !== false && r.next_date);
-  const monthFlowVisible = (monthIncome ?? 0) > 0;
   const spendTrendVisible = history.length >= 4 && history.filter((m) => m.total > 0).length >= 3;
 
-  const flowVisible = monthFlowVisible || spendTrendVisible;
+  const flowVisible = spendTrendVisible;
   const rhythmVisible = spent > 0;
   const paceChapterVisible = paceVisible || activeDaysCount > 0;
   const calendarVisible = activeDaysCount >= 4 || !!settle;
@@ -261,7 +259,6 @@ export default function StoryPage() {
           <Frame wide>
             <ChapterHeader chapterKey="flow" index={idx} total={total} />
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-              {monthFlowVisible && <Tile><DashMonthFlow income={monthIncome ?? 0} spent={spent} monthName={monthName} /></Tile>}
               {spendTrendVisible && <Tile><DashSpendTrend months={history} /></Tile>}
             </Box>
           </Frame>

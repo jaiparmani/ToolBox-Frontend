@@ -27,7 +27,6 @@ export { default as ErrorBanner } from './ErrorBanner';
 export { default as Assistant } from './Assistant';
 
 // Money OS — the cinematic finance surfaces
-export { default as SafeToSpendHero } from './SafeToSpendHero';
 export { default as MoneyCommandBar } from './MoneyCommandBar';
 export { default as FinancialWeather, deriveWeather, WEATHER } from './FinancialWeather';
 export { default as FinancialWeatherBar } from './FinancialWeatherBar';
@@ -36,12 +35,11 @@ export { default as InsightConstellation } from './InsightConstellation';
 export { deriveProjectionAttention } from './moneyAttention';
 export { copilotToItem, copilotIcon, copilotTone } from './copilotCards';
 export { default as MoneyPulse } from './MoneyPulse';
-export { default as CashFlowRiver } from './CashFlowRiver';
 export { default as MoneyUniverse } from './MoneyUniverse';
 export { default as NotificationBell } from './NotificationBell';
 export { default as TelegramConnect } from './TelegramConnect';
 export { default as ShortcutConnect } from './ShortcutConnect';
-export { default as TransactionStoryDrawer, buildStoryFromEvent, buildStoryFromExpense } from './TransactionStoryDrawer';
+export { default as TransactionStoryDrawer, buildStoryFromExpense } from './TransactionStoryDrawer';
 
 // Money helpers
 export { money, moneyWhole, moneySmart, relativeDay } from './money';

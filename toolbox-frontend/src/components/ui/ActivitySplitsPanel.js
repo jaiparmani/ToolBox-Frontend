@@ -66,8 +66,9 @@ function NetPosition({ owedToYou, youOwe, reduce }) {
           <Box
             aria-hidden
             sx={{
-              display: 'flex', mt: 1.5, height: 6, borderRadius: 999, overflow: 'hidden',
-              bgcolor: (t) => (t.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
+              display: 'flex', mt: 1.5, height: 8, borderRadius: 999, overflow: 'hidden',
+              bgcolor: (t) => (t.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'),
+              boxShadow: mode === 'dark' ? 'inset 0 1px 2px rgba(0,0,0,0.3)' : 'inset 0 1px 2px rgba(0,0,0,0.06)',
             }}
           >
             <Box
@@ -76,7 +77,11 @@ function NetPosition({ owedToYou, youOwe, reduce }) {
               animate={{ scaleX: 1 }}
               transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 200, damping: 26 }}
               style={{ transformOrigin: 'left center' }}
-              sx={{ width: `${inPct}%`, bgcolor: flowIn }}
+              sx={{
+                width: `${inPct}%`,
+                background: `linear-gradient(90deg, ${flowIn}cc, ${flowIn})`,
+                boxShadow: `0 0 8px ${flowIn}44`,
+              }}
             />
             <Box
               component={framerMotion.div}
@@ -84,7 +89,11 @@ function NetPosition({ owedToYou, youOwe, reduce }) {
               animate={{ scaleX: 1 }}
               transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 200, damping: 26, delay: 0.06 }}
               style={{ transformOrigin: 'right center' }}
-              sx={{ width: `${100 - inPct}%`, bgcolor: flowOut }}
+              sx={{
+                width: `${100 - inPct}%`,
+                background: `linear-gradient(90deg, ${flowOut}, ${flowOut}cc)`,
+                boxShadow: `0 0 8px ${flowOut}44`,
+              }}
             />
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.85, gap: 2 }}>

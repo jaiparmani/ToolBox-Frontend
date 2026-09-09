@@ -187,7 +187,13 @@ export default function ActivityLabelsPanel({
         <Box>
           <Typography
             component="h2"
-            sx={{ fontFamily: type.displayFamily, fontSize: '1.3rem', fontWeight: 650, letterSpacing: '-0.02em' }}
+            sx={{
+              fontFamily: type.displayFamily, fontSize: '1.4rem', fontWeight: 700, letterSpacing: '-0.025em',
+              background: `linear-gradient(135deg, ${accents.purple || accents.violet}, ${accents.amber})`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}
           >
             Labels
           </Typography>

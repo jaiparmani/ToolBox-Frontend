@@ -54,27 +54,27 @@ function Peek({ section }) {
     <Box sx={{
       position: 'sticky', top: 0, height: '100vh', maxHeight: '100%',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      gap: 1.25, px: 3, textAlign: 'center',
+      gap: 1.5, px: 3, textAlign: 'center',
     }}>
       <Box sx={{
-        width: 56, height: 56, borderRadius: `${radius.lg}px`,
+        width: 64, height: 64, borderRadius: `${radius.xl}px`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        bgcolor: `${section.color}1f`, border: '1px solid', borderColor: `${section.color}3d`,
+        background: `linear-gradient(135deg, ${section.color}2a, ${section.color}12)`,
+        border: '1px solid', borderColor: `${section.color}44`,
+        boxShadow: `0 4px 20px ${section.color}22`,
       }}>
-        <Icon sx={{ color: section.color, fontSize: 26 }} />
+        <Icon sx={{ color: section.color, fontSize: 28 }} />
       </Box>
       <Typography sx={{
-        fontSize: '1.15rem', fontWeight: 650, letterSpacing: '-0.02em',
+        fontSize: '1.25rem', fontWeight: 700, letterSpacing: '-0.02em',
         lineHeight: 1.15, color: 'text.primary',
       }}>
         {section.label}
       </Typography>
-      {/* Only ever a figure the page already knows. A section with nothing
-          loaded yet shows its name and nothing else — never a placeholder. */}
       {section.hint && (
         <Typography sx={{
           fontFamily: type.displayFamily, fontVariantNumeric: 'tabular-nums',
-          fontSize: 12.5, letterSpacing: '0.005em', color: 'text.disabled', lineHeight: 1.3,
+          fontSize: 13, letterSpacing: '0.005em', color: 'text.disabled', lineHeight: 1.3,
         }}>
           {section.hint}
         </Typography>

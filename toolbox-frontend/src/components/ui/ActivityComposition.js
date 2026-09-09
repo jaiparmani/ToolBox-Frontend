@@ -306,9 +306,12 @@ export default function ActivityComposition({
           role="group"
           aria-label={`Spending by category${scopeLabel ? ` for ${scopeLabel}` : ''}, ${money(total)} across ${bands.length} bands`}
           sx={{
-            position: 'relative', display: 'flex', width: '100%', height: 30,
-            borderRadius: `${radius.sm}px`, overflow: 'hidden',
-            bgcolor: (t) => (t.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'),
+            position: 'relative', display: 'flex', width: '100%', height: 34,
+            borderRadius: `${radius.md}px`, overflow: 'hidden',
+            bgcolor: (t) => (t.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
+            boxShadow: (t) => t.palette.mode === 'dark'
+              ? 'inset 0 1px 0 rgba(255,255,255,0.04), 0 2px 8px rgba(0,0,0,0.2)'
+              : 'inset 0 1px 0 rgba(255,255,255,0.5), 0 1px 4px rgba(0,0,0,0.06)',
             transformOrigin: 'left center',
             ...(!reduce && {
               animation: `activityCompositionBloom ${motionTokens.slow}ms ${motionTokens.ease} both`,

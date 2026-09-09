@@ -126,7 +126,7 @@ export default function SplitsPage() {
   const [shared, setShared] = useState({ loading: true, items: [] });
   const [sharedExpanded, setSharedExpanded] = useState(null);
   const [including, setIncluding] = useState(null);
-  const [showSettled, setShowSettled] = useState(false);
+  const [showSettled, setShowSettled] = useState(true);
   const [settledHistory, setSettledHistory] = useState({ loading: false, items: [] });
 
   // Groups. `openGroup` switches the page into that group's own view rather
@@ -185,8 +185,8 @@ export default function SplitsPage() {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) { load(); loadGroups(); loadShared(); }
-  }, [isAuthenticated, load, loadGroups, loadShared]);
+    if (isAuthenticated) { load(); loadGroups(); loadShared(); loadSettledHistory(); }
+  }, [isAuthenticated, load, loadGroups, loadShared, loadSettledHistory]);
 
   // The edit dialog needs the category list; fetch it once, quietly, and let
   // the dialog say so if it hasn't arrived.
@@ -1171,7 +1171,7 @@ export default function SplitsPage() {
                   '&:hover': { opacity: 1 },
                   transition: 'opacity 0.2s ease',
                 }}
-                onClick={() => { setShowSettled(prev => !prev); if (!showSettled) loadSettledHistory(); }}
+                onClick={() => { setShowSettled(prev => !prev); }}
               >
                 <DoneAllIcon sx={{ fontSize: 14, mr: 0.75, color: 'text.secondary' }} />
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: '0.04em' }}>

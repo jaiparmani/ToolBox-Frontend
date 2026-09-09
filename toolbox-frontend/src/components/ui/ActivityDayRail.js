@@ -256,12 +256,16 @@ export default function ActivityDayRail({ days = [], maxDaySpend = 0, onJump, sx
               aria-hidden
               ref={(node) => { barRefs.current[i] = node; }}
               sx={{
-                width: '100%', height: 3, borderRadius: 999,
+                width: '100%', height: 3.5, borderRadius: 999,
                 transformOrigin: 'left center',
                 transform: `scaleX(${lengths[i] || 0})`,
-                bgcolor: i === active ? accents.mint : 'text.disabled',
+                background: i === active
+                  ? `linear-gradient(90deg, ${accents.mint}, ${accents.cyan})`
+                  : undefined,
+                bgcolor: i === active ? undefined : 'text.disabled',
                 opacity: 0.55,
-                transition: `background-color ${motionTokens.fast}ms ${motionTokens.ease}`,
+                boxShadow: i === active ? `0 0 6px ${accents.mint}66` : 'none',
+                transition: `background-color ${motionTokens.fast}ms ${motionTokens.ease}, box-shadow ${motionTokens.fast}ms ${motionTokens.ease}`,
                 willChange: 'transform',
               }}
             />

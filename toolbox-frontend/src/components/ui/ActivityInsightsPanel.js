@@ -121,7 +121,15 @@ export default function ActivityInsightsPanel({
         <Box>
           <Typography
             component="h2"
-            sx={{ fontFamily: type.displayFamily, fontSize: '1.3rem', fontWeight: 650, letterSpacing: '-0.02em' }}
+            sx={{
+              fontFamily: type.displayFamily, fontSize: '1.4rem', fontWeight: 700, letterSpacing: '-0.025em',
+              background: mode === 'dark'
+                ? `linear-gradient(135deg, ${accents.violet}, ${accents.blue})`
+                : `linear-gradient(135deg, ${accents.violet}, ${accents.blue})`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}
           >
             Insights
           </Typography>
@@ -136,7 +144,17 @@ export default function ActivityInsightsPanel({
           startIcon={<AutoAwesomeIcon />}
           onClick={() => onGenerate(!!review)}
           disabled={busy}
-          sx={{ borderRadius: `${radius.pill}px`, px: 2 }}
+          sx={{
+            borderRadius: `${radius.pill}px`, px: 2,
+            ...(!review && {
+              background: `linear-gradient(135deg, ${accents.violet}, ${accents.blue})`,
+              boxShadow: `0 2px 12px ${accents.violet}44`,
+              '&:hover': {
+                background: `linear-gradient(135deg, ${accents.violet}, ${accents.blue})`,
+                boxShadow: `0 4px 16px ${accents.violet}66`,
+              },
+            }),
+          }}
         >
           {busy ? 'Reading…' : review ? 'Refresh review' : 'Write me a review'}
         </Button>

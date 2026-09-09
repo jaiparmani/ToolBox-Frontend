@@ -3,7 +3,7 @@ import { Box, Typography, useTheme } from '@mui/material';
 import AnimatedNumber from './AnimatedNumber';
 import ScrollFade from './ScrollFade';
 import { money } from './money';
-import { type, radius } from '../../theme/tokens';
+import { type, radius, accents } from '../../theme/tokens';
 import { resolveToneColor, srOnly } from './StatusBadge';
 
 /**
@@ -51,22 +51,36 @@ export const STAT_VALUE_SX = {
  */
 function StatCard({ stat }) {
   const theme = useTheme();
-  // Callers pass raw `accents.*`, which are tuned for the dark canvas; on light
-  // they resolve to the token file's light-mode twin instead.
+  const dark = theme.palette.mode === 'dark';
   const tone = resolveToneColor(stat.tone, theme.palette.mode);
   const isMoney = stat.raw !== undefined;
-  // The exact figure, never the compact form the tile shows — moneySmart()
-  // rounds ₹1,24,500 to "₹1.2L", which is a fine label and a wrong number.
   const spoken = isMoney ? money(stat.raw) : String(stat.value ?? '');
 
   return (
-    <Box role="listitem" sx={STAT_CARD_SX}>
-      <Typography sx={STAT_LABEL_SX} noWrap>{stat.label}</Typography>
+    <Box role="listitem" sx={{
+      ...STAT_CARD_SX,
+      position: 'relative', overflow: 'hidden',
+      transition: 'border-color 200ms ease, box-shadow 200ms ease',
+      '&:hover': {
+        borderColor: tone ? `${tone}44` : 'divider',
+        boxShadow: tone ? `0 4px 16px ${tone}18` : 'none',
+      },
+    }}>
+      {/* Subtle accent glow at top-left */}
+      {tone && (
+        <Box aria-hidden sx={{
+          position: 'absolute', top: -12, left: -12,
+          width: 60, height: 60, borderRadius: '50%',
+          background: `radial-gradient(circle, ${tone}18, transparent 70%)`,
+          pointerEvents: 'none',
+        }} />
+      )}
+      <Typography sx={{ ...STAT_LABEL_SX, position: 'relative' }} noWrap>{stat.label}</Typography>
       <Box component="span" sx={srOnly}>{spoken}</Box>
       <Typography
         component="div"
         aria-hidden
-        sx={{ ...STAT_VALUE_SX, color: tone || 'text.primary' }}
+        sx={{ ...STAT_VALUE_SX, color: tone || 'text.primary', position: 'relative' }}
         noWrap
       >
         {isMoney

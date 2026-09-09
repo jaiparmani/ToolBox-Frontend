@@ -159,9 +159,9 @@ export default function ActivityDayHeader({
           role="img"
           aria-label={meterLabel}
           sx={{
-            position: 'absolute', left: { xs: 6, sm: 8 }, right: { xs: 6, sm: 8 }, bottom: 0, height: 3,
+            position: 'absolute', left: { xs: 6, sm: 8 }, right: { xs: 6, sm: 8 }, bottom: 0, height: 4,
             zIndex: 1, borderRadius: 999, overflow: 'hidden',
-            bgcolor: (t) => (t.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)'),
+            bgcolor: (t) => (t.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
           }}
         >
           <Box
@@ -171,7 +171,12 @@ export default function ActivityDayHeader({
               height: '100%', width: '100%', borderRadius: 999,
               transformOrigin: 'left center',
               transform: 'scaleX(var(--activity-day-meter))',
-              bgcolor: meterTone,
+              background: heaviest
+                ? `linear-gradient(90deg, ${accents.red}, ${accents.amber})`
+                : vsAvg > 1
+                  ? `linear-gradient(90deg, ${accents.amber}cc, ${accents.amber})`
+                  : meterTone,
+              boxShadow: heaviest ? `0 0 8px ${accents.red}44` : 'none',
               animation: `activityDayMeter ${motionTokens.slow}ms ${motionTokens.ease} both`,
               '@keyframes activityDayMeter': {
                 from: { transform: 'scaleX(0)' },
@@ -184,8 +189,10 @@ export default function ActivityDayHeader({
             <Box
               aria-hidden
               sx={{
-                position: 'absolute', top: 0, bottom: 0, left: `${avgMark * 100}%`,
-                width: 2, bgcolor: 'text.primary', opacity: 0.4,
+                position: 'absolute', top: -1, bottom: -1, left: `${avgMark * 100}%`,
+                width: 2, borderRadius: 1,
+                bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.35)',
+                boxShadow: theme.palette.mode === 'dark' ? '0 0 4px rgba(255,255,255,0.3)' : 'none',
               }}
             />
           )}

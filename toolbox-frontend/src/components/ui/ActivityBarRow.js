@@ -116,8 +116,8 @@ export default function ActivityBarRow({
         <Box
           aria-hidden
           sx={{
-            mt: 0.7, height: 3, borderRadius: 999, overflow: 'hidden',
-            bgcolor: (t) => (t.palette.mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)'),
+            mt: 0.7, height: 4, borderRadius: 999, overflow: 'hidden',
+            bgcolor: (t) => (t.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'),
           }}
         >
           <Box
@@ -130,7 +130,8 @@ export default function ActivityBarRow({
             style={{ transformOrigin: 'left center' }}
             sx={{
               height: '100%', width: `${Math.max(share, 1.5)}%`, borderRadius: 999,
-              background: `linear-gradient(90deg, ${color}, ${color}aa)`,
+              background: `linear-gradient(90deg, ${color}, ${color}88)`,
+              boxShadow: share > 40 ? `0 0 8px ${color}44` : 'none',
             }}
           />
         </Box>

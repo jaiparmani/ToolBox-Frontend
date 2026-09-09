@@ -14,6 +14,7 @@ import AutorenewIcon from '@mui/icons-material/AutorenewRounded';
 import AutoGraphIcon from '@mui/icons-material/InsightsRounded';
 import CallSplitIcon from '@mui/icons-material/CallSplitRounded';
 import BubbleChartIcon from '@mui/icons-material/BubbleChartRounded';
+import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
 import SettingsIcon from '@mui/icons-material/SettingsRounded';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import LogoutIcon from '@mui/icons-material/LogoutRounded';
@@ -46,6 +47,7 @@ const NAV = [
   { seg: 'recurring', label: 'Recurring', icon: AutorenewIcon, tone: accents.violet },
   { seg: 'reports', label: 'Insights', icon: AutoGraphIcon, tone: accents.purple },
   { seg: 'universe', label: 'Universe', icon: BubbleChartIcon, tone: accents.violet },
+  { seg: 'pulse', label: 'Pulse', icon: FavoriteBorderRoundedIcon, tone: accents.red },
   { seg: 'splits', label: 'Shared', icon: CallSplitIcon, tone: accents.amber },
 ];
 

@@ -36,6 +36,7 @@ export { deriveProjectionAttention } from './moneyAttention';
 export { copilotToItem, copilotIcon, copilotTone } from './copilotCards';
 export { default as MoneyPulse } from './MoneyPulse';
 export { default as MoneyUniverse } from './MoneyUniverse';
+export { default as CashFlowPulse } from './CashFlowPulse';
 export { default as NotificationBell } from './NotificationBell';
 export { default as TelegramConnect } from './TelegramConnect';
 export { default as ShortcutConnect } from './ShortcutConnect';

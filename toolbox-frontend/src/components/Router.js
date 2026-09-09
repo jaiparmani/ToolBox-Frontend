@@ -16,6 +16,7 @@ import ResetPasswordPage from './screens/ResetPasswordPage'
 import ApiKeysPage from './screens/ApiKeysPage'
 import SplitsPage from './screens/SplitsPage'
 import MoneyUniversePage from './screens/MoneyUniversePage'
+import CashFlowPulsePage from './screens/CashFlowPulsePage'
 import GuidePage from './screens/GuidePage'
 import { Box, CircularProgress, Typography } from '@mui/material'
 
@@ -87,6 +88,7 @@ export default function Router() {
         <Route path="/profile" element={<UserProfilePage />} />
         <Route path="/expense-tracker" element={<ExpenseTrackerPage />} />
         <Route path="/universe" element={<MoneyUniversePage />} />
+        <Route path="/pulse" element={<CashFlowPulsePage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/splits" element={<SplitsPage />} />
         {/* The app's own manual — how to drive the parts you can't see. */}

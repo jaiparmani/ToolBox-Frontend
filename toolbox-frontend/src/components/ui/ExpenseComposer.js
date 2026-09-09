@@ -390,9 +390,6 @@ export default function ExpenseComposer({
           transactionType: typeId,
           date: it.date || new Date(), categoryId, tagIds,
         });
-        // Tags live under More details; opening it is how you get to see what
-        // the parse actually attached rather than finding out after saving.
-        if (tagIds.length) setShowMore(true);
         setNlText(''); setBatch([]);
       } else {
         setBatch(res.items); setNlText('');
@@ -808,6 +805,55 @@ export default function ExpenseComposer({
               </Box>
             </Box>
 
+            {/* Tags sit beside Category, not behind the disclosure: they're
+                the other label you pick at add time, and a tag you can't see
+                is a tag you never apply. */}
+            <Box sx={{ mb: 3 }}>
+              <Eyebrow sx={{ mb: 1.25 }}>Tags</Eyebrow>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                {allTags.map((tag) => {
+                  const on = selectedTags.has(tag.id);
+                  const tagColor = tag.color || heroColor;
+                  return (
+                    <Chip
+                      key={tag.id} label={tag.name} size="small"
+                      icon={on ? <CheckIcon sx={{ fontSize: 14, color: '#fff !important' }} /> : undefined}
+                      onClick={() => {
+                        const next = new Set(selectedTags);
+                        on ? next.delete(tag.id) : next.add(tag.id);
+                        set({ tagIds: [...next] });
+                      }}
+                      sx={{
+                        fontWeight: 600, fontSize: 12.5, height: 32, px: 0.25,
+                        borderRadius: `${radius.pill}px`,
+                        border: '1px solid',
+                        borderColor: on ? tagColor : (t) => color.hairline[t.palette.mode],
+                        bgcolor: on ? tagColor : 'transparent',
+                        color: on ? '#fff' : 'text.secondary',
+                        transition: `all ${motionTokens.fast}ms ${motionTokens.ease}`,
+                        '&:hover': { bgcolor: on ? tagColor : `${tagColor}0d` },
+                        '&:active': { transform: 'scale(0.95)' },
+                      }}
+                    />
+                  );
+                })}
+                <InlineLabelCreate
+                  isOpen={tagDraft !== null}
+                  onOpen={() => { setTagDraft(''); setTagError(null); }}
+                  onCancel={() => { setTagDraft(null); setTagError(null); }}
+                  openLabel="New tag"
+                  addLabel={allTags.length === 0 ? 'Add a tag' : 'New'}
+                  placeholder="Name this tag"
+                  tone={accents.violet}
+                  value={tagDraft || ''}
+                  onValue={(v) => { setTagDraft(v); setTagError(null); }}
+                  onSubmit={submitTag}
+                  busy={makingTag}
+                  error={tagError}
+                />
+              </Box>
+            </Box>
+
             {/* ── More details collapsible ── */}
             <Box
               sx={{
@@ -836,7 +882,7 @@ export default function ExpenseComposer({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
                   {!showMore && (
                     <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }} noWrap>
-                      {legacyType ? 'Date, tags, location' : 'Date, income, tags'}
+                      {legacyType ? 'Date, location, payment' : 'Date, income, location'}
                     </Typography>
                   )}
                   <ExpandMoreIcon
@@ -910,54 +956,6 @@ export default function ExpenseComposer({
                     }}
                   />
 
-                  {/* Always here, even with nothing to show yet: the first tag
-                      has to be creatable from somewhere, and the sheet is
-                      where you notice you want one. */}
-                  <Box>
-                    <Eyebrow sx={{ mb: 1 }}>Tags</Eyebrow>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                        {allTags.map((tag) => {
-                          const on = selectedTags.has(tag.id);
-                          const tagColor = tag.color || heroColor;
-                          return (
-                            <Chip
-                              key={tag.id} label={tag.name} size="small"
-                              onClick={() => {
-                                const next = new Set(selectedTags);
-                                on ? next.delete(tag.id) : next.add(tag.id);
-                                set({ tagIds: [...next] });
-                              }}
-                              sx={{
-                                height: 28, fontSize: 12, fontWeight: 550,
-                                borderRadius: `${radius.pill}px`,
-                                border: '1px solid',
-                                borderColor: on ? tagColor : (t) => color.hairline[t.palette.mode],
-                                bgcolor: on ? tagColor : 'transparent',
-                                color: on ? '#fff' : 'text.secondary',
-                                transition: `all ${motionTokens.fast}ms ${motionTokens.ease}`,
-                                '&:hover': { bgcolor: on ? tagColor : `${tagColor}0d` },
-                                '&:active': { transform: 'scale(0.95)' },
-                              }}
-                            />
-                          );
-                        })}
-                      <InlineLabelCreate
-                        isOpen={tagDraft !== null}
-                        onOpen={() => { setTagDraft(''); setTagError(null); }}
-                        onCancel={() => { setTagDraft(null); setTagError(null); }}
-                        openLabel="New tag"
-                        addLabel={allTags.length === 0 ? 'Add a tag' : 'New'}
-                        placeholder="Name this tag"
-                        tone={accents.violet}
-                        height={28}
-                        value={tagDraft || ''}
-                        onValue={(v) => { setTagDraft(v); setTagError(null); }}
-                        onSubmit={submitTag}
-                        busy={makingTag}
-                        error={tagError}
-                      />
-                    </Box>
-                  </Box>
 
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                     <TextField

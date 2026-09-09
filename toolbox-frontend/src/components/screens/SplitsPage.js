@@ -124,6 +124,7 @@ export default function SplitsPage() {
   // you say they are yours: a split someone else made never becomes an expense
   // on your books on its own, which is what it used to do silently.
   const [shared, setShared] = useState({ loading: true, items: [] });
+  const [sharedExpanded, setSharedExpanded] = useState(null);
   const [including, setIncluding] = useState(null);
   const [showSettled, setShowSettled] = useState(false);
   const [settledHistory, setSettledHistory] = useState({ loading: false, items: [] });
@@ -479,53 +480,63 @@ export default function SplitsPage() {
         <ErrorBanner error={error} onClose={() => setError(null)} />
         {/* Financial weather now lives once in the app top bar, not per-screen. */}
 
-        {/* The headline: one number saying which way you stand overall */}
+        {/* Net position — the one figure you glance at */}
         <Reveal>
           <Paper
             elevation={0}
             sx={{
               p: { xs: 2.5, sm: 3 }, mb: 2, borderRadius: 4, textAlign: 'center',
               border: '1px solid', borderColor: 'divider',
+              position: 'relative', overflow: 'hidden',
             }}
           >
-            <Box display="flex" alignItems="center" justifyContent="center" gap={1} sx={{ mb: 0.75 }}>
-              <CallSplitIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.08em' }}>
-                {netPositive ? 'You are owed, overall' : 'You owe, overall'}
+            {/* Subtle accent glow behind the number */}
+            <Box
+              aria-hidden
+              sx={{
+                position: 'absolute', top: '-40%', left: '50%', transform: 'translateX(-50%)',
+                width: 280, height: 140, borderRadius: '50%',
+                background: `radial-gradient(ellipse, ${netPositive ? posColor : negColor}18 0%, transparent 70%)`,
+                pointerEvents: 'none',
+              }}
+            />
+            <Box display="flex" alignItems="center" justifyContent="center" gap={1} sx={{ mb: 0.75, position: 'relative' }}>
+              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.1em', fontSize: '0.65rem' }}>
+                {netPositive ? 'You are owed' : 'You owe'}
               </Typography>
               <IconButton size="small" onClick={load} aria-label="Refresh balances" sx={{ ml: 0.25 }}>
-                <RefreshIcon fontSize="small" />
+                <RefreshIcon sx={{ fontSize: 14 }} />
               </IconButton>
             </Box>
             <Typography
               sx={{
-                fontFamily: type.displayFamily, fontWeight: 700, letterSpacing: '-0.035em',
-                fontSize: { xs: '2.6rem', sm: '3.2rem' }, lineHeight: 1.05,
+                position: 'relative',
+                fontFamily: type.displayFamily, fontWeight: 700, letterSpacing: '-0.04em',
+                fontSize: { xs: '2.8rem', sm: '3.4rem' }, lineHeight: 1,
                 fontVariantNumeric: 'tabular-nums',
                 color: netPositive ? posColor : negColor,
               }}
             >
               {money(Math.abs(state.net))}
             </Typography>
-            {/* Two directions, split evenly with a hairline between them */}
             <Stack
               direction="row"
-              sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}
+              sx={{ mt: 2.5, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}
             >
               <Box sx={{ flex: 1, borderRight: '1px solid', borderColor: 'divider' }}>
-                <Typography variant="overline" color="text.secondary" sx={{ display: 'block', lineHeight: 1.4 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.3, mb: 0.5, fontWeight: 500, letterSpacing: '0.04em' }}>
                   Owed to you
                 </Typography>
-                <Typography sx={{ fontWeight: 700, color: posColor, fontVariantNumeric: 'tabular-nums' }}>
-                  {money(state.totalOwed)}
+                <Typography sx={{ fontWeight: 700, color: posColor, fontVariantNumeric: 'tabular-nums', fontSize: '1.05rem' }}>
+                  +{money(state.totalOwed)}
                 </Typography>
               </Box>
               <Box sx={{ flex: 1 }}>
-                <Typography variant="overline" color="text.secondary" sx={{ display: 'block', lineHeight: 1.4 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.3, mb: 0.5, fontWeight: 500, letterSpacing: '0.04em' }}>
                   You owe
                 </Typography>
-                <Typography sx={{ fontWeight: 700, color: state.totalYouOwe > 0 ? negColor : 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
-                  {money(state.totalYouOwe)}
+                <Typography sx={{ fontWeight: 700, color: state.totalYouOwe > 0 ? negColor : 'text.secondary', fontVariantNumeric: 'tabular-nums', fontSize: '1.05rem' }}>
+                  {state.totalYouOwe > 0 ? '−' : ''}{money(state.totalYouOwe)}
                 </Typography>
               </Box>
             </Stack>
@@ -759,12 +770,26 @@ export default function SplitsPage() {
         ) : people.length === 0 ? (
           <Paper
             elevation={0}
-            sx={{ p: 5, borderRadius: 4, textAlign: 'center', border: '1px dashed', borderColor: 'divider' }}
+            sx={{
+              p: { xs: 4, sm: 5 }, borderRadius: 4, textAlign: 'center',
+              border: '1px dashed', borderColor: 'divider',
+              position: 'relative', overflow: 'hidden',
+            }}
           >
-            <CallSplitIcon sx={{ fontSize: 44, color: 'text.disabled', mb: 1 }} />
-            <Typography variant="body1" sx={{ fontWeight: 500 }}>Nobody owes anybody</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Split a bill from the expense tracker and the people will appear here.
+            <Box
+              aria-hidden
+              sx={{
+                position: 'absolute', top: '50%', left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: 200, height: 200, borderRadius: '50%',
+                background: `radial-gradient(ellipse, ${accents.mint}0a 0%, transparent 70%)`,
+                pointerEvents: 'none',
+              }}
+            />
+            <CallSplitIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1.5, position: 'relative' }} />
+            <Typography variant="body1" sx={{ fontWeight: 600, position: 'relative' }}>All square</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, position: 'relative' }}>
+              Split a bill from the expense tracker and people will show up here.
             </Typography>
           </Paper>
         ) : (
@@ -779,9 +804,6 @@ export default function SplitsPage() {
                   selectedId={selected?.id}
                   onSelect={openPerson}
                 />
-                <Typography variant="caption" color="text.secondary" align="center" sx={{ display: 'block', pb: 1 }}>
-                  Tap a person to see the bills behind their balance
-                </Typography>
               </Paper>
             </Reveal>
 
@@ -825,27 +847,35 @@ export default function SplitsPage() {
                   <Card
                     elevation={0}
                     sx={{
-                      borderRadius: 3, border: '1px solid',
-                      borderColor: selected?.id === person.id ? accents.mint : 'divider',
+                      borderRadius: 3,
+                      border: '1px solid',
+                      borderColor: selected?.id === person.id ? (person.net > 0 ? posColor : negColor) : 'divider',
+                      borderLeft: `3px solid ${person.net > 0 ? posColor : person.net < 0 ? negColor : 'transparent'}`,
+                      transition: 'border-color 0.2s ease',
                     }}
                   >
-                    <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
-                      <Box display="flex" alignItems="center" justifyContent="space-between" gap={2}>
+                    <CardContent sx={{ py: 1.75, '&:last-child': { pb: 1.75 } }}>
+                      <Box
+                        display="flex" alignItems="center" justifyContent="space-between" gap={2}
+                        sx={{ cursor: 'pointer' }}
+                        onClick={() => openPerson(selected?.id === person.id ? null : person)}
+                      >
                         <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.3 }} noWrap>
                             {person.name}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
                             {person.net === 0
                               ? 'all settled'
                               : person.net > 0 ? 'owes you' : 'you owe them'}
-                            {person.unsettled ? ` · ${person.unsettled} unsettled` : ''}
+                            {person.unsettled ? ` · ${person.unsettled} ${person.unsettled === 1 ? 'bill' : 'bills'}` : ''}
                           </Typography>
                         </Box>
-                        <Box textAlign="right" sx={{ flexShrink: 0 }}>
+                        <Box textAlign="right" sx={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography
                             sx={{
                               fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+                              fontSize: '1.05rem',
                               color: person.net === 0 ? 'text.secondary'
                                 : person.net > 0 ? posColor : negColor,
                             }}
@@ -854,43 +884,51 @@ export default function SplitsPage() {
                             {money(Math.abs(person.net))}
                           </Typography>
                           {person.net !== 0 && (
-                            <Button
+                            <IconButton
                               size="small"
-                              startIcon={<DoneAllIcon />}
-                              onClick={() => openSettle(person)}
-                              sx={{ mt: 0.5, color: accents.mint, fontWeight: 600 }}
+                              onClick={(e) => { e.stopPropagation(); openSettle(person); }}
+                              sx={{ color: accents.mint }}
+                              aria-label={person.net < 0 ? `Mark paid to ${person.name}` : `Settle with ${person.name}`}
                             >
-                              {person.net < 0 ? 'Mark paid' : 'Settle'}
-                            </Button>
+                              <DoneAllIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
                           )}
                         </Box>
                       </Box>
 
+                      <AnimatePresence initial={false}>
                       {selected?.id === person.id && detail.items.length > 0 && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ type: 'spring', stiffness: 400, damping: 34 }}
+                          style={{ overflow: 'hidden' }}
+                        >
                         <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
-                          {detail.items.slice(0, 6).map((item) => (
+                          <Stack spacing={0.75}>
+                          {detail.items.slice(0, 8).map((item) => (
                             <Box
                               key={item.id}
                               display="flex" alignItems="center" justifyContent="space-between"
                               gap={1}
-                              sx={{ py: 0.75 }}
+                              sx={{
+                                py: 0.75, px: 1, borderRadius: 2,
+                                '&:hover': { bgcolor: 'action.hover' },
+                                transition: 'background-color 0.15s ease',
+                              }}
                             >
                               <Box sx={{ minWidth: 0 }}>
-                                <Typography variant="body2" color="text.secondary" noWrap>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
                                   {item.description}
-                                  <Chip
-                                    label={relativeDay(item.date)}
-                                    size="small"
-                                    sx={{ ml: 1, height: 17, fontSize: '0.62rem' }}
-                                  />
+                                  <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.75 }}>
+                                    {relativeDay(item.date)}
+                                  </Typography>
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary">
                                   {item.direction === 'you_owe'
                                     ? `${item.counterparty} paid`
                                     : 'you paid'}
-                                  {/* A part-paid share says so, with both real
-                                      figures — the amount shown alongside is
-                                      what is left, not the original. */}
                                   {item.settledAmount > 0
                                     ? ` · ${money(item.settledAmount)} of ${money(item.amount)} paid`
                                     : ''}
@@ -901,15 +939,16 @@ export default function SplitsPage() {
                                   direction={item.direction}
                                   amount={item.outstanding}
                                   label={item.settledAmount > 0
-                                    ? (item.direction === 'you_owe' ? 'still to pay' : 'still owed')
+                                    ? (item.direction === 'you_owe' ? 'remaining' : 'still owed')
                                     : undefined}
                                 />
                                 <IconButton
                                   size="small"
                                   aria-label={`Record a payment on ${item.description}`}
                                   onClick={() => setPartial({ open: true, item, saving: false, error: null })}
+                                  sx={{ color: accents.mint }}
                                 >
-                                  <PaymentsIcon sx={{ fontSize: 16 }} />
+                                  <PaymentsIcon sx={{ fontSize: 15 }} />
                                 </IconButton>
                                 {item.canEdit && (
                                   <>
@@ -920,22 +959,30 @@ export default function SplitsPage() {
                                         open: true, item, saving: false,
                                       })}
                                     >
-                                      <EditIcon sx={{ fontSize: 16 }} />
+                                      <EditIcon sx={{ fontSize: 15 }} />
                                     </IconButton>
                                     <IconButton
                                       size="small"
                                       aria-label={`Remove the ${item.description} split`}
                                       onClick={() => setRemoveTarget({ open: true, item, saving: false })}
                                     >
-                                      <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                                      <DeleteOutlineIcon sx={{ fontSize: 15 }} />
                                     </IconButton>
                                   </>
                                 )}
                               </Box>
                             </Box>
                           ))}
+                          </Stack>
+                          {detail.items.length > 8 && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
+                              +{detail.items.length - 8} more
+                            </Typography>
+                          )}
                         </Box>
+                        </motion.div>
                       )}
+                      </AnimatePresence>
                     </CardContent>
                   </Card>
                   </SwipeAction>
@@ -953,139 +1000,196 @@ export default function SplitsPage() {
           </>
         )}
 
-        {/* Bills other people split with you.
-            A split someone else created used to reach straight into this
-            account's spending totals — felt in the balance, invisible as an
-            item. It lands here instead, and stays here until you say it is
-            yours. Nothing is copied either way: the "add to my expenses" toggle
-            flips a flag on the one shared row. */}
+        {/* Bills other people split with you, grouped by who paid. */}
         {!openGroup && shared.items.length > 0 && (
           <Reveal index={2}>
-            <Paper
-              elevation={0}
-              sx={{ p: { xs: 2, sm: 2.5 }, mt: 3, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}
-            >
-              <Box display="flex" alignItems="center" gap={1}>
-                <MoveToInboxIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                <Typography variant="subtitle2" sx={{ fontWeight: 650 }}>
+            <Box sx={{ mt: 3 }}>
+              <Box display="flex" alignItems="baseline" justifyContent="space-between" sx={{ px: 0.5, mb: 1 }}>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 650 }}>
                   Shared with you
                 </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                  {money(shared.items.reduce((s, i) => s + (i.outstanding || 0), 0))} total
+                </Typography>
               </Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1.5 }}>
-                Bills someone else paid and split with you. They stay separate from your
-                spending unless you choose to count them.
-              </Typography>
 
               <Stack spacing={1.25}>
                 <AnimatePresence initial={false}>
-                {shared.items.map((item) => (
-                  <motion.div
-                    key={item.id}
-                    layout
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -40, transition: { duration: 0.25 } }}
-                  >
-                  <Box
-                    sx={{
-                      p: 1.5, borderRadius: 3, border: '1px solid', borderColor: 'divider',
-                    }}
-                  >
-                    <Box display="flex" alignItems="flex-start" justifyContent="space-between" gap={1.5}>
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
-                          {item.description}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {item.counterparty} paid {money(item.expenseTotal)} · {relativeDay(item.date)}
-                          {item.settledAmount > 0
-                            ? ` · ${money(item.settledAmount)} of ${money(item.amount)} paid`
-                            : ''}
-                        </Typography>
-                        {item.participants && item.participants.length > 1 && (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
-                            Split with {item.participants
-                              .filter(p => !p.isYou)
-                              .map(p => p.name)
-                              .join(', ')}
-                            {item.participants.some(p => p.isYou) ? ' and you' : ''}
-                          </Typography>
-                        )}
-                      </Box>
-                      <Box sx={{ flexShrink: 0 }}>
-                        <SplitAmount direction="you_owe" amount={item.outstanding} />
-                      </Box>
-                    </Box>
-
-                    <Stack
-                      direction="row" spacing={0.5} alignItems="center"
-                      sx={{ mt: 1, flexWrap: 'wrap' }}
+                {(() => {
+                  const byPerson = new Map();
+                  shared.items.forEach(item => {
+                    const key = item.counterparty || 'Someone';
+                    if (!byPerson.has(key)) byPerson.set(key, { items: [], total: 0 });
+                    const group = byPerson.get(key);
+                    group.items.push(item);
+                    group.total += item.outstanding || 0;
+                  });
+                  return [...byPerson.entries()].map(([personName, group]) => (
+                    <motion.div
+                      key={personName}
+                      layout
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, x: -40, transition: { duration: 0.25 } }}
                     >
-                      {item.canInclude && (
-                        item.includeInExpenses ? (
-                          <Chip
-                            icon={<CheckCircleIcon />}
-                            label="In your expenses"
-                            size="small"
-                            onClick={() => toggleInExpenses(item)}
-                            disabled={including === item.id}
-                            sx={{ color: accents.mint, borderColor: accents.mint }}
-                            variant="outlined"
-                          />
-                        ) : (
-                          <Button
-                            size="small" startIcon={<AddIcon />}
-                            onClick={() => toggleInExpenses(item)}
-                            disabled={including === item.id}
-                            sx={{ fontWeight: 600 }}
-                          >
-                            {including === item.id ? 'Adding…' : 'Count as my spending'}
-                          </Button>
-                        )
-                      )}
-                      <Box sx={{ flex: 1 }} />
-                      <Button
-                        size="small" startIcon={<PaymentsIcon />}
-                        onClick={() => setPartial({ open: true, item, saving: false, error: null })}
-                        sx={{ color: accents.mint, fontWeight: 600 }}
-                      >
-                        Pay
-                      </Button>
-                      {item.canEdit && (
-                        <IconButton
-                          size="small"
-                          aria-label={`Edit the ${item.description} bill`}
-                          onClick={() => setEditSplit({ open: true, item, saving: false })}
+                    <Card
+                      elevation={0}
+                      sx={{
+                        borderRadius: 3, border: '1px solid', borderColor: 'divider',
+                        overflow: 'visible',
+                      }}
+                    >
+                      <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+                        <Box
+                          display="flex" alignItems="center" justifyContent="space-between" gap={2}
+                          sx={{ cursor: 'pointer' }}
+                          onClick={() => setSharedExpanded(prev =>
+                            prev === personName ? null : personName
+                          )}
                         >
-                          <EditIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      )}
-                    </Stack>
-                  </Box>
-                  </motion.div>
-                ))}
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>
+                              {personName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {group.items.length} {group.items.length === 1 ? 'bill' : 'bills'}
+                            </Typography>
+                          </Box>
+                          <Box textAlign="right" sx={{ flexShrink: 0 }}>
+                            <SplitAmount direction="you_owe" amount={group.total} />
+                          </Box>
+                        </Box>
+
+                        <AnimatePresence initial={false}>
+                        {sharedExpanded === personName && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 34 }}
+                            style={{ overflow: 'hidden' }}
+                          >
+                          <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+                            <Stack spacing={1}>
+                            {group.items.map((item) => (
+                              <Box
+                                key={item.id}
+                                sx={{
+                                  p: 1.25, borderRadius: 2.5,
+                                  bgcolor: 'action.hover',
+                                }}
+                              >
+                                <Box display="flex" alignItems="flex-start" justifyContent="space-between" gap={1.5}>
+                                  <Box sx={{ minWidth: 0 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                                      {item.description}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {money(item.expenseTotal)} total · {relativeDay(item.date)}
+                                      {item.settledAmount > 0
+                                        ? ` · ${money(item.settledAmount)} paid`
+                                        : ''}
+                                    </Typography>
+                                  </Box>
+                                  <Box sx={{ flexShrink: 0 }}>
+                                    <SplitAmount direction="you_owe" amount={item.outstanding} />
+                                  </Box>
+                                </Box>
+
+                                <Stack
+                                  direction="row" spacing={0.5} alignItems="center"
+                                  sx={{ mt: 0.75, flexWrap: 'wrap' }}
+                                >
+                                  {item.canInclude && (
+                                    item.includeInExpenses ? (
+                                      <Chip
+                                        icon={<CheckCircleIcon />}
+                                        label="Counted"
+                                        size="small"
+                                        onClick={() => toggleInExpenses(item)}
+                                        disabled={including === item.id}
+                                        sx={{ color: accents.mint, borderColor: accents.mint, height: 24 }}
+                                        variant="outlined"
+                                      />
+                                    ) : (
+                                      <Chip
+                                        icon={<AddIcon />}
+                                        label="Count"
+                                        size="small"
+                                        onClick={() => toggleInExpenses(item)}
+                                        disabled={including === item.id}
+                                        variant="outlined"
+                                        sx={{ height: 24 }}
+                                      />
+                                    )
+                                  )}
+                                  <Box sx={{ flex: 1 }} />
+                                  <IconButton
+                                    size="small"
+                                    aria-label={`Pay on ${item.description}`}
+                                    onClick={() => setPartial({ open: true, item, saving: false, error: null })}
+                                    sx={{ color: accents.mint }}
+                                  >
+                                    <PaymentsIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                  {item.canEdit && (
+                                    <IconButton
+                                      size="small"
+                                      aria-label={`Edit the ${item.description} bill`}
+                                      onClick={() => setEditSplit({ open: true, item, saving: false })}
+                                    >
+                                      <EditIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  )}
+                                </Stack>
+                              </Box>
+                            ))}
+                            </Stack>
+                          </Box>
+                          </motion.div>
+                        )}
+                        </AnimatePresence>
+                      </CardContent>
+                    </Card>
+                    </motion.div>
+                  ));
+                })()}
                 </AnimatePresence>
               </Stack>
-            </Paper>
+            </Box>
           </Reveal>
         )}
 
-        {/* Settled history — toggled on demand so the page stays clean. */}
+        {/* Settled history — tucked away until needed */}
         {!openGroup && (
           <Reveal index={3}>
-            <Box sx={{ mt: 3, textAlign: 'center' }}>
-              <Button
-                size="small" variant="outlined" color="inherit"
-                startIcon={<DoneAllIcon />}
+            <Box sx={{ mt: 3 }}>
+              <Box
+                display="flex" alignItems="center" justifyContent="center"
+                sx={{
+                  cursor: 'pointer', py: 1, opacity: 0.7,
+                  '&:hover': { opacity: 1 },
+                  transition: 'opacity 0.2s ease',
+                }}
                 onClick={() => { setShowSettled(prev => !prev); if (!showSettled) loadSettledHistory(); }}
-                sx={{ fontWeight: 600 }}
               >
-                {showSettled ? 'Hide settled history' : 'Show settled history'}
-              </Button>
+                <DoneAllIcon sx={{ fontSize: 14, mr: 0.75, color: 'text.secondary' }} />
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: '0.04em' }}>
+                  {showSettled ? 'Hide settled' : 'Settled history'}
+                </Typography>
+              </Box>
+              <AnimatePresence initial={false}>
               {showSettled && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 34 }}
+                  style={{ overflow: 'hidden' }}
+                >
                 <Paper
                   elevation={0}
-                  sx={{ p: 2, mt: 1.5, borderRadius: 4, border: '1px solid', borderColor: 'divider', textAlign: 'left' }}
+                  sx={{ p: 2, mt: 0.5, borderRadius: 4, border: '1px solid', borderColor: 'divider', textAlign: 'left' }}
                 >
                   {settledHistory.loading ? (
                     <LinearProgress sx={{ borderRadius: 999 }} />
@@ -1094,38 +1198,35 @@ export default function SplitsPage() {
                       No settled bills yet.
                     </Typography>
                   ) : (
-                    <Stack spacing={1}>
+                    <Stack spacing={0.5}>
                       {settledHistory.items.slice(0, 20).map((item) => (
                         <Box
                           key={item.id}
+                          display="flex" justifyContent="space-between" alignItems="center"
                           sx={{
-                            p: 1.5, borderRadius: 2, bgcolor: 'action.hover',
-                            opacity: 0.8,
+                            py: 0.75, px: 1, borderRadius: 2,
+                            '&:hover': { bgcolor: 'action.hover' },
                           }}
                         >
-                          <Box display="flex" justifyContent="space-between" alignItems="center">
-                            <Box sx={{ minWidth: 0 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
-                                {item.description}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {item.counterparty} · {relativeDay(item.date)} · settled {money(item.settledAmount)}
-                              </Typography>
-                            </Box>
-                            <Chip
-                              icon={<CheckCircleIcon />}
-                              label="Paid"
-                              size="small"
-                              sx={{ color: accents.mint, borderColor: accents.mint }}
-                              variant="outlined"
-                            />
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+                              {item.description}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {item.counterparty} · {relativeDay(item.date)}
+                            </Typography>
                           </Box>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: accents.mint, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                            {money(item.settledAmount)}
+                          </Typography>
                         </Box>
                       ))}
                     </Stack>
                   )}
                 </Paper>
+                </motion.div>
               )}
+              </AnimatePresence>
             </Box>
           </Reveal>
         )}

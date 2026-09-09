@@ -1,12 +1,14 @@
 /**
- * CashFlow Pulse — the financial organism.
+ * CashFlow Pulse — the instrument page.
  *
- * The page is not a dashboard. It's a single WebGL scene (FinancialOrganism)
- * that fills the viewport, surrounded by HUD-style instrumentation overlays:
- * corner telemetry panels, an orbital metrics ring header, a scanline
- * atmosphere, and a hover readout that appears when you inspect a day-node.
+ * The scene owns the primary readouts diegetically (a canvas-textured label
+ * floats above the scrub cursor). The page provides:
+ *   • the identity strip (title + status)
+ *   • the "range totals" strip — up-to-cursor cumulative telemetry
+ *   • the taxonomy strip (category legend, sorted by month spend)
  *
- * Every number on screen is derived from real API data. No cards.
+ * The scene reports its cursor index back via onCursorChange, so range
+ * totals here always reflect what the reader is looking at.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -17,7 +19,7 @@ import { getExpenses, getExpenseSummary } from '../rest/expenseTrackerApis';
 import { EmptyState } from '../ui';
 import FinancialOrganism from '../ui/FinancialOrganism';
 import { moneySmart } from '../ui/money';
-import { accents } from '../../theme/tokens';
+import { accents, chart } from '../../theme/tokens';
 
 const MONO = '"SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace';
 
@@ -27,7 +29,7 @@ export default function CashFlowPulsePage() {
   const [expenses, setExpenses] = useState(null);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [hoverIdx, setHoverIdx] = useState(null);
+  const [cursor, setCursor] = useState(null);
 
   useEffect(() => {
     const today = new Date();
@@ -83,143 +85,112 @@ export default function CashFlowPulsePage() {
     return { days: result, categories: Array.from(catSet.keys()) };
   }, [expenses]);
 
-  const stats = useMemo(() => {
+  const monthStats = useMemo(() => {
     if (!summary || !days.length) return null;
-    const totalIncome = summary.totalIncome || 0;
-    const totalSpent = summary.totalExpenses || 0;
-    const net = summary.netBalance || 0;
-    const heaviestDay = Math.max(...days.map(d => d.total));
-    const heaviestIdx = days.findIndex(d => d.total === heaviestDay);
-    const avgDay = days.reduce((s, d) => s + d.total, 0) / days.length;
-    const activeDays = days.filter(d => d.total > 0).length;
-    return { totalIncome, totalSpent, net, heaviestDay, heaviestIdx, avgDay, activeDays };
+    return {
+      totalIncome: summary.totalIncome || 0,
+      totalSpent: summary.totalExpenses || 0,
+      net: summary.netBalance || 0,
+      heaviestDay: Math.max(...days.map(d => d.total)),
+      avgDay: days.reduce((s, d) => s + d.total, 0) / days.length,
+      activeDays: days.filter(d => d.total > 0).length,
+    };
   }, [summary, days]);
 
+  // Range totals — everything up to (and including) cursor
+  const rangeStats = useMemo(() => {
+    if (!days.length || cursor == null) return null;
+    const slice = days.slice(0, cursor + 1);
+    const spent = slice.reduce((s, d) => s + (d.total || 0), 0);
+    const txns = slice.reduce((s, d) => s + (d.count || 0), 0);
+    const active = slice.filter(d => d.total > 0).length;
+    const dayShare = summary?.totalIncome
+      ? (summary.totalIncome / days.length) * slice.length
+      : 0;
+    return { spent, txns, active, incomeToDate: dayShare, netToDate: dayShare - spent, dayN: slice.length };
+  }, [days, cursor, summary]);
+
   const hasData = days.length > 0 && (summary || expenses);
-  const hoveredDay = hoverIdx != null ? days[hoverIdx] : null;
 
   return (
-    <Box sx={{ position: 'relative', pb: 6, bgcolor: '#04050a', minHeight: '100vh', mx: { xs: -1, sm: -2, md: -3 }, mt: -2 }}>
-      {/* Top spine — page identity + orbital metric ticker */}
+    <Box sx={{
+      position: 'relative', pb: 6,
+      bgcolor: '#04050a', minHeight: '100vh',
+      mx: { xs: -1, sm: -2, md: -3 }, mt: -2,
+    }}>
+      {/* Identity strip */}
       <Box sx={{
         position: 'relative', px: { xs: 2, sm: 4 }, pt: { xs: 3, sm: 4 }, pb: 2,
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap',
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 3, flexWrap: 'wrap',
         borderBottom: '1px solid rgba(120,140,200,0.08)',
       }}>
-        {/* Corner-bracket ornament */}
         <CornerBracket pos="tl" />
         <CornerBracket pos="tr" />
         <Box>
           <Typography sx={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.35em', color: accents.cyan, opacity: 0.7, textTransform: 'uppercase' }}>
-            ᴼˢ.PULSE // {new Date().toISOString().slice(0, 10)}
+            ᴼˢ.PULSE // {new Date().toISOString().slice(0, 10)} // INSTRUMENT
           </Typography>
           <Typography sx={{ fontSize: { xs: 26, sm: 36 }, fontWeight: 200, letterSpacing: '-0.02em', color: '#e8ecf5', lineHeight: 1.05, mt: 0.5 }}>
-            The Financial <em style={{ fontStyle: 'italic', color: accents.violet, fontWeight: 300 }}>Organism</em>
+            The Financial <em style={{ fontStyle: 'italic', color: accents.violet, fontWeight: 300 }}>Instrument</em>
           </Typography>
           <Typography sx={{ fontFamily: MONO, fontSize: 11, color: 'rgba(180,190,220,0.55)', mt: 0.5, letterSpacing: '0.04em' }}>
             {hasData
-              ? `LIVE — ${days.length} day${days.length !== 1 ? 's' : ''} indexed · ${stats?.activeDays ?? 0} active`
+              ? `LIVE — grab the read-head. sweep. left/right arrow keys move a day.`
               : 'STANDBY'}
           </Typography>
         </Box>
-        {stats && (
-          <TelemetryRow stats={stats} />
+        {monthStats && (
+          <TelemetryRow stats={monthStats} />
         )}
       </Box>
 
-      {/* The organism */}
+      {/* Instrument */}
       <Box sx={{ position: 'relative', px: { xs: 1, sm: 3 }, mt: 2 }}>
         {loading ? (
           <OrganismSkeleton />
         ) : hasData ? (
-          <Box sx={{ position: 'relative' }}>
+          <>
             <FinancialOrganism
               days={days}
               categories={categories}
-              net={stats?.net ?? 0}
-              income={stats?.totalIncome ?? 0}
-              onHover={setHoverIdx}
-              height={compact ? 520 : 680}
+              net={monthStats?.net ?? 0}
+              income={monthStats?.totalIncome ?? 0}
+              onCursorChange={setCursor}
+              initialCursor={days.length - 1}
+              height={compact ? 540 : 680}
             />
-
-            {/* Corner instrumentation panels overlayed on the scene */}
-            <TelemetryPanel pos="tl" label="NUCLEUS" mono>
-              <MetricLine k="NET" v={moneySmart(stats.net)} tone={stats.net >= 0 ? accents.mint : accents.red} />
-              <MetricLine k="MASS" v={`log(${moneySmart(Math.abs(stats.net))})`} muted />
-            </TelemetryPanel>
-            <TelemetryPanel pos="tr" label="FLUX" mono>
-              <MetricLine k="OUT" v={moneySmart(stats.totalSpent)} tone={accents.violet} />
-              <MetricLine k="IN " v={moneySmart(stats.totalIncome)} tone={accents.mint} />
-            </TelemetryPanel>
-            <TelemetryPanel pos="bl" label="RHYTHM" mono>
-              <MetricLine k="AVG" v={moneySmart(stats.avgDay)} tone={accents.cyan} />
-              <MetricLine k="MAX" v={moneySmart(stats.heaviestDay)} tone={accents.amber} />
-            </TelemetryPanel>
-            <TelemetryPanel pos="br" label="INDEX" mono>
-              <MetricLine k="DAY" v={`${stats.activeDays}/${days.length}`} tone={accents.cyan} />
-              <MetricLine k="TXN" v={`${(expenses || []).length}`} muted />
-            </TelemetryPanel>
-
-            {/* Center-top hover readout */}
-            {hoveredDay && (
+            {/* Scrub-range strip — up-to-cursor cumulative totals */}
+            {rangeStats && (
               <Box sx={{
-                position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)',
-                px: 2.5, py: 1.5, borderRadius: 2,
-                bgcolor: 'rgba(6,8,16,0.72)',
-                backdropFilter: 'blur(14px) saturate(180%)',
-                border: '1px solid rgba(100,210,255,0.18)',
-                boxShadow: '0 0 40px rgba(100,210,255,0.08), inset 0 1px 0 rgba(255,255,255,0.04)',
-                pointerEvents: 'none', minWidth: 220, textAlign: 'center',
+                mt: 2, display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 3 },
+                px: { xs: 1.5, sm: 2.5 }, py: 1.5, flexWrap: 'wrap',
+                borderRadius: 2, border: '1px solid rgba(100,210,255,0.12)',
+                bgcolor: 'rgba(8,10,20,0.6)',
               }}>
-                <Typography sx={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.24em', color: accents.cyan, mb: 0.5 }}>
-                  ▸ {hoveredDay.dateLabel}
-                </Typography>
-                <Typography sx={{ fontSize: 22, fontWeight: 300, color: '#f0f3fa', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
-                  {moneySmart(hoveredDay.total || 0)}
-                </Typography>
-                <Typography sx={{ fontFamily: MONO, fontSize: 10, color: 'rgba(180,190,220,0.6)', mt: 0.25 }}>
-                  {hoveredDay.count} txn{hoveredDay.count !== 1 ? 's' : ''}
-                  {hoveredDay.cats?.[0] ? ` · ${hoveredDay.cats[0].name}` : ''}
-                </Typography>
-                {hoveredDay.cats && hoveredDay.cats.length > 0 && (
-                  <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', mt: 1 }}>
-                    {hoveredDay.cats.slice(0, 5).map((c, i) => (
-                      <Box key={i} sx={{
-                        width: 44 * (c.amount / hoveredDay.total),
-                        height: 3, borderRadius: 0.5, minWidth: 6,
-                        bgcolor: [accents.cyan, accents.violet, accents.mint, accents.amber, accents.blue][i],
-                        boxShadow: `0 0 6px ${[accents.cyan, accents.violet, accents.mint, accents.amber, accents.blue][i]}`,
-                      }} />
-                    ))}
-                  </Box>
-                )}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: accents.cyan,
+                    boxShadow: `0 0 10px ${accents.cyan}` }} />
+                  <Typography sx={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.3em', color: accents.cyan, opacity: 0.85 }}>
+                    UP TO DAY {rangeStats.dayN} · CUMULATIVE
+                  </Typography>
+                </Box>
+                <RangeMetric k="SPENT" v={moneySmart(rangeStats.spent)} tone={accents.violet} />
+                <RangeMetric k="TXNS" v={String(rangeStats.txns)} tone={accents.cyan} />
+                <RangeMetric k="ACTIVE" v={`${rangeStats.active}/${rangeStats.dayN}`} tone={accents.blue} />
+                <RangeMetric k="RUN NET" v={moneySmart(rangeStats.netToDate)}
+                  tone={rangeStats.netToDate >= 0 ? accents.mint : accents.red} />
               </Box>
             )}
-
-            {/* Bottom scanlines / footer */}
-            <Box sx={{
-              position: 'absolute', bottom: 12, left: 20, right: 20,
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              pointerEvents: 'none',
-            }}>
-              <Typography sx={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.3em', color: 'rgba(180,190,220,0.35)' }}>
-                DRAG · ROTATE   |   HOVER · INSPECT   |   SCROLL · ZOOM
-              </Typography>
-              <Typography sx={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.3em', color: 'rgba(180,190,220,0.35)' }}>
-                ● BIOSIGNAL STABLE
-              </Typography>
-            </Box>
-          </Box>
+          </>
         ) : (
           <EmptyState
             icon={FavoriteBorderRoundedIcon}
             title="No heartbeat yet"
-            description="Log spending this month and the organism will materialize — each transaction becomes matter in the field."
+            description="Log spending this month and the instrument will materialize — each transaction becomes a vertex on the manifold."
           />
         )}
       </Box>
 
-      {/* Category legend — the taxonomy that colors the organism */}
       {hasData && categories.length > 0 && (
         <CategoryTaxonomy categories={categories} days={days} />
       )}
@@ -227,14 +198,14 @@ export default function CashFlowPulsePage() {
   );
 }
 
-/* ─── HUD building blocks ────────────────────────────────────────────────── */
+/* ─── HUD parts ────────────────────────────────────────────────────────── */
 
 function TelemetryRow({ stats }) {
   const items = [
     { k: 'SPEND', v: moneySmart(stats.totalSpent), c: accents.violet },
     { k: 'INCOME', v: moneySmart(stats.totalIncome), c: accents.mint },
     { k: 'NET', v: moneySmart(stats.net), c: stats.net >= 0 ? accents.mint : accents.red },
-    { k: 'AVG/DAY', v: moneySmart(stats.avgDay), c: accents.cyan },
+    { k: 'HEAVIEST', v: moneySmart(stats.heaviestDay), c: accents.amber },
   ];
   return (
     <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -256,45 +227,13 @@ function TelemetryRow({ stats }) {
   );
 }
 
-function TelemetryPanel({ pos, label, children }) {
-  const p = {
-    tl: { top: 16, left: 20, align: 'left' },
-    tr: { top: 16, right: 20, align: 'right' },
-    bl: { bottom: 48, left: 20, align: 'left' },
-    br: { bottom: 48, right: 20, align: 'right' },
-  }[pos];
+function RangeMetric({ k, v, tone }) {
   return (
-    <Box sx={{
-      position: 'absolute', ...p,
-      minWidth: 140, pointerEvents: 'none',
-      textAlign: p.align,
-    }}>
-      <Box sx={{
-        display: 'flex', alignItems: 'center', gap: 0.75,
-        justifyContent: p.align === 'right' ? 'flex-end' : 'flex-start', mb: 0.5,
-      }}>
-        {p.align === 'right' && <Box sx={{ flex: 1, height: 1, bgcolor: 'rgba(100,210,255,0.2)', maxWidth: 40 }} />}
-        <Typography sx={{ fontFamily: MONO, fontSize: 8, letterSpacing: '0.4em', color: accents.cyan, opacity: 0.8 }}>
-          {label}
-        </Typography>
-        {p.align === 'left' && <Box sx={{ flex: 1, height: 1, bgcolor: 'rgba(100,210,255,0.2)', maxWidth: 40 }} />}
-      </Box>
-      {children}
-    </Box>
-  );
-}
-
-function MetricLine({ k, v, tone, muted }) {
-  return (
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'baseline' }}>
-      <Typography sx={{ fontFamily: MONO, fontSize: 9, color: 'rgba(150,160,190,0.55)', letterSpacing: '0.14em' }}>
+    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
+      <Typography sx={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.22em', color: 'rgba(180,190,220,0.5)' }}>
         {k}
       </Typography>
-      <Typography sx={{
-        fontFamily: MONO, fontSize: 12,
-        color: muted ? 'rgba(180,190,220,0.5)' : (tone || '#e8ecf5'),
-        fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em',
-      }}>
+      <Typography sx={{ fontFamily: MONO, fontSize: 14, color: tone, fontVariantNumeric: 'tabular-nums' }}>
         {v}
       </Typography>
     </Box>
@@ -320,7 +259,7 @@ function CategoryTaxonomy({ categories, days }) {
       .filter(c => c.total > 0)
       .sort((a, b) => b.total - a.total);
   }, [categories, days]);
-  const palette = [accents.cyan, accents.violet, accents.mint, accents.amber, accents.blue, accents.purple, accents.red];
+  const palette = chart.categorical.dark;
   return (
     <Box sx={{ mt: 4, px: { xs: 2, sm: 4 } }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
@@ -375,7 +314,7 @@ function OrganismSkeleton() {
         animation: 'blink 1.4s steps(2, end) infinite',
         '@keyframes blink': { '50%': { opacity: 0.2 } },
       }}>
-        ▸ MATERIALIZING…
+        ▸ CALIBRATING…
       </Typography>
     </Box>
   );

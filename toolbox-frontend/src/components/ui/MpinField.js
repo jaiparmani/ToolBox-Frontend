@@ -22,6 +22,7 @@ export default function MpinField({
   const rowRef = React.useRef(null);
   const [focused, setFocused] = React.useState(false);
   const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
   const set = (next) => {
     const clean = String(next).replace(/\D/g, '').slice(0, length);
@@ -49,10 +50,10 @@ export default function MpinField({
 
   const press = (k) => {
     if (disabled) return;
-    if (k === '⌫') { set(value.slice(0, -1)); inputRef.current?.focus(); return; }
+    if (k === '⌫') { set(value.slice(0, -1)); if (!isTouch) inputRef.current?.focus(); return; }
     if (k === '') return;
     set(value + k);
-    inputRef.current?.focus();
+    if (!isTouch) inputRef.current?.focus();
   };
 
   return (
@@ -60,7 +61,7 @@ export default function MpinField({
       {/* Slot row (the real input is transparent, on top, so typing + mobile keypad work) */}
       <Box
         ref={rowRef}
-        onClick={() => inputRef.current?.focus()}
+        onClick={() => { if (!isTouch) inputRef.current?.focus(); }}
         sx={{ position: 'relative', display: 'flex', gap: { xs: 1, sm: 1.35 }, cursor: 'text',
           '@keyframes slotBreathe': { '0%,100%': { boxShadow: `0 0 0 1px ${color}66, 0 0 18px -6px ${color}` }, '50%': { boxShadow: `0 0 0 1px ${color}, 0 0 26px -4px ${color}` } },
           '@keyframes slotPop': { '0%': { transform: 'scale(0.4)', opacity: 0 }, '70%': { transform: 'scale(1.18)' }, '100%': { transform: 'scale(1)', opacity: 1 } },
@@ -95,17 +96,20 @@ export default function MpinField({
           component="input"
           ref={inputRef}
           value={value}
-          onChange={(e) => set(e.target.value)}
+          onChange={(e) => { if (!isTouch) set(e.target.value); }}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           disabled={disabled}
-          autoFocus={autoFocus}
-          inputMode="numeric"
+          autoFocus={!isTouch && autoFocus}
+          readOnly={isTouch}
+          inputMode={isTouch ? 'none' : 'numeric'}
           autoComplete="one-time-code"
           aria-label={`${length}-digit MPIN`}
           maxLength={length}
           sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, border: 0, background: 'transparent',
-            cursor: 'text', color: 'transparent', caretColor: 'transparent', fontSize: 16 /* keeps iOS from zooming */, textAlign: 'center', outline: 'none' }}
+            cursor: 'text', color: 'transparent', caretColor: 'transparent', fontSize: 16, textAlign: 'center', outline: 'none',
+            ...(isTouch && { pointerEvents: 'none' }),
+          }}
         />
       </Box>
 

@@ -91,6 +91,11 @@ export default function GroupStrip({ groups, activeId, onOpen, onCreate }) {
         <Typography variant="caption" color="text.secondary">
           {groups.length === 0 ? 'Make a group' : 'New group'}
         </Typography>
+        {groups.length === 0 && (
+          <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem', textAlign: 'center' }}>
+            For a flat, trip, or regular table
+          </Typography>
+        )}
       </Card>
     </Stack>
   );

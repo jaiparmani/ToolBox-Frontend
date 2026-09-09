@@ -125,6 +125,8 @@ export default function SplitsPage() {
   // on your books on its own, which is what it used to do silently.
   const [shared, setShared] = useState({ loading: true, items: [] });
   const [including, setIncluding] = useState(null);
+  const [showSettled, setShowSettled] = useState(false);
+  const [settledHistory, setSettledHistory] = useState({ loading: false, items: [] });
 
   // Groups. `openGroup` switches the page into that group's own view rather
   // than navigating away, so the constellation can simply re-scope itself.
@@ -169,6 +171,15 @@ export default function SplitsPage() {
       setShared({ loading: false, items: await getSplits({ direction: 'you_owe', settled: 'false' }) });
     } catch (err) {
       setShared({ loading: false, items: [] });
+    }
+  }, []);
+
+  const loadSettledHistory = useCallback(async () => {
+    setSettledHistory({ loading: true, items: [] });
+    try {
+      setSettledHistory({ loading: false, items: await getSplits({ settled: 'true' }) });
+    } catch (err) {
+      setSettledHistory({ loading: false, items: [] });
     }
   }, []);
 
@@ -805,7 +816,7 @@ export default function SplitsPage() {
                   transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                 >
                   <SwipeAction
-                    onAction={() => runSettle(person)}
+                    onAction={() => openSettle(person)}
                     color={accents.mint}
                     icon={<DoneAllIcon sx={{ color: '#fff' }} />}
                     label={person.net < 0 ? 'Mark paid' : 'Settle'}
@@ -961,14 +972,21 @@ export default function SplitsPage() {
                 </Typography>
               </Box>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1.5 }}>
-                Bills someone else split with you. None of it counts as your spending
-                until you add it.
+                Bills someone else paid and split with you. They stay separate from your
+                spending unless you choose to count them.
               </Typography>
 
               <Stack spacing={1.25}>
+                <AnimatePresence initial={false}>
                 {shared.items.map((item) => (
-                  <Box
+                  <motion.div
                     key={item.id}
+                    layout
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -40, transition: { duration: 0.25 } }}
+                  >
+                  <Box
                     sx={{
                       p: 1.5, borderRadius: 3, border: '1px solid', borderColor: 'divider',
                     }}
@@ -984,6 +1002,15 @@ export default function SplitsPage() {
                             ? ` · ${money(item.settledAmount)} of ${money(item.amount)} paid`
                             : ''}
                         </Typography>
+                        {item.participants && item.participants.length > 1 && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+                            Split with {item.participants
+                              .filter(p => !p.isYou)
+                              .map(p => p.name)
+                              .join(', ')}
+                            {item.participants.some(p => p.isYou) ? ' and you' : ''}
+                          </Typography>
+                        )}
                       </Box>
                       <Box sx={{ flexShrink: 0 }}>
                         <SplitAmount direction="you_owe" amount={item.outstanding} />
@@ -1012,7 +1039,7 @@ export default function SplitsPage() {
                             disabled={including === item.id}
                             sx={{ fontWeight: 600 }}
                           >
-                            {including === item.id ? 'Adding…' : 'Add to my expenses'}
+                            {including === item.id ? 'Adding…' : 'Count as my spending'}
                           </Button>
                         )
                       )}
@@ -1035,9 +1062,71 @@ export default function SplitsPage() {
                       )}
                     </Stack>
                   </Box>
+                  </motion.div>
                 ))}
+                </AnimatePresence>
               </Stack>
             </Paper>
+          </Reveal>
+        )}
+
+        {/* Settled history — toggled on demand so the page stays clean. */}
+        {!openGroup && (
+          <Reveal index={3}>
+            <Box sx={{ mt: 3, textAlign: 'center' }}>
+              <Button
+                size="small" variant="outlined" color="inherit"
+                startIcon={<DoneAllIcon />}
+                onClick={() => { setShowSettled(prev => !prev); if (!showSettled) loadSettledHistory(); }}
+                sx={{ fontWeight: 600 }}
+              >
+                {showSettled ? 'Hide settled history' : 'Show settled history'}
+              </Button>
+              {showSettled && (
+                <Paper
+                  elevation={0}
+                  sx={{ p: 2, mt: 1.5, borderRadius: 4, border: '1px solid', borderColor: 'divider', textAlign: 'left' }}
+                >
+                  {settledHistory.loading ? (
+                    <LinearProgress sx={{ borderRadius: 999 }} />
+                  ) : settledHistory.items.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                      No settled bills yet.
+                    </Typography>
+                  ) : (
+                    <Stack spacing={1}>
+                      {settledHistory.items.slice(0, 20).map((item) => (
+                        <Box
+                          key={item.id}
+                          sx={{
+                            p: 1.5, borderRadius: 2, bgcolor: 'action.hover',
+                            opacity: 0.8,
+                          }}
+                        >
+                          <Box display="flex" justifyContent="space-between" alignItems="center">
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+                                {item.description}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {item.counterparty} · {relativeDay(item.date)} · settled {money(item.settledAmount)}
+                              </Typography>
+                            </Box>
+                            <Chip
+                              icon={<CheckCircleIcon />}
+                              label="Paid"
+                              size="small"
+                              sx={{ color: accents.mint, borderColor: accents.mint }}
+                              variant="outlined"
+                            />
+                          </Box>
+                        </Box>
+                      ))}
+                    </Stack>
+                  )}
+                </Paper>
+              )}
+            </Box>
           </Reveal>
         )}
 

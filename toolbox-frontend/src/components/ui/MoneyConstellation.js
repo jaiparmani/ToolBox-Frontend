@@ -202,6 +202,11 @@ export default function MoneyConstellation({ people, selectedId, onSelect, centr
         r: 22 + scale * (compact ? 10 : 16),
         width: 1.5 + scale * 5,
         colour: magnitude === 0 ? flow.settled : person.net > 0 ? flow.owedToYou : flow.youOwe,
+        textColour: magnitude === 0
+          ? (isDark ? '#999' : '#888')
+          : person.net > 0
+            ? flow.owedToYou
+            : (isDark ? '#f07060' : flow.youOwe),
       };
     });
   }, [people, centre, ring, compact, flow]);
@@ -352,7 +357,7 @@ export default function MoneyConstellation({ people, selectedId, onSelect, centr
                 </text>
                 <text
                   x={node.x} y={node.y + node.r + 29} textAnchor="middle"
-                  style={{ fill: node.colour, fontSize: 11, fontWeight: 650, fontVariantNumeric: 'tabular-nums' }}
+                  style={{ fill: node.textColour, fontSize: 11, fontWeight: 650, fontVariantNumeric: 'tabular-nums' }}
                 >
                   {sign}{moneySmart(Math.abs(node.net))}
                 </text>

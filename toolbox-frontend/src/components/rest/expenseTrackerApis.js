@@ -150,7 +150,11 @@ export const transformExpenseForUI = (apiExpense) => {
         paymentMethod: apiExpense.payment_method,
         isRecurring: apiExpense.is_recurring,
         createdAt: apiExpense.created_at,
-        updatedAt: apiExpense.updated_at
+        updatedAt: apiExpense.updated_at,
+        // Present only on a just-created expense the backend thinks echoes one
+        // from the last few minutes (same amount, category, date) — a soft,
+        // dismissible nudge, never a block. See ExpenseViewSet.create.
+        duplicateWarning: apiExpense.duplicate_warning || null
     };
 };
 
@@ -1148,6 +1152,11 @@ export const getExpenseSummary = async (filters = {}) => {
         const params = new URLSearchParams();
         if (filters.dateFrom) params.append('date_from', filters.dateFrom);
         if (filters.dateTo) params.append('date_to', filters.dateTo);
+        if (filters.amountMin) params.append('amount_min', filters.amountMin);
+        if (filters.amountMax) params.append('amount_max', filters.amountMax);
+        if (filters.category) params.append('category', filters.category);
+        if (filters.tags && filters.tags.length) params.append('tags', filters.tags.join(','));
+        if (filters.search) params.append('search', filters.search);
 
         const response = await authenticatedFetch(`${API_BASE_URL}/expenses/summary/?${params}`);
         const data = await response.json();

@@ -129,6 +129,10 @@ export default function ExpenseTrackerPage() {
  const [loading, setLoading] = useState(false);
  const [error, setError] = useState(null);
  const [success, setSuccess] = useState(null);
+ // A save that looks like it echoes one from the last few minutes — same
+ // amount, category, date (see ExpenseViewSet.create). Never blocks the
+ // save; just a dismissible heads-up.
+ const [duplicateWarning, setDuplicateWarning] = useState(null);
  const [activeTab, setActiveTab] = useState(0);
  // The four sections now live in ActivityDeck, which owns both the tab row and
  // the drag between panels — direction, momentum, the peek on the incoming
@@ -429,9 +433,18 @@ export default function ExpenseTrackerPage() {
 
  const loadSummary = async () => {
    try {
+     // Same filters the list itself reads, so SPENT/INCOME/BALANCE up top
+     // stays in lockstep with whatever's actually narrowing the rows below —
+     // a tag or category filter used to only touch the list, leaving the
+     // header quoting the whole scope's totals.
      const summaryData = await getExpenseSummary({
        dateFrom: filters.dateFrom,
-       dateTo: filters.dateTo
+       dateTo: filters.dateTo,
+       amountMin: filters.amountMin,
+       amountMax: filters.amountMax,
+       category: filters.category,
+       tags: filters.tags,
+       search: filters.search,
      });
      setSummary(summaryData);
    } catch (error) {
@@ -510,8 +523,12 @@ export default function ExpenseTrackerPage() {
        await updateExpense(expenseForm.data.id, expenseForm.data);
        setSuccess('Expense updated successfully!');
      } else {
-       await addExpenseApi(expenseForm.data);
+       const created = await addExpenseApi(expenseForm.data);
        setSuccess('Expense added successfully!');
+       if (created?.duplicateWarning) {
+         const d = created.duplicateWarning;
+         setDuplicateWarning(`Looks like a duplicate of "${d.description}" (${money(parseFloat(d.amount))}) added moments ago.`);
+       }
      }
      feedback('success');
      closeExpenseForm();
@@ -1246,6 +1263,17 @@ export default function ExpenseTrackerPage() {
      >
        <Alert onClose={() => setSuccess(null)} severity="success" sx={{ width: '100%', borderRadius: 3 }}>
          {success}
+       </Alert>
+     </Snackbar>
+     <Snackbar
+       open={!!duplicateWarning}
+       autoHideDuration={7000}
+       onClose={() => setDuplicateWarning(null)}
+       anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+       sx={{ bottom: { xs: 80, md: 24 } }}
+     >
+       <Alert onClose={() => setDuplicateWarning(null)} severity="warning" sx={{ width: '100%', borderRadius: 3 }}>
+         {duplicateWarning}
        </Alert>
      </Snackbar>
 

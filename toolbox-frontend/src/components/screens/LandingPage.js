@@ -224,7 +224,7 @@ export default function LandingPage() {
               <Reveal index={1}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.5 }}>
                   <Eyebrow>Spending this month</Eyebrow>
-                  <Typography sx={{ fontSize: 11, color: 'text.disabled', display: { xs: 'none', sm: 'block' } }}>cumulative · hover to inspect</Typography>
+                  <Typography sx={{ fontSize: 11, color: 'text.disabled', display: { xs: 'none', sm: 'block' } }}>cumulative · hover or tap to inspect</Typography>
                 </Box>
                 <ProjectionChart series={trend} accent={GREEN} height={200} />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75 }}>

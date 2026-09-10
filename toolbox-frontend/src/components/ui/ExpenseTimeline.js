@@ -90,6 +90,7 @@ function ExpenseRow({ expense, prominent, share = 0, onEdit, onDelete, onOpen })
   const income = isIncomeOf(expense);
   const dot = expense.category?.color || (income ? accents.green : NEUTRAL_DOT);
   const amountColor = income ? accents.green : accents.red;
+  const tags = expense.tags || [];
 
   return (
     <Box
@@ -143,9 +144,30 @@ function ExpenseRow({ expense, prominent, share = 0, onEdit, onDelete, onOpen })
         <Typography sx={{ fontSize: 13, fontWeight: 550, color: 'text.primary', letterSpacing: '-0.005em' }} noWrap>
           {expense.description || subtitleOf(expense)}
         </Typography>
-        <Typography sx={{ fontSize: 11, letterSpacing: '0.005em', color: 'text.disabled', mt: 0.15 }} noWrap>
-          {subtitleOf(expense)}{!income && expense.isSplit ? ` · split of ${money(fullAmt(expense))}` : ''}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.15, minWidth: 0 }}>
+          <Typography sx={{ fontSize: 11, letterSpacing: '0.005em', color: 'text.disabled', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {subtitleOf(expense)}{!income && expense.isSplit ? ` · split of ${money(fullAmt(expense))}` : ''}
+          </Typography>
+          {tags.length > 0 && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4, flexShrink: 0 }}>
+              {tags.slice(0, 2).map((tag) => (
+                <Box
+                  key={tag.id}
+                  sx={{
+                    px: 0.6, py: 0.05, borderRadius: 999, fontSize: 9.5, fontWeight: 600,
+                    letterSpacing: '0.01em', whiteSpace: 'nowrap',
+                    bgcolor: `${tag.color || NEUTRAL_DOT}22`, color: tag.color || 'text.secondary',
+                  }}
+                >
+                  {tag.name}
+                </Box>
+              ))}
+              {tags.length > 2 && (
+                <Typography sx={{ fontSize: 9.5, color: 'text.disabled', flexShrink: 0 }}>+{tags.length - 2}</Typography>
+              )}
+            </Box>
+          )}
+        </Box>
       </Box>
 
       <Typography sx={{

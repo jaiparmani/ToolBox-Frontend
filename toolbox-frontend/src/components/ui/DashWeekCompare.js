@@ -54,6 +54,12 @@ export default function DashWeekCompare({ dailyTotals = [] }) {
     return { days: out, thisWeek: tw, lastWeekSame: lw, todayLabel: LB[dow] };
   }, [dailyTotals]);
 
+  // hovered (desktop) takes over from picked (tap-to-pin, works without a mouse)
+  const [pointedIdx, setPointedIdx] = React.useState(null);
+  const [pickedIdx, setPickedIdx] = React.useState(null);
+  const shownIdx = pointedIdx ?? pickedIdx;
+  const shownDay = shownIdx != null ? days[shownIdx] : null;
+
   if (thisWeek <= 0 && lastWeekSame <= 0) return null;
 
   const delta = lastWeekSame > 0 ? ((thisWeek - lastWeekSame) / lastWeekSame) * 100 : null;
@@ -67,7 +73,11 @@ export default function DashWeekCompare({ dailyTotals = [] }) {
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.25, gap: 1 }}>
         <Eyebrow>This week</Eyebrow>
-        {delta != null && (
+        {shownDay ? (
+          <Typography sx={{ fontSize: 12, color: 'text.secondary' }} noWrap>
+            <Box component="span" sx={{ color: 'text.primary', fontWeight: 650 }}>{shownDay.label}</Box> · <Box component="span" sx={{ ...num }}>{shownDay.isFuture ? 'upcoming' : shownDay.amount > 0 ? money(shownDay.amount) : 'nothing spent'}</Box>
+          </Typography>
+        ) : delta != null && (
           <Typography sx={{ ...num, fontSize: 12, fontWeight: 650, color: delta <= 0 ? GREEN : accents.amber }} noWrap>
             {delta <= 0 ? '↓' : '↑'} {Math.abs(delta).toFixed(0)}% vs last week
           </Typography>
@@ -81,8 +91,26 @@ export default function DashWeekCompare({ dailyTotals = [] }) {
         {days.map((d, i) => {
           const amtPct = d.amount > 0 ? Math.max(6, (d.amount / max) * 100) : 0;
           const ghostPct = d.lwAmt > 0 ? Math.max(3, (d.lwAmt / max) * 100) : 0;
+          const isPicked = pickedIdx === i;
+          const toggle = () => setPickedIdx((v) => (v === i ? null : i));
           return (
-            <Box key={i} sx={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 0.75 }}>
+            <Box
+              key={i}
+              role="button" tabIndex={0}
+              aria-label={`${d.label} · ${d.isFuture ? 'upcoming' : d.amount > 0 ? money(d.amount) : 'nothing spent'}`}
+              aria-pressed={isPicked}
+              onMouseEnter={() => setPointedIdx(i)}
+              onMouseLeave={() => setPointedIdx(null)}
+              onFocus={() => setPointedIdx(i)}
+              onBlur={() => setPointedIdx(null)}
+              onClick={toggle}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
+              sx={{
+                flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 0.75,
+                cursor: 'pointer', outline: 'none', borderRadius: '6px',
+                '&:focus-visible': { boxShadow: `0 0 0 2px ${GREEN}` },
+              }}
+            >
               <Box sx={{ position: 'relative', width: '100%', flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                 {/* same weekday, last week — a faint reference */}
                 {ghostPct > 0 && (
@@ -93,10 +121,11 @@ export default function DashWeekCompare({ dailyTotals = [] }) {
                 {amtPct > 0 && (
                   <BarGrow heightPct={amtPct} index={i} title={`${d.label} · ${money(d.amount)}`}
                     sx={{ position: 'relative', zIndex: 1, width: '58%', borderRadius: '4px 4px 2px 2px',
-                      bgcolor: d.isToday ? GREEN : `${GREEN}55` }} />
+                      bgcolor: d.isToday ? GREEN : `${GREEN}55`,
+                      outline: isPicked ? `1.5px solid ${GREEN}` : 'none', outlineOffset: '1px' }} />
                 )}
               </Box>
-              <Typography sx={{ fontSize: 10, color: d.isToday ? 'text.secondary' : 'text.disabled', fontWeight: d.isToday ? 650 : 500, letterSpacing: '0.02em' }} noWrap>{d.label}</Typography>
+              <Typography sx={{ fontSize: 10, color: (d.isToday || isPicked) ? 'text.secondary' : 'text.disabled', fontWeight: (d.isToday || isPicked) ? 650 : 500, letterSpacing: '0.02em' }} noWrap>{d.label}</Typography>
             </Box>
           );
         })}

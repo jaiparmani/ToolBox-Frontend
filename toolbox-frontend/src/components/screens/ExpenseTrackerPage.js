@@ -7,7 +7,7 @@ import {
   Fab, Switch, FormControlLabel,
   Table, TableBody, TableCell, TableContainer,
   TableRow, TablePagination, InputAdornment, Autocomplete,
-  useMediaQuery, Collapse, Slide, Stack, InputBase
+  useMediaQuery, Slide, Stack, InputBase
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -22,7 +22,7 @@ import {
   Insights as InsightsIcon,
   CallSplit as CallSplitIcon,
   Person as PersonIcon,
-  ExpandMore as ExpandMoreIcon
+  ChevronRight as ChevronRightIcon
 } from '@mui/icons-material';
 
 // Import API functions and reusable components
@@ -44,7 +44,10 @@ import ActivityDeck from '../ui/ActivityDeck';
 import ExpenseTimeline from '../ui/ExpenseTimeline';
 import ActivityScopeBar, { scopeRange } from '../ui/ActivityScopeBar';
 import ActivityComposition from '../ui/ActivityComposition';
+import ActivityTagChips from '../ui/ActivityTagChips';
 import ActivityGlance from '../ui/ActivityGlance';
+import AmountRangeSlider from '../ui/AmountRangeSlider';
+import BottomSheet from '../ui/BottomSheet';
 import ExpenseComposer from '../ui/ExpenseComposer';
 import QuickCapture from '../ui/QuickCapture';
 import ErrorBanner from '../ui/ErrorBanner';
@@ -109,32 +112,6 @@ function AssistantNudge({ label }) {
  );
 }
 
-/** A compact amount pill — matches the app's borderless-input language instead of a raw number spinner. */
-function AmountField({ value, onChange, placeholder, ariaLabel }) {
- return (
-   <Box
-     sx={{
-       display: 'flex', alignItems: 'center', gap: 0.4,
-       px: 1.1, py: 0.7, borderRadius: radius.pill,
-       border: '1px solid', borderColor: 'divider',
-       bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
-       transition: `border-color ${motion.fast}ms ${motion.ease}, background-color ${motion.fast}ms ${motion.ease}`,
-       '&:focus-within': {
-         borderColor: accents.mint,
-         bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(48,214,165,0.08)' : 'rgba(48,214,165,0.06)',
-       },
-     }}
-   >
-     <Typography sx={{ fontSize: 12.5, color: 'text.disabled', fontWeight: 500 }}>₹</Typography>
-     <InputBase
-       value={value}
-       onChange={(e) => onChange(e.target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))}
-       placeholder={placeholder}
-       inputProps={{ inputMode: 'decimal', 'aria-label': ariaLabel, style: { width: 46, padding: 0, fontSize: 12.5, fontVariantNumeric: 'tabular-nums' } }}
-     />
-   </Box>
- );
-}
 
 export default function ExpenseTrackerPage() {
   // Use global authentication state
@@ -268,11 +245,11 @@ export default function ExpenseTrackerPage() {
    selectTab(0);
    feedback('open');
  };
- // Filters start closed on a phone, open on desktop where there's room.
- const isCompact = useMediaQuery((theme) => theme.breakpoints.down('md'));
+ // Filters live in a sheet, opened on demand — a modal that springs open
+ // unasked on page load is never "there's room for it," just a surprise.
  const [filtersOpen, setFiltersOpen] = useState(false);
- useEffect(() => { setFiltersOpen(!isCompact); }, [isCompact]);
  const clearFiltersPress = usePressSpring({ pressScale: 0.88 });
+ const filterTriggerPress = usePressSpring({ pressScale: 0.98 });
 
  // Quick Add (free-text, parsed by the LLM router endpoint) state
  const [story, setStory] = useState(null);
@@ -1114,6 +1091,39 @@ export default function ExpenseTrackerPage() {
    filters.amountMin, filters.amountMax,
  ].filter(Boolean).length + (filters.tags?.length ? 1 : 0);
 
+ // Every filter this tray owns (search / amount / category / tags — date and
+ // scope stay the scope bar's own business), as a removable token each — the
+ // Mail/Files pattern of showing exactly what's narrowing the view instead of
+ // making you reopen the sheet to remember, or to undo just one of them.
+ const activeFilterChips = React.useMemo(() => {
+   const chips = [];
+   if (filters.search) {
+     chips.push({ key: 'search', label: `“${filters.search}”`, onRemove: () => handleFilterChange('search', '') });
+   }
+   if (filters.amountMin || filters.amountMax) {
+     const lo = filters.amountMin ? money(Number(filters.amountMin)) : 'Any';
+     const hi = filters.amountMax ? money(Number(filters.amountMax)) : 'Any';
+     chips.push({
+       key: 'amount', label: `${lo} – ${hi}`,
+       onRemove: () => { handleFilterChange('amountMin', ''); handleFilterChange('amountMax', ''); },
+     });
+   }
+   if (filters.category) {
+     const cat = categories.find((c) => String(c.id) === String(filters.category));
+     chips.push({ key: 'category', label: cat?.name || 'Category', color: cat?.color, onRemove: () => handleFilterChange('category', '') });
+   }
+   (filters.tags || []).forEach((tagId) => {
+     const tag = tags.find((t) => String(t.id) === String(tagId));
+     if (!tag) return;
+     chips.push({
+       key: `tag-${tagId}`, label: tag.name, color: tag.color,
+       onRemove: () => handleFilterChange('tags', filters.tags.filter((id) => String(id) !== String(tagId))),
+     });
+   });
+   return chips;
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [filters.search, filters.amountMin, filters.amountMax, filters.category, filters.tags, categories, tags]);
+
  // A one-line story context: this expense's place in its category this month.
  const storyContext = (expense) => {
    if (!expense?.category) return null;
@@ -1355,11 +1365,14 @@ export default function ExpenseTrackerPage() {
              </Reveal>
            )}
 
-           {/* Filters — a collapsible tray with a sunken inset feel */}
+           {/* Filters — a trigger with the active tokens visible at a glance;
+               editing itself happens in a sheet (Apple Design: Photos/Files/Mail
+               all put filter *editing* behind one tap, but never hide *which*
+               filters are on). */}
            <Paper
              elevation={0}
              sx={{
-               p: { xs: 1.75, sm: 2.5 },
+               p: { xs: 1.5, sm: 2 },
                mb: 3,
                borderRadius: `${radius.lg}px`,
                border: '1px solid',
@@ -1369,9 +1382,18 @@ export default function ExpenseTrackerPage() {
              }}
            >
              <Box
-               display="flex" alignItems="center" gap={1}
-               onClick={() => setFiltersOpen(prev => !prev)}
-               sx={{ mb: filtersOpen ? 1.5 : 0, cursor: { xs: 'pointer', md: 'default' } }}
+               ref={filterTriggerPress.ref}
+               {...filterTriggerPress.bindEvents}
+               role="button" tabIndex={0}
+               aria-haspopup="dialog"
+               aria-expanded={filtersOpen}
+               onClick={() => setFiltersOpen(true)}
+               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFiltersOpen(true); } }}
+               sx={{
+                 display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', outline: 'none',
+                 WebkitTapHighlightColor: 'transparent', borderRadius: `${radius.sm}px`,
+                 '&:focus-visible': { outline: `2px solid ${accents.mint}`, outlineOffset: 2 },
+               }}
              >
                <Box
                  sx={{
@@ -1387,98 +1409,130 @@ export default function ExpenseTrackerPage() {
                <Typography variant="subtitle2" sx={{ fontWeight: 600, flexGrow: 1, color: 'text.secondary', fontSize: 13 }}>
                  Filters
                </Typography>
-               {activeFilterCount > 0 && (
-                 <Box
-                   sx={{
-                     px: 0.85, py: 0.15, borderRadius: `${radius.sm}px`, minWidth: 20,
-                     textAlign: 'center', fontSize: 11, fontWeight: 700,
-                     bgcolor: (t) => t.palette.mode === 'dark'
-                       ? `${accents.mint}22`
-                       : `${accents.mint}18`,
-                     color: accents.mint,
-                     letterSpacing: '0.02em',
-                   }}
-                 >
-                   {activeFilterCount}
-                 </Box>
-               )}
-               {/* Fold away on mobile so filters don't eat the viewport. The
-                   chevron is the keyboard path to the same toggle the whole
-                   header row exposes to touch, so it carries the state. */}
-               <IconButton
-                 size="small"
-                 aria-expanded={filtersOpen}
-                 aria-controls="activity-filters-tray"
-                 aria-label={filtersOpen ? 'Hide filters' : 'Show filters'}
-                 sx={{
-                   display: { xs: 'inline-flex', md: 'none' },
-                   transition: `transform ${motion.normal}ms ${motion.ease}`,
-                   transform: filtersOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                 }}
-               >
-                 <ExpandMoreIcon fontSize="small" />
-               </IconButton>
-             </Box>
-             <Collapse in={filtersOpen} timeout={motion.normal} easing={motion.ease} id="activity-filters-tray">
-               {/* Search + amount range only — category and date are already owned by
-                   the chips and scope bar just below, so this tray isn't a second,
-                   conflicting way to set the same thing. A single wrapping row instead
-                   of a rigid grid, since there are only three controls left to place. */}
-               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 1.25, sm: 1.5 }, alignItems: 'center' }}>
-                 <Box sx={{ flex: '1 1 200px', minWidth: 0 }}>
-                   <TextField
-                     id="search-input"
-                     fullWidth
-                     size="small"
-                     label="Search expenses"
-                     value={filters.search}
-                     onChange={(e) => handleFilterChange('search', e.target.value)}
-                     InputProps={{
-                       startAdornment: (
-                         <InputAdornment position="start">
-                           <SearchIcon fontSize="small" />
-                         </InputAdornment>
-                       ),
-                     }}
-                     placeholder="Description, location..."
-                   />
-                 </Box>
-                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
-                   <AmountField
-                     value={filters.amountMin}
-                     onChange={(v) => handleFilterChange('amountMin', v)}
-                     placeholder="Min"
-                     ariaLabel="Minimum amount"
-                   />
-                   <Box aria-hidden sx={{ width: 8, height: '1px', bgcolor: 'divider', flexShrink: 0 }} />
-                   <AmountField
-                     value={filters.amountMax}
-                     onChange={(v) => handleFilterChange('amountMax', v)}
-                     placeholder="Max"
-                     ariaLabel="Maximum amount"
-                   />
-                 </Box>
-                 <Tooltip title="Clear filters">
-                   <IconButton
-                     ref={clearFiltersPress.ref}
-                     {...clearFiltersPress.bindEvents}
-                     onClick={clearFilters}
-                     size="small"
+               {/* Springs in/out and pops on every count change (Apple Design §7) —
+                   the number itself is the feedback that a filter just landed. */}
+               <AnimatePresence mode="popLayout" initial={false}>
+                 {activeFilterCount > 0 && (
+                   <Box
+                     key={activeFilterCount}
+                     component={framerMotion.span}
+                     initial={{ scale: 0.4, opacity: 0 }}
+                     animate={{ scale: 1, opacity: 1 }}
+                     exit={{ scale: 0.4, opacity: 0 }}
+                     transition={{ type: 'spring', stiffness: 500, damping: 24 }}
                      sx={{
-                       width: 32, height: 32, borderRadius: `${radius.sm}px`, flexShrink: 0,
+                       display: 'inline-flex', px: 0.85, py: 0.15, borderRadius: `${radius.sm}px`, minWidth: 20,
+                       textAlign: 'center', fontSize: 11, fontWeight: 700,
                        bgcolor: (t) => t.palette.mode === 'dark'
-                         ? 'rgba(255,255,255,0.04)'
-                         : 'rgba(0,0,0,0.03)',
-                       '&:hover': { color: accents.red, bgcolor: `${accents.red}14` },
-                       transition: `color ${motion.fast}ms ${motion.ease}, background-color ${motion.fast}ms ${motion.ease}`,
+                         ? `${accents.mint}22`
+                         : `${accents.mint}18`,
+                       color: accents.mint,
+                       letterSpacing: '0.02em',
                      }}
                    >
-                     <CloseIcon sx={{ fontSize: 16 }} />
-                   </IconButton>
-                 </Tooltip>
+                     {activeFilterCount}
+                   </Box>
+                 )}
+               </AnimatePresence>
+               <ChevronRightIcon aria-hidden sx={{ fontSize: 18, color: 'text.disabled' }} />
+             </Box>
+
+             {/* Active filter tokens — exactly what's narrowing the view, each
+                 removable on its own without reopening the sheet. */}
+             {activeFilterChips.length > 0 && (
+               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6, mt: 1.25 }}>
+                 {activeFilterChips.map((chip) => (
+                   <Chip
+                     key={chip.key}
+                     size="small"
+                     label={chip.label}
+                     onDelete={chip.onRemove}
+                     icon={chip.color ? (
+                       <Box aria-hidden sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: chip.color, ml: '8px !important' }} />
+                     ) : undefined}
+                     sx={{
+                       height: 26, borderRadius: radius.pill, fontSize: 12, fontWeight: 550,
+                       border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper',
+                       '& .MuiChip-deleteIcon': { fontSize: 15, color: 'text.disabled' },
+                       '& .MuiChip-deleteIcon:hover': { color: accents.red },
+                     }}
+                   />
+                 ))}
+                 <Chip
+                   size="small"
+                   label="Clear all"
+                   onClick={clearFilters}
+                   sx={{
+                     height: 26, borderRadius: radius.pill, fontSize: 12, fontWeight: 600,
+                     bgcolor: 'transparent', color: 'text.disabled',
+                     border: '1px dashed', borderColor: 'divider',
+                     '&:hover': { color: accents.red, borderColor: accents.red },
+                   }}
+                 />
                </Box>
-             </Collapse>
+             )}
            </Paper>
+
+           {/* The editing surface itself — a sheet that slides up on a phone
+               (drag-to-dismiss, Apple's fluid-interfaces physics) and becomes a
+               centred dialog with room to breathe on a larger screen. Category and
+               tags stay owned by the chips and scope bar below; this is search +
+               amount only. */}
+           <BottomSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} maxWidth={440}>
+             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5 }}>
+               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 17 }}>Filters</Typography>
+               <IconButton
+                 size="small" onClick={() => setFiltersOpen(false)} aria-label="Close filters"
+                 sx={{ display: { xs: 'none', sm: 'inline-flex' } }}
+               >
+                 <CloseIcon fontSize="small" />
+               </IconButton>
+             </Box>
+
+             <TextField
+               id="search-input"
+               fullWidth
+               size="small"
+               label="Search expenses"
+               value={filters.search}
+               onChange={(e) => handleFilterChange('search', e.target.value)}
+               InputProps={{
+                 startAdornment: (
+                   <InputAdornment position="start">
+                     <SearchIcon fontSize="small" />
+                   </InputAdornment>
+                 ),
+               }}
+               placeholder="Description, location..."
+               sx={{ mb: 3.5 }}
+             />
+
+             <AmountRangeSlider
+               expenses={expenses}
+               min={filters.amountMin}
+               max={filters.amountMax}
+               onChange={(lo, hi) => { handleFilterChange('amountMin', lo); handleFilterChange('amountMax', hi); }}
+             />
+
+             <Box sx={{ display: 'flex', gap: 1, mt: 3.5 }}>
+               <Button
+                 fullWidth variant="outlined" color="inherit"
+                 ref={clearFiltersPress.ref}
+                 {...clearFiltersPress.bindEvents}
+                 onClick={clearFilters}
+                 sx={{ borderRadius: radius.pill, textTransform: 'none', fontWeight: 600, borderColor: 'divider', color: 'text.secondary' }}
+               >
+                 Clear all
+               </Button>
+               <Button
+                 fullWidth variant="contained" disableElevation
+                 onClick={() => setFiltersOpen(false)}
+                 sx={{ borderRadius: radius.pill, textTransform: 'none', fontWeight: 700, bgcolor: accents.mint, color: '#04150e', '&:hover': { bgcolor: accents.mint } }}
+               >
+                 Done
+               </Button>
+             </Box>
+           </BottomSheet>
 
            {/* Scope the stream — segmented control + month stepping. Drives the
                same date filter the list and the SPENT/INCOME/BALANCE header read. */}
@@ -1499,6 +1553,15 @@ export default function ExpenseTrackerPage() {
              selected={filters.category}
              onSelect={(id) => handleFilterChange('category', id)}
              scopeLabel={scopeLabel}
+           />
+
+           {/* Tag narrowing — multi-select, since a transaction can honestly
+               carry more than one tag. Drives the same filters.tags array the
+               API already accepts. */}
+           <ActivityTagChips
+             tags={tags}
+             selected={filters.tags}
+             onChange={(ids) => handleFilterChange('tags', ids)}
            />
 
            {/* The list, as a chronological timeline grouped by day — each day a

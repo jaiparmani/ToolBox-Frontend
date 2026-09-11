@@ -965,6 +965,28 @@ export default function ExpenseComposer({
               </Box>
             </Box>
 
+            {/* Date sits beside Tags, not behind the disclosure: it's not
+                "more detail" the way location/payment are — it's a field
+                you'd otherwise have to open an accordion just to check or
+                change on every single expense. */}
+            <Box sx={{ mb: 3 }}>
+              <Eyebrow sx={{ mb: 1.25 }}>Date</Eyebrow>
+              <TextField
+                fullWidth size="small" type="date"
+                InputLabelProps={{ shrink: true }}
+                value={dateValue} onChange={(e) => set({ date: e.target.value })}
+                sx={{
+                  ...fieldSx(heroColor),
+                  minWidth: 0,
+                  '& .MuiInputBase-input': {
+                    minWidth: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  },
+                }}
+              />
+            </Box>
+
             {/* ── More details collapsible ── */}
             <Box
               sx={{
@@ -993,7 +1015,7 @@ export default function ExpenseComposer({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
                   {!showMore && (
                     <Typography sx={{ fontSize: 11.5, color: 'text.disabled' }} noWrap>
-                      {legacyType ? 'Date, location, payment' : 'Date, income, location'}
+                      {legacyType ? 'Location, payment' : 'Income, location'}
                     </Typography>
                   )}
                   <ExpandMoreIcon
@@ -1051,22 +1073,6 @@ export default function ExpenseComposer({
                       />
                     </Box>
                   )}
-
-                  <TextField
-                    fullWidth size="small" type="date" label="Date"
-                    InputLabelProps={{ shrink: true }}
-                    value={dateValue} onChange={(e) => set({ date: e.target.value })}
-                    sx={{
-                      ...fieldSx(heroColor),
-                      minWidth: 0,
-                      '& .MuiInputBase-input': {
-                        minWidth: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      },
-                    }}
-                  />
-
 
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                     <TextField

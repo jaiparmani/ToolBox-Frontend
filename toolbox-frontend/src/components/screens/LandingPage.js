@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Fab } from '@mui/material';
+import { Box, Typography, Fab, Snackbar, Alert } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { yourShareOf } from '../rest/expenseTrackerApis';
+import { yourShareOf, addExpenseApi, bulkAddExpenses } from '../rest/expenseTrackerApis';
 import ProjectionChart from '../ui/ProjectionChart';
 import DashPace from '../ui/DashPace';
 import DashSpendTrend from '../ui/DashSpendTrend';
@@ -18,7 +18,7 @@ import DashWeekCompare from '../ui/DashWeekCompare';
 import DashCategoryMovers from '../ui/DashCategoryMovers';
 import MoneyPulse from '../ui/MoneyPulse';
 import MonthRecapCard, { shouldShowRecap } from '../ui/MonthRecapCard';
-import QuickAddExpense from '../ui/QuickAddExpense';
+import ExpenseComposer from '../ui/ExpenseComposer';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import CategoryDonut from '../ui/CategoryDonut';
 import CursorGlow from '../motion/CursorGlow';
@@ -34,7 +34,13 @@ import {
 import { money } from '../ui/money';
 import useMonthlyDashboard from '../ui/useMonthlyDashboard';
 import usePressSpring from '../ui/usePressSpring';
+import { feedback } from '../ui/feedback';
 import { accents, motion as motionTokens, radius, type } from '../../theme/tokens';
+
+const BLANK_EXPENSE = {
+  id: null, amount: '', description: '', categoryId: '', date: new Date(),
+  tagIds: [], location: '', paymentMethod: '', transactionType: 'expense', isRecurring: false,
+};
 
 const GREEN = accents.mint;
 const greetOf = () => { const h = new Date().getHours(); return h < 5 ? 'Still up' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; };
@@ -69,20 +75,79 @@ export default function LandingPage() {
   const { user } = useAuth();
   const heroPress = usePressSpring({ pressScale: 0.96 });
   const fabPress = usePressSpring({ pressScale: 0.92 });
-  const [originRect, setOriginRect] = useState(null);
-  const [addOpen, setAddOpen] = useState(false);
-  const [addDate, setAddDate] = useState(null);
   const [recapDismissed, setRecapDismissed] = useState(false);
 
-  // Tapping a blank day on the spend calendar opens the same composer,
-  // pre-dated there instead of today.
-  const openAddForDate = (dateStr) => { setOriginRect(null); setAddDate(dateStr); setAddOpen(true); };
+  // The same composer the Activity page uses, so "add an expense" is one
+  // experience, not two that quietly drift apart (smart-add parsing,
+  // category/tag auto-fill, the date field — all of it, in both places).
+  const [expenseForm, setExpenseForm] = useState({ open: false, editing: false, data: {} });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const [duplicateWarning, setDuplicateWarning] = useState(null);
 
   const {
-    report, lastReport, recent, insightText, categories, recurring, history, pulse,
+    report, lastReport, recent, insightText, categories, tags, recurring, history, pulse,
     dayOfMonth, daysInMonth, monthName, spent, count, trend, cats, topCat, delta, avgPerDay, rhythm, settle,
     reload, status,
   } = useMonthlyDashboard();
+
+  // Tapping a blank day on the spend calendar opens the same composer,
+  // pre-dated there instead of today.
+  const openExpenseForm = (dateStr) => {
+    setExpenseForm({ open: true, editing: false, data: { ...BLANK_EXPENSE, date: dateStr ? new Date(dateStr) : new Date() } });
+  };
+  const closeExpenseForm = () => setExpenseForm({ open: false, editing: false, data: {} });
+
+  const saveExpense = async () => {
+    if (!expenseForm.data.amount || parseFloat(expenseForm.data.amount) <= 0) {
+      setError('Please enter a valid amount greater than 0'); return;
+    }
+    if (!expenseForm.data.description || expenseForm.data.description.trim().length < 3) {
+      setError('Please enter a description (minimum 3 characters)'); return;
+    }
+    if (!expenseForm.data.categoryId) {
+      setError('Please select a category'); return;
+    }
+    if (!expenseForm.data.date) {
+      setError('Please select a date'); return;
+    }
+
+    setSaving(true);
+    try {
+      const created = await addExpenseApi(expenseForm.data);
+      setSuccess('Expense added successfully!');
+      if (created?.duplicateWarning) {
+        const d = created.duplicateWarning;
+        setDuplicateWarning(`Looks like a duplicate of "${d.description}" (${money(parseFloat(d.amount))}) added moments ago.`);
+      }
+      feedback('success');
+      closeExpenseForm();
+      reload();
+    } catch (err) {
+      feedback('error');
+      setError(err.message || 'Failed to add expense');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Commit a reviewed batch straight from the composer's Smart-add flow.
+  const addExpenseBatchHandler = async (items) => {
+    const result = await bulkAddExpenses(items, true);
+    feedback('success');
+    setSuccess(`Added ${result.count} ${result.count === 1 ? 'transaction' : 'transactions'}`);
+    closeExpenseForm();
+    reload();
+  };
+
+  // Commit a single reviewed row without closing the composer.
+  const addExpenseOneHandler = async (item) => {
+    const result = await bulkAddExpenses([item], true);
+    feedback('success');
+    setSuccess(`Added ${result.count === 1 ? (result.items?.[0]?.description || 'expense') : `${result.count} transactions`}`);
+    reload();
+  };
 
   const lastMonthName = React.useMemo(() => {
     if (!lastReport) return '';
@@ -99,7 +164,7 @@ export default function LandingPage() {
       if (e.key.toLowerCase() === 'a' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         const t = e.target; const tag = t?.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || t?.isContentEditable) return;
-        e.preventDefault(); setAddOpen(true);
+        e.preventDefault(); openExpenseForm();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -221,8 +286,8 @@ export default function LandingPage() {
 
                 {/* hero action */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 3, flexWrap: 'wrap' }}>
-                  <Box ref={heroPress.ref} role="button" tabIndex={0} onClick={(e) => { setOriginRect(e.currentTarget.getBoundingClientRect()); setAddDate(null); setAddOpen(true); }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAddOpen(true); } }}
+                  <Box ref={heroPress.ref} role="button" tabIndex={0} onClick={() => openExpenseForm()}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openExpenseForm(); } }}
                     {...heroPress.bindEvents}
                     sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, pl: 1.75, pr: 2.25, py: 1.15, borderRadius: `${radius.pill}px`, cursor: 'pointer',
                       bgcolor: GREEN, color: '#04150e', fontWeight: 650, fontSize: 14.5,
@@ -368,7 +433,7 @@ export default function LandingPage() {
               ) : (
                 <>
                   <Reveal index={6} sx={{ ...slot, '&:empty': { display: 'none' } }}>
-                    <DashSpendCalendar dailyTotals={report?.daily_totals || []} onAddExpense={openAddForDate} />
+                    <DashSpendCalendar dailyTotals={report?.daily_totals || []} onAddExpense={openExpenseForm} />
                   </Reveal>
                   {settle && (
                     <Reveal index={7} sx={{ ...slot, flexBasis: 300 }}>
@@ -486,13 +551,40 @@ export default function LandingPage() {
       </Box>
 
       {/* floating add (mobile-friendly, always reachable) */}
-      <Fab ref={fabPress.ref} onClick={(e) => { setOriginRect(e.currentTarget.getBoundingClientRect()); setAddDate(null); setAddOpen(true); }} aria-label="Add expense"
+      <Fab ref={fabPress.ref} onClick={() => openExpenseForm()} aria-label="Add expense"
         {...fabPress.bindEvents}
         sx={{ position: 'fixed', bottom: { xs: 20, md: 28 }, right: { xs: 20, md: 28 }, zIndex: 20, bgcolor: GREEN, color: '#04150e', boxShadow: '0 8px 24px -6px rgba(0,0,0,0.5)', '&:hover': { bgcolor: GREEN, filter: 'brightness(1.05)' } }}>
         <AddRoundedIcon />
       </Fab>
 
-      <QuickAddExpense open={addOpen} onClose={() => setAddOpen(false)} categories={categories} onAdded={reload} originRect={originRect} initialDate={addDate} />
+      <ExpenseComposer
+        open={expenseForm.open}
+        editing={expenseForm.editing}
+        data={expenseForm.data}
+        saving={saving}
+        categories={categories}
+        tags={tags}
+        onClose={closeExpenseForm}
+        onChange={(patch) => setExpenseForm((prev) => ({ ...prev, data: { ...prev.data, ...patch } }))}
+        onSave={saveExpense}
+        onSmartParse={(text) => bulkAddExpenses(text, false)}
+        onAddBatch={addExpenseBatchHandler}
+        onAddOne={addExpenseOneHandler}
+      />
+
+      {/* Failures stay until dismissed; confirmations fade on their own */}
+      <Snackbar open={!!error} autoHideDuration={5000} onClose={() => setError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} sx={{ bottom: { xs: 80, md: 24 } }}>
+        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%', borderRadius: 3 }}>{error}</Alert>
+      </Snackbar>
+      <Snackbar open={!!success} autoHideDuration={4000} onClose={() => setSuccess(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} sx={{ bottom: { xs: 80, md: 24 } }}>
+        <Alert onClose={() => setSuccess(null)} severity="success" sx={{ width: '100%', borderRadius: 3 }}>{success}</Alert>
+      </Snackbar>
+      <Snackbar open={!!duplicateWarning} autoHideDuration={7000} onClose={() => setDuplicateWarning(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} sx={{ bottom: { xs: 80, md: 24 } }}>
+        <Alert onClose={() => setDuplicateWarning(null)} severity="warning" sx={{ width: '100%', borderRadius: 3 }}>{duplicateWarning}</Alert>
+      </Snackbar>
     </Box>
   );
 }

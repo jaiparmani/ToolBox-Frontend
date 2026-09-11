@@ -8,13 +8,9 @@ import {
 import { motion, useReducedMotion } from 'framer-motion';
 import DashboardIcon from '@mui/icons-material/SpaceDashboardRounded';
 import AutoStoriesRoundedIcon from '@mui/icons-material/AutoStoriesRounded';
-import AllInboxIcon from '@mui/icons-material/MoveToInboxRounded';
 import TimelineIcon from '@mui/icons-material/TimelineRounded';
 import AutorenewIcon from '@mui/icons-material/AutorenewRounded';
 import AutoGraphIcon from '@mui/icons-material/InsightsRounded';
-import CallSplitIcon from '@mui/icons-material/CallSplitRounded';
-import BubbleChartIcon from '@mui/icons-material/BubbleChartRounded';
-import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
 import SettingsIcon from '@mui/icons-material/SettingsRounded';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import LogoutIcon from '@mui/icons-material/LogoutRounded';
@@ -22,7 +18,6 @@ import LightModeIcon from '@mui/icons-material/LightModeRounded';
 import DarkModeIcon from '@mui/icons-material/DarkModeRounded';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweepRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
-import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 
 import { authUtils } from './rest/authUtils';
 import { clearAllData } from './rest/userApis';
@@ -39,24 +34,22 @@ import { accents, type } from '../theme/tokens';
 
 const RAIL_W = 256;
 
+// Nav is scoped to the expense-tracking core — recording, viewing, and
+// analysing your own transactions. Inbox (copilot cards + split balances),
+// Universe and Pulse (immersive, opt-in visualisations), Shared (splitting
+// bills with other people) and the guide are deliberately not primary nav
+// items; their routes and pages still exist (a copilot card's "Settle up" or
+// "Manage recurring" action still lands somewhere real), they're just not
+// what this app leads with.
 const NAV = [
   { seg: 'dashboard', alias: ['', 'dashboard'], label: 'Home', icon: DashboardIcon, tone: accents.blue },
   { seg: 'story', label: 'Today', icon: AutoStoriesRoundedIcon, tone: accents.mint },
-  { seg: 'inbox', label: 'Inbox', icon: AllInboxIcon, tone: accents.cyan },
   { seg: 'expense-tracker', label: 'Activity', icon: TimelineIcon, tone: accents.blue },
   { seg: 'recurring', label: 'Recurring', icon: AutorenewIcon, tone: accents.violet },
   { seg: 'reports', label: 'Insights', icon: AutoGraphIcon, tone: accents.purple },
-  { seg: 'universe', label: 'Universe', icon: BubbleChartIcon, tone: accents.violet },
-  { seg: 'pulse', label: 'Pulse', icon: FavoriteBorderRoundedIcon, tone: accents.red },
-  { seg: 'splits', label: 'Shared', icon: CallSplitIcon, tone: accents.amber },
 ];
 
-// Not a money section, so it sits below the hairline rather than under the
-// "Money" heading — but it's the same NavItem, because it behaves the same.
-// Named for what's in it: a person looking for help is looking for "How to use".
-const LEARN = [
-  { seg: 'how-to', label: 'How to use', icon: MenuBookRoundedIcon, tone: accents.cyan },
-];
+const LEARN = [];
 
 const ALL_NAV = [...NAV, ...LEARN];
 
@@ -152,11 +145,15 @@ function RailContent({ pathname, onNavigate, onOpenAccount, accountRef, user }) 
           <NavItem key={item.seg} item={item} active={isActive(item, pathname)} reduce={reduce}
             onClick={() => onNavigate('/' + item.seg)} />
         ))}
-        <Box sx={{ height: '1px', bgcolor: 'divider', mx: 1.5, my: 1 }} aria-hidden />
-        {LEARN.map((item) => (
-          <NavItem key={item.seg} item={item} active={isActive(item, pathname)} reduce={reduce}
-            onClick={() => onNavigate('/' + item.seg)} />
-        ))}
+        {LEARN.length > 0 && (
+          <>
+            <Box sx={{ height: '1px', bgcolor: 'divider', mx: 1.5, my: 1 }} aria-hidden />
+            {LEARN.map((item) => (
+              <NavItem key={item.seg} item={item} active={isActive(item, pathname)} reduce={reduce}
+                onClick={() => onNavigate('/' + item.seg)} />
+            ))}
+          </>
+        )}
       </Box>
 
       <Box sx={{ flex: 1 }} />

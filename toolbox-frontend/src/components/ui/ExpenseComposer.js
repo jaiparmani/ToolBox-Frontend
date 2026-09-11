@@ -669,7 +669,7 @@ export default function ExpenseComposer({
                 {'₹'}
               </Typography>
               <InputBase
-                inputRef={amountRef} type="number" placeholder="0" value={data.amount}
+                inputRef={amountRef} type="number" placeholder="0" value={data.amount ?? ''}
                 onChange={(e) => set({ amount: e.target.value })}
                 inputProps={{ inputMode: 'decimal', style: { textAlign: 'center' } }}
                 sx={{
@@ -831,7 +831,7 @@ export default function ExpenseComposer({
                 <InputBase
                   inputRef={descriptionRef}
                   fullWidth placeholder="What was it for?"
-                  value={data.description}
+                  value={data.description ?? ''}
                   onChange={(e) => set({ description: e.target.value })}
                   onFocus={() => setShowSuggestions(true)}
                   onBlur={() => setShowSuggestions(false)}

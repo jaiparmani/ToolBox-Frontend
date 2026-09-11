@@ -17,6 +17,7 @@ import DashUpcomingBills from '../ui/DashUpcomingBills';
 import DashWeekCompare from '../ui/DashWeekCompare';
 import DashCategoryMovers from '../ui/DashCategoryMovers';
 import MoneyPulse from '../ui/MoneyPulse';
+import MonthRecapCard, { shouldShowRecap } from '../ui/MonthRecapCard';
 import QuickAddExpense from '../ui/QuickAddExpense';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import CategoryDonut from '../ui/CategoryDonut';
@@ -70,12 +71,27 @@ export default function LandingPage() {
   const fabPress = usePressSpring({ pressScale: 0.92 });
   const [originRect, setOriginRect] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [addDate, setAddDate] = useState(null);
+  const [recapDismissed, setRecapDismissed] = useState(false);
+
+  // Tapping a blank day on the spend calendar opens the same composer,
+  // pre-dated there instead of today.
+  const openAddForDate = (dateStr) => { setOriginRect(null); setAddDate(dateStr); setAddOpen(true); };
 
   const {
     report, lastReport, recent, insightText, categories, recurring, history, pulse,
     dayOfMonth, daysInMonth, monthName, spent, count, trend, cats, topCat, delta, avgPerDay, rhythm, settle,
     reload, status,
   } = useMonthlyDashboard();
+
+  const lastMonthName = React.useMemo(() => {
+    if (!lastReport) return '';
+    return new Date(lastReport.year, lastReport.month - 1, 1).toLocaleDateString('en-IN', { month: 'long' });
+  }, [lastReport]);
+  const showRecap = !recapDismissed && shouldShowRecap({
+    dayOfMonth, lastReport,
+    dismissedKey: lastReport ? `${lastReport.year}-${String(lastReport.month).padStart(2, '0')}` : '',
+  });
 
   // open quick-add with the "a" shortcut (when not typing)
   useEffect(() => {
@@ -205,7 +221,7 @@ export default function LandingPage() {
 
                 {/* hero action */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 3, flexWrap: 'wrap' }}>
-                  <Box ref={heroPress.ref} role="button" tabIndex={0} onClick={(e) => { setOriginRect(e.currentTarget.getBoundingClientRect()); setAddOpen(true); }}
+                  <Box ref={heroPress.ref} role="button" tabIndex={0} onClick={(e) => { setOriginRect(e.currentTarget.getBoundingClientRect()); setAddDate(null); setAddOpen(true); }}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAddOpen(true); } }}
                     {...heroPress.bindEvents}
                     sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, pl: 1.75, pr: 2.25, py: 1.15, borderRadius: `${radius.pill}px`, cursor: 'pointer',
@@ -243,6 +259,16 @@ export default function LandingPage() {
           <Box sx={{ mb: { xs: 2, md: 2.5 } }}>
             <Reveal index={2}>
               <MoneyPulse pulse={pulse} />
+            </Reveal>
+          </Box>
+        )}
+
+        {/* A brief look back at the month that just ended — first week of a
+            new month only, and only while it hasn't been dismissed. */}
+        {!firstWave && !failed && showRecap && (
+          <Box sx={{ mb: { xs: 2, md: 2.5 } }}>
+            <Reveal index={3}>
+              <MonthRecapCard lastReport={lastReport} monthName={lastMonthName} onDismiss={() => setRecapDismissed(true)} />
             </Reveal>
           </Box>
         )}
@@ -342,7 +368,7 @@ export default function LandingPage() {
               ) : (
                 <>
                   <Reveal index={6} sx={{ ...slot, '&:empty': { display: 'none' } }}>
-                    <DashSpendCalendar dailyTotals={report?.daily_totals || []} />
+                    <DashSpendCalendar dailyTotals={report?.daily_totals || []} onAddExpense={openAddForDate} />
                   </Reveal>
                   {settle && (
                     <Reveal index={7} sx={{ ...slot, flexBasis: 300 }}>
@@ -460,13 +486,13 @@ export default function LandingPage() {
       </Box>
 
       {/* floating add (mobile-friendly, always reachable) */}
-      <Fab ref={fabPress.ref} onClick={(e) => { setOriginRect(e.currentTarget.getBoundingClientRect()); setAddOpen(true); }} aria-label="Add expense"
+      <Fab ref={fabPress.ref} onClick={(e) => { setOriginRect(e.currentTarget.getBoundingClientRect()); setAddDate(null); setAddOpen(true); }} aria-label="Add expense"
         {...fabPress.bindEvents}
         sx={{ position: 'fixed', bottom: { xs: 20, md: 28 }, right: { xs: 20, md: 28 }, zIndex: 20, bgcolor: GREEN, color: '#04150e', boxShadow: '0 8px 24px -6px rgba(0,0,0,0.5)', '&:hover': { bgcolor: GREEN, filter: 'brightness(1.05)' } }}>
         <AddRoundedIcon />
       </Fab>
 
-      <QuickAddExpense open={addOpen} onClose={() => setAddOpen(false)} categories={categories} onAdded={reload} originRect={originRect} />
+      <QuickAddExpense open={addOpen} onClose={() => setAddOpen(false)} categories={categories} onAdded={reload} originRect={originRect} initialDate={addDate} />
     </Box>
   );
 }

@@ -26,8 +26,14 @@ const alphaHex = (a) => pad(Math.max(0, Math.min(255, Math.round(a * 255))).toSt
  * its tooltip, in the header readout, and in a visually-hidden list; future days
  * carry no data and render as empty placeholders. Renders nothing until spend has
  * landed on enough days to read as a pattern.
+ *
+ * A day with nothing on it has little to pin and show — so when `onAddExpense`
+ * is given, tapping a blank past day opens the composer pre-dated there
+ * instead of pinning an empty "nothing spent" readout. A day that already has
+ * spend keeps the original tap-to-pin behaviour; there's real data worth
+ * surfacing on those.
  */
-export default function DashSpendCalendar({ dailyTotals = [] }) {
+export default function DashSpendCalendar({ dailyTotals = [], onAddExpense }) {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -66,6 +72,14 @@ export default function DashSpendCalendar({ dailyTotals = [] }) {
 
   const heaviestDate = new Date(year, month, heaviest.day).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
+  const cellClick = (c) => {
+    if (!c.amt && !c.future && onAddExpense) {
+      onAddExpense(`${year}-${pad(month + 1)}-${pad(c.day)}`);
+      return;
+    }
+    setPickedDay((d) => (d === c.day ? null : c.day));
+  };
+
   return (
     <Box
       role="group"
@@ -99,21 +113,25 @@ export default function DashSpendCalendar({ dailyTotals = [] }) {
           const isToday = c.day === today;
           const on = c.amt > 0;
           const isPicked = pickedDay === c.day;
+          const addable = !c.amt && !c.future && !!onAddExpense;
           // Perceptual floor so a small spend day still reads above an empty one.
           const t = on ? 0.22 + 0.78 * Math.sqrt(c.amt / max) : 0;
           return (
             <Box
               key={i}
               role="button" tabIndex={0}
-              aria-label={`${c.day} ${monthLabel.slice(0, 3)} · ${on ? money(c.amt) : (c.future ? 'upcoming' : 'nothing spent')}`}
-              aria-pressed={isPicked}
+              aria-label={addable
+                ? `Add an expense on ${c.day} ${monthLabel.slice(0, 3)}`
+                : `${c.day} ${monthLabel.slice(0, 3)} · ${on ? money(c.amt) : (c.future ? 'upcoming' : 'nothing spent')}`}
+              aria-pressed={addable ? undefined : isPicked}
               onMouseEnter={() => setPointedDay(c.day)}
               onMouseLeave={() => setPointedDay(null)}
               onFocus={() => setPointedDay(c.day)}
               onBlur={() => setPointedDay(null)}
-              onClick={() => setPickedDay((d) => (d === c.day ? null : c.day))}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPickedDay((d) => (d === c.day ? null : c.day)); } }}
+              onClick={() => cellClick(c)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cellClick(c); } }}
               sx={{
+                position: 'relative',
                 aspectRatio: '1 / 1', borderRadius: '5px', display: 'grid', placeItems: 'center', cursor: 'pointer',
                 bgcolor: on ? `${GREEN}${alphaHex(t)}` : (c.future ? 'transparent' : 'action.hover'),
                 border: (isToday || isPicked) ? '1.5px solid' : (c.future ? '1px dashed' : '1px solid transparent'),
@@ -126,8 +144,17 @@ export default function DashSpendCalendar({ dailyTotals = [] }) {
               <Typography sx={{
                 ...num, fontSize: 10, lineHeight: 1, fontWeight: isToday ? 700 : 500,
                 color: on ? (t > 0.55 ? '#04150e' : 'text.primary') : (c.future ? 'text.disabled' : 'text.secondary'),
-                opacity: c.future ? 0.55 : 1,
+                opacity: addable && pointedDay === c.day ? 0 : (c.future ? 0.55 : 1),
+                transition: 'opacity .1s ease',
               }}>{c.day}</Typography>
+              {/* Swaps in for the day number on hover/focus — the cell has
+                  nothing else worth pinning, so the affordance is "add one". */}
+              {addable && (
+                <Typography aria-hidden sx={{
+                  ...num, position: 'absolute', fontSize: 13, lineHeight: 1, fontWeight: 700, color: GREEN,
+                  opacity: pointedDay === c.day ? 1 : 0, transition: 'opacity .1s ease',
+                }}>+</Typography>
+              )}
             </Box>
           );
         })}

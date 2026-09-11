@@ -13,7 +13,7 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { accents, motion as motionTokens, type, radius, color } from '../../theme/tokens';
 import { money } from './money';
-import { createCategory, createTag } from '../rest/expenseTrackerApis';
+import { createCategory, createTag, getEntrySuggestions, getLabelUsage } from '../rest/expenseTrackerApis';
 
 /**
  * The add / edit expense composer.
@@ -236,6 +236,17 @@ export default function ExpenseComposer({
   const [catError, setCatError] = React.useState(null);
   const [tagError, setTagError] = React.useState(null);
 
+  // Entry-time suggestions — matching past descriptions plus the category/
+  // tags most often paired with them. Auto-fill only ever touches a *blank*
+  // field: once you've picked something yourself (or a suggestion already
+  // filled it), later keystrokes never override it. Frequency counts for the
+  // picker order are fetched once per open, not per keystroke.
+  const [suggestions, setSuggestions] = React.useState({ descriptions: [], category_id: null, tag_ids: [] });
+  const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const [labelUsage, setLabelUsage] = React.useState({ categories: {}, tags: {} });
+  const suggestDebounce = React.useRef(null);
+  const descriptionRef = React.useRef(null);
+
   const typeId = data.transactionType || 'expense';
   const activeType = TYPE_META[typeId] || DEFAULT_TYPE;
   const heroColor = activeType.color;
@@ -258,7 +269,26 @@ export default function ExpenseComposer({
   // Categories are typed on the backend, and it rejects a save whose type and
   // category type disagree. So only offer categories that match the chosen type
   // — otherwise you could pick an expense category for an income and get a 400.
-  const visibleCats = allCats.filter(c => (c.transaction_type || 'expense') === activeType.id);
+  // Ordered by how often *you* actually use each one (label_usage), not
+  // alphabetically — a stable sort, so two equally-unused categories keep
+  // their original relative order rather than jittering between renders.
+  const visibleCats = React.useMemo(() => {
+    const list = allCats.filter(c => (c.transaction_type || 'expense') === activeType.id);
+    return [...list].sort((a, b) => (labelUsage.categories[a.id] || 0) < (labelUsage.categories[b.id] || 0) ? 1
+      : (labelUsage.categories[a.id] || 0) > (labelUsage.categories[b.id] || 0) ? -1 : 0);
+  }, [allCats, activeType.id, labelUsage]);
+  const sortedTags = React.useMemo(() => (
+    [...allTags].sort((a, b) => (labelUsage.tags[a.id] || 0) < (labelUsage.tags[b.id] || 0) ? 1
+      : (labelUsage.tags[a.id] || 0) > (labelUsage.tags[b.id] || 0) ? -1 : 0)
+  ), [allTags, labelUsage]);
+
+  // Nothing to offer once it exactly matches what's already typed.
+  const suggestionList = React.useMemo(() => {
+    const current = (data.description || '').trim().toLowerCase();
+    return suggestions.descriptions.filter((d) => d.toLowerCase() !== current);
+  }, [suggestions.descriptions, data.description]);
+
+  const set = (patch) => onChange(patch);
 
   React.useEffect(() => {
     if (open) {
@@ -266,12 +296,54 @@ export default function ExpenseComposer({
       setNlText(''); setBatch([]); setNlError(null); setParsing(false); setCommitting(false);
       setMadeCats([]); setMadeTags([]);
       setCatDraft(null); setTagDraft(null); setCatError(null); setTagError(null);
+      setSuggestions({ descriptions: [], category_id: null, tag_ids: [] });
+      setShowSuggestions(false);
       const t = setTimeout(() => amountRef.current?.focus(), 250);
+      getLabelUsage()
+        .then((u) => setLabelUsage({ categories: u?.categories || {}, tags: u?.tags || {} }))
+        .catch(() => {}); // frequency order is a nicety - the alphabetical fallback still works
       return () => clearTimeout(t);
     }
   }, [open]);
 
-  const set = (patch) => onChange(patch);
+  // Debounced: matching past descriptions, plus the category/tags most often
+  // paired with them. A short description isn't worth a round trip - it would
+  // match almost everything and suggest nothing useful.
+  React.useEffect(() => {
+    const text = (data.description || '').trim();
+    clearTimeout(suggestDebounce.current);
+    if (!open || text.length < 2) {
+      setSuggestions({ descriptions: [], category_id: null, tag_ids: [] });
+      return undefined;
+    }
+    suggestDebounce.current = setTimeout(() => {
+      getEntrySuggestions(text, typeId)
+        .then((res) => setSuggestions({
+          descriptions: res?.descriptions || [],
+          category_id: res?.category_id ?? null,
+          tag_ids: res?.tag_ids || [],
+        }))
+        .catch(() => {});
+    }, 300);
+    return () => clearTimeout(suggestDebounce.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.description, typeId, open]);
+
+  // Fill category/tags from the suggestion, but only into a field that's
+  // still blank - never second-guess a choice you (or an earlier suggestion)
+  // already made. allCats/allTags gate it so a suggested id from before a
+  // freshly-created label lands is never applied against a stale list.
+  React.useEffect(() => {
+    if (!data.categoryId && suggestions.category_id && allCats.some(c => c.id === suggestions.category_id)) {
+      set({ categoryId: suggestions.category_id });
+    }
+    if ((data.tagIds || []).length === 0 && suggestions.tag_ids.length > 0) {
+      const valid = suggestions.tag_ids.filter((id) => allTags.some(t => t.id === id));
+      if (valid.length > 0) set({ tagIds: valid });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestions]);
+
   const dateValue = data.date instanceof Date
     ? data.date.toISOString().slice(0, 10)
     : (typeof data.date === 'string' ? data.date.slice(0, 10) : '');
@@ -736,26 +808,65 @@ export default function ExpenseComposer({
         ) : (
           /* ── Single-entry form ── */
           <>
-            {/* Description input — styled as a cohesive surface */}
-            <Box
-              sx={{
-                mb: 3, px: 1.75, py: 0.25,
-                borderRadius: `${radius.lg}px`,
-                border: '1px solid', borderColor: (t) => color.hairline[t.palette.mode],
-                bgcolor: (t) => color.sunken[t.palette.mode],
-                transition: `border-color ${motionTokens.fast}ms ${motionTokens.ease}, box-shadow ${motionTokens.fast}ms ${motionTokens.ease}`,
-                '&:focus-within': {
-                  borderColor: `${heroColor}44`,
-                  boxShadow: `0 0 0 3px ${heroColor}0d`,
-                },
-              }}
-            >
-              <InputBase
-                fullWidth placeholder="What was it for?"
-                value={data.description}
-                onChange={(e) => set({ description: e.target.value })}
-                sx={{ fontSize: 16, py: 1.25 }}
-              />
+            {/* Description input — styled as a cohesive surface. Past
+                descriptions that match what you're typing drop down below it
+                (Apple Design §1: respond to input, don't wait for you to
+                finish); picking one also refreshes the category/tag
+                suggestion for that exact wording. */}
+            <Box sx={{ position: 'relative', mb: 3 }}>
+              <Box
+                sx={{
+                  px: 1.75, py: 0.25,
+                  borderRadius: showSuggestions && suggestionList.length > 0
+                    ? `${radius.lg}px ${radius.lg}px 0 0` : `${radius.lg}px`,
+                  border: '1px solid', borderColor: (t) => color.hairline[t.palette.mode],
+                  bgcolor: (t) => color.sunken[t.palette.mode],
+                  transition: `border-color ${motionTokens.fast}ms ${motionTokens.ease}, box-shadow ${motionTokens.fast}ms ${motionTokens.ease}`,
+                  '&:focus-within': {
+                    borderColor: `${heroColor}44`,
+                    boxShadow: `0 0 0 3px ${heroColor}0d`,
+                  },
+                }}
+              >
+                <InputBase
+                  inputRef={descriptionRef}
+                  fullWidth placeholder="What was it for?"
+                  value={data.description}
+                  onChange={(e) => set({ description: e.target.value })}
+                  onFocus={() => setShowSuggestions(true)}
+                  onBlur={() => setShowSuggestions(false)}
+                  sx={{ fontSize: 16, py: 1.25 }}
+                />
+              </Box>
+              {showSuggestions && suggestionList.length > 0 && (
+                <Box
+                  sx={{
+                    position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 2,
+                    border: '1px solid', borderTop: 'none', borderColor: (t) => color.hairline[t.palette.mode],
+                    borderRadius: `0 0 ${radius.lg}px ${radius.lg}px`,
+                    bgcolor: (t) => color.raised[t.palette.mode],
+                    boxShadow: '0 8px 20px -6px rgba(0,0,0,0.35)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {suggestionList.map((desc) => (
+                    <Box
+                      key={desc}
+                      role="button" tabIndex={-1}
+                      // mousedown, not click: fires before the input's blur,
+                      // so the dropdown is still there to be picked from.
+                      onMouseDown={(e) => { e.preventDefault(); set({ description: desc }); setShowSuggestions(false); }}
+                      sx={{
+                        px: 1.75, py: 1, fontSize: 14, cursor: 'pointer', color: 'text.secondary',
+                        transition: `background-color ${motionTokens.fast}ms ${motionTokens.ease}`,
+                        '&:hover': { bgcolor: (t) => color.sunken[t.palette.mode], color: 'text.primary' },
+                      }}
+                    >
+                      {desc}
+                    </Box>
+                  ))}
+                </Box>
+              )}
             </Box>
 
             {/* Category section */}
@@ -811,7 +922,7 @@ export default function ExpenseComposer({
             <Box sx={{ mb: 3 }}>
               <Eyebrow sx={{ mb: 1.25 }}>Tags</Eyebrow>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                {allTags.map((tag) => {
+                {sortedTags.map((tag) => {
                   const on = selectedTags.has(tag.id);
                   const tagColor = tag.color || heroColor;
                   return (

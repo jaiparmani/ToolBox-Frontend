@@ -1181,6 +1181,29 @@ export const getExpenseSummary = async (filters = {}) => {
     }
 };
 
+// What you typed before, for what you're typing now — matching past
+// descriptions plus the category/tags you most often paired with them.
+export const getEntrySuggestions = async (q, transactionType = 'expense') => {
+    try {
+        const params = new URLSearchParams({ q: q || '', type: transactionType });
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/entry_suggestions/?${params}`);
+        return await response.json();
+    } catch (error) {
+        throw handleApiError(error, 'fetch entry suggestions');
+    }
+};
+
+// All-time usage counts per category/tag id (as strings), for sorting
+// pickers by what you actually use instead of alphabetical order.
+export const getLabelUsage = async () => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/label_usage/`);
+        return await response.json();
+    } catch (error) {
+        throw handleApiError(error, 'fetch label usage');
+    }
+};
+
 export const getRecentExpenses = async () => {
     try {
         const response = await authenticatedFetch(`${API_BASE_URL}/expenses/recent/`);

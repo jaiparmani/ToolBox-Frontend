@@ -27,11 +27,11 @@ const alphaHex = (a) => pad(Math.max(0, Math.min(255, Math.round(a * 255))).toSt
  * carry no data and render as empty placeholders. Renders nothing until spend has
  * landed on enough days to read as a pattern.
  *
- * A day with nothing on it has little to pin and show — so when `onAddExpense`
- * is given, tapping a blank past day opens the composer pre-dated there
- * instead of pinning an empty "nothing spent" readout. A day that already has
- * spend keeps the original tap-to-pin behaviour; there's real data worth
- * surfacing on those.
+ * A single tap always pins/shows that day's value — same behaviour on every
+ * cell, spend or none, so idle browsing never has a side effect. A blank,
+ * non-future day is also a shortcut: double-click (or Enter/Space, since a
+ * keyboard has no double-tap) opens the composer pre-dated there when
+ * `onAddExpense` is given.
  */
 export default function DashSpendCalendar({ dailyTotals = [], onAddExpense }) {
   const now = new Date();
@@ -72,12 +72,18 @@ export default function DashSpendCalendar({ dailyTotals = [], onAddExpense }) {
 
   const heaviestDate = new Date(year, month, heaviest.day).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
+  // Single click/tap always pins — identical on every cell, so idle
+  // browsing never has a side effect.
   const cellClick = (c) => {
+    setPickedDay((d) => (d === c.day ? null : c.day));
+  };
+
+  // Adding is the deliberate, harder-to-trigger gesture: a double-click, or
+  // (since keyboard users have no double-tap) a single Enter/Space.
+  const cellAdd = (c) => {
     if (!c.amt && !c.future && onAddExpense) {
       onAddExpense(`${year}-${pad(month + 1)}-${pad(c.day)}`);
-      return;
     }
-    setPickedDay((d) => (d === c.day ? null : c.day));
   };
 
   return (
@@ -120,16 +126,22 @@ export default function DashSpendCalendar({ dailyTotals = [], onAddExpense }) {
             <Box
               key={i}
               role="button" tabIndex={0}
+              title={addable ? 'Double-click to add an expense here' : undefined}
               aria-label={addable
-                ? `Add an expense on ${c.day} ${monthLabel.slice(0, 3)}`
+                ? `${c.day} ${monthLabel.slice(0, 3)} · nothing spent. Double-click, or press Enter, to add an expense here.`
                 : `${c.day} ${monthLabel.slice(0, 3)} · ${on ? money(c.amt) : (c.future ? 'upcoming' : 'nothing spent')}`}
-              aria-pressed={addable ? undefined : isPicked}
+              aria-pressed={isPicked}
               onMouseEnter={() => setPointedDay(c.day)}
               onMouseLeave={() => setPointedDay(null)}
               onFocus={() => setPointedDay(c.day)}
               onBlur={() => setPointedDay(null)}
               onClick={() => cellClick(c)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cellClick(c); } }}
+              onDoubleClick={() => cellAdd(c)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.preventDefault();
+                if (addable) cellAdd(c); else cellClick(c);
+              }}
               sx={{
                 position: 'relative',
                 aspectRatio: '1 / 1', borderRadius: '5px', display: 'grid', placeItems: 'center', cursor: 'pointer',

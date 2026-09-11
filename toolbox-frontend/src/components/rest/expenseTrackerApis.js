@@ -888,6 +888,36 @@ export const actCopilotCard = async (id) => {
     } catch (error) { throw handleApiError(error, 'act on that card'); }
 };
 
+// ── Web Push — a real notification with no tab open, the same way a linked
+// Telegram account already gets one. See ui/pushNotifications.js for the
+// subscribe flow these back.
+export const getVapidPublicKey = async () => {
+    try {
+        const r = await authenticatedFetch(`${API_BASE_URL}/copilot/vapid-public-key/`);
+        return await r.json();
+    } catch (error) { throw handleApiError(error, 'read the push key'); }
+};
+
+export const subscribePush = async (subscription) => {
+    try {
+        await authenticatedFetch(`${API_BASE_URL}/copilot/subscribe/`, {
+            method: 'POST',
+            body: JSON.stringify(subscription),
+        });
+        return true;
+    } catch (error) { throw handleApiError(error, 'save this device for push'); }
+};
+
+export const unsubscribePush = async (endpoint) => {
+    try {
+        await authenticatedFetch(`${API_BASE_URL}/copilot/unsubscribe/`, {
+            method: 'POST',
+            body: JSON.stringify({ endpoint }),
+        });
+        return true;
+    } catch (error) { throw handleApiError(error, 'remove this device from push'); }
+};
+
 export const createRecurring = async (rule) => {
     try {
         const r = await authenticatedFetch(`${API_BASE_URL}/recurring/`, {

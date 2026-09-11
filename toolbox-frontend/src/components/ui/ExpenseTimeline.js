@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, IconButton, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
+import { Box, Typography, IconButton, Menu, MenuItem, ListItemIcon, ListItemText, useTheme, useMediaQuery } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -91,6 +91,14 @@ function ExpenseRow({ expense, prominent, share = 0, onEdit, onDelete, onOpen })
   const dot = expense.category?.color || (income ? accents.green : NEUTRAL_DOT);
   const amountColor = income ? accents.green : accents.red;
   const tags = expense.tags || [];
+  // The category is the identity of this row's subtitle line; tags are
+  // context. On a phone the two are fighting over ~190px, so the pill row
+  // gives up a slot there rather than ever crushing the category to an
+  // unreadable sliver (the bug this guards against — a bare "…" with a
+  // fully-legible tag sitting right next to it).
+  const theme = useTheme();
+  const compactTags = useMediaQuery(theme.breakpoints.down('sm'));
+  const maxTags = compactTags ? 1 : 2;
 
   return (
     <Box
@@ -145,12 +153,22 @@ function ExpenseRow({ expense, prominent, share = 0, onEdit, onDelete, onOpen })
           {expense.description || subtitleOf(expense)}
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.15, minWidth: 0 }}>
-          <Typography sx={{ fontSize: 11, letterSpacing: '0.005em', color: 'text.disabled', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <Typography
+            sx={{
+              fontSize: 11, letterSpacing: '0.005em', color: 'text.disabled',
+              // A guaranteed floor: tags get whatever's left over, never the
+              // other way around. Without this, `flex: 0 1 auto` + the tags'
+              // `flexShrink: 0` let the pills claim the row and squeeze the
+              // category down to a bare ellipsis.
+              flex: '1 1 auto', minWidth: 60,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}
+          >
             {subtitleOf(expense)}{!income && expense.isSplit ? ` · split of ${money(fullAmt(expense))}` : ''}
           </Typography>
           {tags.length > 0 && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4, flexShrink: 0 }}>
-              {tags.slice(0, 2).map((tag) => (
+              {tags.slice(0, maxTags).map((tag) => (
                 <Box
                   key={tag.id}
                   sx={{
@@ -162,8 +180,8 @@ function ExpenseRow({ expense, prominent, share = 0, onEdit, onDelete, onOpen })
                   {tag.name}
                 </Box>
               ))}
-              {tags.length > 2 && (
-                <Typography sx={{ fontSize: 9.5, color: 'text.disabled', flexShrink: 0 }}>+{tags.length - 2}</Typography>
+              {tags.length > maxTags && (
+                <Typography sx={{ fontSize: 9.5, color: 'text.disabled', flexShrink: 0 }}>+{tags.length - maxTags}</Typography>
               )}
             </Box>
           )}

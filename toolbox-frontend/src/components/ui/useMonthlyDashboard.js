@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getMonthlyReport, getRecentExpenses, getLatestExpenseInsight,
-  getCategories, getSplitBalances, getRecurring,
+  getCategories, getSplitBalances, getRecurring, getMoneyPulse,
 } from '../rest/expenseTrackerApis';
 import { computeSettle } from './settleSummary';
 
@@ -29,6 +29,7 @@ export default function useMonthlyDashboard() {
   const [balances, setBalances] = useState(null);
   const [recurring, setRecurring] = useState([]);
   const [history, setHistory] = useState([]);
+  const [pulse, setPulse] = useState(null);
 
   // 'loading' → 'ready' | 'error' per wave. 'error' means *nothing* in that
   // wave came back; a partial failure still counts as ready, because the cards
@@ -59,8 +60,9 @@ export default function useMonthlyDashboard() {
       getCategories({ type: 'expense' }),
       getSplitBalances(),
       getRecurring(),
+      getMoneyPulse(),
     ]).then((results) => {
-      const [r, l, rc, ins, cat, bal, rec] = results;
+      const [r, l, rc, ins, cat, bal, rec, p] = results;
       if (!live()) return;
       setPrimary(results.some((x) => x.status === 'fulfilled') ? 'ready' : 'error');
       if (r.status === 'fulfilled') setReport(r.value);
@@ -70,6 +72,7 @@ export default function useMonthlyDashboard() {
       if (cat.status === 'fulfilled') setCategories(Array.isArray(cat.value) ? cat.value : (cat.value?.results || []));
       if (bal.status === 'fulfilled') setBalances(bal.value ?? null);
       if (rec.status === 'fulfilled') setRecurring(Array.isArray(rec.value) ? rec.value : (rec.value?.results || []));
+      if (p.status === 'fulfilled') setPulse(p.value ?? null);
     });
 
     // 6-month spend history — kept in a separate pass so the main grid never
@@ -157,7 +160,7 @@ export default function useMonthlyDashboard() {
   const insightText = insight ? (insight.summary || insight.text || insight.body || insight.message || (typeof insight === 'string' ? insight : null)) : null;
 
   return {
-    report, lastReport, recent, insight, insightText, categories, balances, recurring, history,
+    report, lastReport, recent, insight, insightText, categories, balances, recurring, history, pulse,
     dayOfMonth, daysInMonth, monthName, spent, count, trend, cats, topCat, delta, avgPerDay, rhythm, settle,
     reload: load,
     // ── fetch status (additive; existing consumers can ignore it) ──

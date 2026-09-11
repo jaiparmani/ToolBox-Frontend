@@ -16,6 +16,7 @@ import DashSpendCalendar from '../ui/DashSpendCalendar';
 import DashUpcomingBills from '../ui/DashUpcomingBills';
 import DashWeekCompare from '../ui/DashWeekCompare';
 import DashCategoryMovers from '../ui/DashCategoryMovers';
+import MoneyPulse from '../ui/MoneyPulse';
 import QuickAddExpense from '../ui/QuickAddExpense';
 import AnimatedNumber from '../ui/AnimatedNumber';
 import CategoryDonut from '../ui/CategoryDonut';
@@ -71,7 +72,7 @@ export default function LandingPage() {
   const [addOpen, setAddOpen] = useState(false);
 
   const {
-    report, lastReport, recent, insightText, categories, recurring, history,
+    report, lastReport, recent, insightText, categories, recurring, history, pulse,
     dayOfMonth, daysInMonth, monthName, spent, count, trend, cats, topCat, delta, avgPerDay, rhythm, settle,
     reload, status,
   } = useMonthlyDashboard();
@@ -235,6 +236,16 @@ export default function LandingPage() {
             </Box>
           )}
         </Box>
+
+        {/* The ambient read on where you stand right now — a plain-language
+            status plus the actual numbers behind it, one tap away. */}
+        {!firstWave && !failed && (
+          <Box sx={{ mb: { xs: 2, md: 2.5 } }}>
+            <Reveal index={2}>
+              <MoneyPulse pulse={pulse} />
+            </Reveal>
+          </Box>
+        )}
 
         {!failed && (
           <>

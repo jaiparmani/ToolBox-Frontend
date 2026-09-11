@@ -11,6 +11,8 @@ import AutoStoriesRoundedIcon from '@mui/icons-material/AutoStoriesRounded';
 import TimelineIcon from '@mui/icons-material/TimelineRounded';
 import AutorenewIcon from '@mui/icons-material/AutorenewRounded';
 import AutoGraphIcon from '@mui/icons-material/InsightsRounded';
+import CallSplitIcon from '@mui/icons-material/CallSplitRounded';
+import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
 import SettingsIcon from '@mui/icons-material/SettingsRounded';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import LogoutIcon from '@mui/icons-material/LogoutRounded';
@@ -34,19 +36,20 @@ import { accents, type } from '../theme/tokens';
 
 const RAIL_W = 256;
 
-// Nav is scoped to the expense-tracking core — recording, viewing, and
-// analysing your own transactions. Inbox (copilot cards + split balances),
-// Universe and Pulse (immersive, opt-in visualisations), Shared (splitting
-// bills with other people) and the guide are deliberately not primary nav
-// items; their routes and pages still exist (a copilot card's "Settle up" or
-// "Manage recurring" action still lands somewhere real), they're just not
-// what this app leads with.
+// Nav is scoped to the expense-tracking core, plus Pulse and Shared brought
+// back by request. Inbox (copilot cards + split balances), Universe
+// (immersive, opt-in visualisation) and the guide stay out; their routes and
+// pages still exist (a copilot card's "Settle up" or "Manage recurring"
+// action still lands somewhere real), they're just not what this app leads
+// with.
 const NAV = [
   { seg: 'dashboard', alias: ['', 'dashboard'], label: 'Home', icon: DashboardIcon, tone: accents.blue },
   { seg: 'story', label: 'Today', icon: AutoStoriesRoundedIcon, tone: accents.mint },
   { seg: 'expense-tracker', label: 'Activity', icon: TimelineIcon, tone: accents.blue },
   { seg: 'recurring', label: 'Recurring', icon: AutorenewIcon, tone: accents.violet },
   { seg: 'reports', label: 'Insights', icon: AutoGraphIcon, tone: accents.purple },
+  { seg: 'pulse', label: 'Pulse', icon: FavoriteBorderRoundedIcon, tone: accents.red },
+  { seg: 'splits', label: 'Shared', icon: CallSplitIcon, tone: accents.amber },
 ];
 
 const LEARN = [];

@@ -17,18 +17,23 @@ self.addEventListener('push', (event) => {
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {
-    // Not JSON — show the raw text rather than nothing.
     if (event.data) data.body = event.data.text();
   }
 
+  // Show the OS notification AND poke any open tabs to refresh the in-app feed.
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: '/logo192.png',
-      badge: '/logo192.png',
-      data: { url: data.url || '/' },
-      tag: data.url || undefined, // a second push to the same place replaces, not stacks
-    })
+    Promise.all([
+      self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: '/logo192.png',
+        badge: '/logo192.png',
+        data: { url: data.url || '/' },
+        tag: data.url || undefined,
+      }),
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+        clients.forEach((c) => c.postMessage({ type: 'toolbox:notify-refresh' }));
+      }),
+    ])
   );
 });
 

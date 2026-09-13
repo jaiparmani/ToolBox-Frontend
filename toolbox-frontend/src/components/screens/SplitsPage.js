@@ -9,6 +9,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import GroupsIcon from '@mui/icons-material/Groups';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import AddIcon from '@mui/icons-material/Add';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import EditIcon from '@mui/icons-material/Edit';
@@ -23,9 +24,11 @@ import LendingAssistant from '../ui/LendingAssistant';
 import ErrorBanner from '../ui/ErrorBanner';
 import { BalanceSkeleton } from '../ui/Skeletons';
 import SwipeAction from '../ui/SwipeAction';
+import ManualSplitDialog from '../ui/ManualSplitDialog';
+import ThinkingHint from '../ui/ThinkingHint';
 import { AnimatePresence, motion, LayoutGroup } from 'framer-motion';
 import { money, moneySmart, relativeDay } from '../ui/money';
-import { accents, type } from '../../theme/tokens';
+import { accents, radius, type } from '../../theme/tokens';
 import { feedback } from '../ui/feedback';
 import GroupStrip from '../ui/GroupStrip';
 import SettleConfirmSheet from '../ui/SettleConfirmSheet';
@@ -35,7 +38,7 @@ import SplitEditDialog from '../ui/SplitEditDialog';
 import SplitSettleDialog from '../ui/SplitSettleDialog';
 import {
   getSplitBalances, settleUpWith, getSplits, updateSplit, deleteSplit,
-  setSplitInExpenses, getCategories,
+  setSplitInExpenses, getCategories, splitAddExpense, addSplitToExpenses,
   getGroups, createGroup, getGroupBalances, getGroupExpenses, splitInGroup,
   addGroupMembers, searchSplitUsers,
 } from '../rest/expenseTrackerApis';
@@ -138,6 +141,16 @@ export default function SplitsPage() {
   const [groupSplit, setGroupSplit] = useState({ amount: '', description: '', saving: false });
   const [addPeople, setAddPeople] = useState({ open: false, picked: [], options: [], saving: false });
 
+  // Adding a new split. The one-line capture reads plain language ("split
+  // 1200 dinner with raj and priya"); "Exact" opens the full dialog for named
+  // numbers instead. Both are the entry point now that splitting lives here.
+  const [quickAdd, setQuickAdd] = useState({ text: '', loading: false });
+  const [manualOpen, setManualOpen] = useState(false);
+
+  // Bills you paid and split, but chose not to count as your own spending —
+  // tracked here only, until you say otherwise.
+  const [splitOnly, setSplitOnly] = useState([]);
+
   const load = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true }));
     try {
@@ -184,9 +197,21 @@ export default function SplitsPage() {
     }
   }, []);
 
+  // Split-only bills you paid: not yet counted in your own expenses. A split
+  // someone else made isn't ours to promote — "Add to expenses" PATCHes an
+  // expense owned by them and 404s — so only bills owed *to* us belong here.
+  const loadSplitOnly = useCallback(async () => {
+    try {
+      const all = await getSplits({ settled: 'false' });
+      setSplitOnly(all.filter(s => s.splitOnly && s.direction === 'owed_to_you'));
+    } catch (err) {
+      setSplitOnly([]);
+    }
+  }, []);
+
   useEffect(() => {
-    if (isAuthenticated) { load(); loadGroups(); loadShared(); loadSettledHistory(); }
-  }, [isAuthenticated, load, loadGroups, loadShared, loadSettledHistory]);
+    if (isAuthenticated) { load(); loadGroups(); loadShared(); loadSettledHistory(); loadSplitOnly(); }
+  }, [isAuthenticated, load, loadGroups, loadShared, loadSettledHistory, loadSplitOnly]);
 
   // The edit dialog needs the category list; fetch it once, quietly, and let
   // the dialog say so if it hasn't arrived.
@@ -397,6 +422,43 @@ export default function SplitsPage() {
     }
   };
 
+  // Plain language, one line: "split 1200 dinner with raj and priya". The
+  // fastest path to a new bill — no model call for the manual dialog below it.
+  const runQuickAdd = async () => {
+    if (!quickAdd.text.trim()) { setError('Describe the shared expense first'); return; }
+    setQuickAdd(prev => ({ ...prev, loading: true }));
+    try {
+      const result = await splitAddExpense(quickAdd.text.trim());
+      const who = result.splits.map(s => `${s.person_name} ${money(s.amount)}`).join(', ');
+      setSuccess(`Split ${money(result.expense.amount)} — ${who || 'no one'}`);
+      feedback('success');
+      setQuickAdd({ text: '', loading: false });
+      load(); loadShared(); loadSplitOnly();
+    } catch (err) {
+      setQuickAdd(prev => ({ ...prev, loading: false }));
+      setError(err.message || 'Could not split that');
+    }
+  };
+
+  const onManualSplitCreated = (result) => {
+    setSuccess(`Split ${money(result.expense.amount)} with ${result.splits.length} ` +
+      `${result.splits.length === 1 ? 'person' : 'people'}`);
+    feedback('success');
+    load(); loadShared(); loadSplitOnly();
+  };
+
+  // A bill you paid and split, moved from "tracked only" into your own
+  // expenses — the flip side of toggleInExpenses, for the other direction.
+  const addToExpenses = async (expenseId) => {
+    try {
+      await addSplitToExpenses(expenseId);
+      setSuccess('Added to your expenses');
+      setSplitOnly(prev => prev.filter(s => s.expenseId !== expenseId));
+    } catch (err) {
+      setError(err.message || 'Could not update');
+    }
+  };
+
   const removeSplit = async () => {
     setRemoveTarget(prev => ({ ...prev, saving: true }));
     try {
@@ -542,6 +604,96 @@ export default function SplitsPage() {
             </Stack>
           </Paper>
         </Reveal>
+
+        {/* Add a split — plain language first, exact numbers if you'd rather */}
+        {!openGroup && (
+          <Reveal index={1}>
+            <Box
+              sx={{
+                display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap',
+                p: 1, mb: 2, borderRadius: `${radius.lg}px`,
+                border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper',
+              }}
+            >
+              <TextField
+                size="small"
+                variant="standard"
+                sx={{ flex: 1, minWidth: 200, px: 1 }}
+                InputProps={{ disableUnderline: true, sx: { fontSize: 14 } }}
+                inputProps={{ 'aria-label': 'Describe a shared bill' }}
+                placeholder='"split 1200 dinner with raj and priya"'
+                value={quickAdd.text}
+                onChange={(e) => setQuickAdd(prev => ({ ...prev, text: e.target.value }))}
+                disabled={quickAdd.loading}
+                onKeyDown={(e) => { if (e.key === 'Enter') runQuickAdd(); }}
+              />
+              <Button
+                variant="contained"
+                size="small"
+                onClick={runQuickAdd}
+                disabled={quickAdd.loading || !quickAdd.text.trim()}
+                startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+                sx={{ borderRadius: `${radius.pill}px`, px: 2 }}
+              >
+                {quickAdd.loading ? 'Splitting…' : 'Split'}
+              </Button>
+              <Button
+                size="small"
+                color="inherit"
+                onClick={() => setManualOpen(true)}
+                startIcon={<AddIcon sx={{ fontSize: 16 }} />}
+                sx={{ borderRadius: `${radius.pill}px`, color: 'text.secondary' }}
+              >
+                Exact
+              </Button>
+            </Box>
+            <ThinkingHint show={quickAdd.loading} label="Working out the shares…" />
+          </Reveal>
+        )}
+
+        {/* Split-only bills you paid: not yet counted as your own spending */}
+        {!openGroup && splitOnly.length > 0 && (
+          <Reveal index={1}>
+            <Box
+              sx={{
+                p: 2, mb: 2, borderRadius: `${radius.lg}px`,
+                border: '1px dashed', borderColor: `${accents.amber}55`,
+              }}
+            >
+              <Typography sx={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: accents.amber, mb: 0.5 }}>
+                Tracked as a split only
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                You paid these but they aren't counted in your spending yet.
+              </Typography>
+              {splitOnly.map((s) => (
+                <Box
+                  key={s.id}
+                  sx={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    gap: 2, flexWrap: 'wrap', py: 1,
+                    borderTop: '1px solid', borderColor: 'divider',
+                  }}
+                >
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{s.description}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {s.personName} owes {money(s.amount)}{s.paidBy ? ` · paid by ${s.paidBy}` : ''}
+                    </Typography>
+                  </Box>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => addToExpenses(s.expenseId)}
+                    sx={{ borderRadius: `${radius.pill}px` }}
+                  >
+                    Count it as spending
+                  </Button>
+                </Box>
+              ))}
+            </Box>
+          </Reveal>
+        )}
 
         {/* Groups: a way in, above everything else */}
         {!openGroup && (
@@ -1370,9 +1522,16 @@ export default function SplitsPage() {
           </DialogActions>
         </Dialog>
 
+        <ManualSplitDialog
+          open={manualOpen}
+          onClose={() => setManualOpen(false)}
+          categories={categories}
+          onCreated={onManualSplitCreated}
+        />
+
         <Fab
           color="primary"
-          href="/expense-tracker"
+          onClick={() => setManualOpen(true)}
           sx={{
             position: 'fixed', right: 16,
             bottom: { xs: 'calc(24px + env(safe-area-inset-bottom))', md: 24 },

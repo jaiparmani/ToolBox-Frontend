@@ -5,12 +5,33 @@ import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
 import CallSplitRoundedIcon from '@mui/icons-material/CallSplitRounded';
 import DoneAllRoundedIcon from '@mui/icons-material/DoneAllRounded';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { getNotifications, markNotificationsRead } from '../rest/expenseTrackerApis';
+import { getNotifications, markNotificationsRead, getVapidPublicKey, subscribePush } from '../rest/expenseTrackerApis';
 import { accents } from '../../theme/tokens';
 import TelegramConnect from './TelegramConnect';
 import { feedback } from './feedback';
 
-const POLL_MS = 25000;
+function urlB64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+async function ensurePushSubscription() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      const { key } = await getVapidPublicKey();
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(key),
+      });
+    }
+    await subscribePush(sub.toJSON());
+  } catch { /* non-fatal */ }
+}
 
 function timeAgo(iso) {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -69,22 +90,41 @@ export default function NotificationBell() {
 
   React.useEffect(() => {
     refresh();
-    const id = setInterval(refresh, POLL_MS);
+
+    // Refresh on tab focus / visibility restore (covers the tab-was-hidden case).
     const onFocus = () => { if (!document.hidden) refresh(); };
-    // Actions that create notifications (e.g. adding a split) fire this so the
-    // bell updates instantly instead of waiting for the next poll.
-    const onPoke = () => refresh();
+    // In-app actions (e.g. adding a split) fire this window event to poke the
+    // bell without any polling — still works even when push isn't set up.
+    const onWindowPoke = () => refresh();
+    // Service-worker push: the SW postMessages every open tab when a push arrives.
+    const onSwMessage = (e) => { if (e.data?.type === 'toolbox:notify-refresh') refresh(); };
+
     document.addEventListener('visibilitychange', onFocus);
     window.addEventListener('focus', onFocus);
-    window.addEventListener('toolbox:notify-refresh', onPoke);
-    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onFocus); window.removeEventListener('focus', onFocus); window.removeEventListener('toolbox:notify-refresh', onPoke); };
+    window.addEventListener('toolbox:notify-refresh', onWindowPoke);
+    navigator.serviceWorker?.addEventListener('message', onSwMessage);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('toolbox:notify-refresh', onWindowPoke);
+      navigator.serviceWorker?.removeEventListener('message', onSwMessage);
+    };
   }, [refresh]);
 
   const openPanel = (e) => {
     setAnchor(e.currentTarget);
-    // Ask for OS-notification permission the first time they engage (a gesture).
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {});
+    if (typeof Notification !== 'undefined') {
+      if (Notification.permission === 'default') {
+        // First tap — ask for permission, then subscribe to push if granted.
+        Notification.requestPermission().then((perm) => {
+          if (perm === 'granted') ensurePushSubscription();
+        }).catch(() => {});
+      } else if (Notification.permission === 'granted') {
+        // Already granted — make sure this device is subscribed (handles new
+        // installs, cleared site data, or a subscription that expired).
+        ensurePushSubscription();
+      }
     }
   };
   const closePanel = () => setAnchor(null);

@@ -6,13 +6,14 @@ headers = []
 [functions."*"]
 
 [build]
-publish = "/Users/jaiparmani/Desktop/TECH/DEVELOPMENT/ToolBoxProject/ToolBoxFrontend/toolbox-frontend/build"
-publishOrigin = "ui"
-commandOrigin = "ui"
-base = "/Users/jaiparmani/Desktop/TECH/DEVELOPMENT/ToolBoxProject/ToolBoxFrontend/toolbox-frontend"
+publish = "/Users/jaiparmani/Desktop/SELF/TECH/DEVELOPMENT/ToolBoxProject/ToolBoxFrontend/toolbox-frontend/build"
+publishOrigin = "config"
+commandOrigin = "config"
+base = "/Users/jaiparmani/Desktop/SELF/TECH/DEVELOPMENT/ToolBoxProject/ToolBoxFrontend/toolbox-frontend"
 command = "npm run build"
 
 [build.environment]
+CI = "false"
 
 [build.processing]
 

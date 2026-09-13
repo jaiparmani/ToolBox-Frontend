@@ -6,10 +6,10 @@ headers = []
 [functions."*"]
 
 [build]
-publish = "/Users/jaiparmani/Desktop/SELF/TECH/DEVELOPMENT/ToolBoxProject/ToolBoxFrontend/toolbox-frontend/build"
+publish = "build"
 publishOrigin = "config"
 commandOrigin = "config"
-base = "/Users/jaiparmani/Desktop/SELF/TECH/DEVELOPMENT/ToolBoxProject/ToolBoxFrontend/toolbox-frontend"
+base = "toolbox-frontend"
 command = "npm run build"
 
 [build.environment]

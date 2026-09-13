@@ -1,12 +1,17 @@
 /**
- * Pulse — the Money OS financial instrument.
+ * Pulse — a computational portrait of spending behaviour.
+ *
+ * This page is 100% spending. There is no income, balance, savings, debt,
+ * net worth, cash flow or forecast anywhere in it or in what it renders —
+ * every pixel traces back to amount, date, merchant, category, frequency,
+ * recurrence, distribution, velocity, clusters or outliers.
  *
  * The field fills the viewport. Everything else is bezel: corner-anchored
  * instrument blocks rather than a page header or a row of cards.
  *
- *   top-left      identity + what you are looking at + the window
- *   top-right     live financial state
- *   right edge    LENS column — six interpretations of the same field
+ *   top-left      identity + what lens you're looking through + the window
+ *   top-right     the window's spending state (or whatever you're inspecting)
+ *   right edge    LENS column — six ways of reading the same purchases
  *   bottom-left   SCALE ladder — how far back you stand
  *   bottom-centre control legend, retreats once you engage
  *   bottom-right  DATA & INTERPRETATION disclosure
@@ -19,9 +24,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Typography } from '@mui/material';
 import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
 
-import { getExpenses, getExpenseSummary } from '../rest/expenseTrackerApis';
+import { getExpenses } from '../rest/expenseTrackerApis';
 import { EmptyState } from '../ui';
-import FinancialConstellation, { deriveField, LENSES, SCALES } from '../ui/FinancialConstellation';
+import { buildSpendingField } from '../ui/spendingField';
+import SpendingFieldView, { LENSES, SCALES } from '../ui/SpendingFieldView';
 import { moneySmart } from '../ui/money';
 import { accents } from '../../theme/tokens';
 
@@ -37,49 +43,42 @@ function prettyDate(dateStr) {
 
 export default function CashFlowPulsePage() {
   const [expenses, setExpenses] = useState(null);
-  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
-  const [lens, setLens] = useState('GRAVITY');
+  const [lens, setLens] = useState('HABITS');
   const [scale, setScale] = useState('MONTH');
   const [focus, setFocus] = useState(null);
-  const [projection, setProjection] = useState(null);
+  const [pull, setPull] = useState(null);
   const [touched, setTouched] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
 
   useEffect(() => {
     const today = new Date();
     const from = new Date(today.getTime() - FETCH_DAYS * 86400000);
-    Promise.all([
-      getExpenses({ dateFrom: iso(from), dateTo: iso(today), pageSize: 500, ordering: 'date' })
-        .then(d => d.results || []),
-      getExpenseSummary({ dateFrom: iso(from), dateTo: iso(today) }),
-    ])
-      .then(([txns, sum]) => { setExpenses(txns); setSummary(sum); })
+    getExpenses({ dateFrom: iso(from), dateTo: iso(today), pageSize: 500, ordering: 'date' })
+      .then(d => setExpenses(d.results || []))
       .catch(() => setFailed(true))
       .finally(() => setLoading(false));
   }, []);
 
+  // Spending only — income rows are excluded before anything downstream ever
+  // sees them, so the field cannot accidentally absorb non-spending data.
   const transactions = useMemo(() => {
     if (!expenses) return [];
     return expenses
       .filter(e => (e.type || 'expense') !== 'income')
       .map(e => ({
-        id: e.id,
         amount: Math.abs(Number(e.amount) || 0),
         date: typeof e.date === 'string' ? e.date.slice(0, 10)
           : e.date instanceof Date ? e.date.toISOString().slice(0, 10) : '',
-        type: 'expense',
         description: e.description || e.note || e.title || '',
-        category: e.category || { name: 'Uncategorized' },
+        category: e.category || { name: 'Uncategorised' },
       }))
       .filter(e => e.amount > 0 && e.date);
   }, [expenses]);
 
-  const field = useMemo(
-    () => deriveField(transactions, summary?.netBalance ?? 0, summary?.totalIncome ?? 0),
-    [transactions, summary]);
+  const field = useMemo(() => buildSpendingField(transactions), [transactions]);
 
   // The window the active SCALE is showing — drives the orientation readout.
   // The dates reported are the window itself, not the extent of the data
@@ -88,18 +87,18 @@ export default function CashFlowPulsePage() {
     if (!field) return null;
     const days = (SCALES.find(s => s.id === scale) || SCALES[1]).days;
     const startDay = field.maxDay - (days - 1);
-    const inWindow = field.stars.filter(s => s.dayNum >= startDay);
+    const inWindow = field.events.filter(e => e.dayNum >= startDay);
     const toDate = (dn) => iso(new Date(dn * 86400000));
     return {
       from: prettyDate(toDate(startDay)),
       to: prettyDate(toDate(field.maxDay)),
       days,
       events: inWindow.length,
-      spent: inWindow.reduce((a, s) => a + s.amt, 0),
-      anomalies: inWindow.filter(s => s.isAnomaly).length,
+      spent: inWindow.reduce((a, e) => a + e.amount, 0),
+      outliers: inWindow.filter(e => e.isOutlier).length,
       // How much of the window actually contains recorded activity.
       covered: inWindow.length
-        ? Math.min(field.maxDay - Math.min(...inWindow.map(s => s.dayNum)) + 1, days)
+        ? Math.min(field.maxDay - Math.min(...inWindow.map(e => e.dayNum)) + 1, days)
         : 0,
     };
   }, [field, scale]);
@@ -137,18 +136,18 @@ export default function CashFlowPulsePage() {
         <Boot />
       ) : hasData ? (
         <Box sx={{ position: 'absolute', inset: 0 }} onPointerDown={engage} onWheel={engage}>
-          <FinancialConstellation
+          <SpendingFieldView
             field={field}
             lens={lens}
             scale={scale}
             onFocusChange={setFocus}
-            onProjectionChange={setProjection}
+            onPullChange={setPull}
             height="100%"
           />
 
           {/* ── bezel ─────────────────────────────────────────────────── */}
           <Identity lens={activeLens} windowInfo={windowInfo} scale={scale} />
-          <StateBlock summary={summary} windowInfo={windowInfo} projection={projection} focus={focus} />
+          <StateBlock field={field} windowInfo={windowInfo} pull={pull} focus={focus} />
           <LensColumn value={lens} onChange={(v) => { setLens(v); setTouched(true); }} />
           <ScaleLadder value={scale} onChange={(v) => { setScale(v); setTouched(true); }} />
           <Legend dim={touched} />
@@ -160,8 +159,8 @@ export default function CashFlowPulsePage() {
             icon={FavoriteBorderRoundedIcon}
             title={failed ? 'The field is unreachable' : 'The field is empty'}
             description={failed
-              ? 'Pulse could not load your transaction history. Check your connection and try again.'
-              : 'Log spending and your field will form — every transaction becomes a star, every category a gravity well, every subscription a line between them.'}
+              ? 'Pulse could not load your spending history. Check your connection and try again.'
+              : 'Log some spending and your field will form — every purchase becomes a body, every habit a lattice, every burst of spending a shockwave.'}
           />
         </Box>
       )}
@@ -176,7 +175,7 @@ export default function CashFlowPulsePage() {
 // On phones the right edge belongs to the lens column, so the state block
 // tucks under the identity instead of fighting it for the top-right corner.
 const stateBlockPos = {
-  top: { xs: 108, sm: 20 },
+  top: { xs: 152, sm: 20 },
   right: { xs: 'auto', sm: 78 },
   left: { xs: 12, sm: 'auto' },
   textAlign: { xs: 'left', sm: 'right' },
@@ -196,7 +195,7 @@ function Identity({ lens, windowInfo, scale }) {
   return (
     <Box sx={{
       ...blockSx, top: { xs: 12, sm: 20 }, left: { xs: 12, sm: 24 },
-      pointerEvents: 'auto', maxWidth: { xs: 190, sm: 340 },
+      pointerEvents: 'auto', maxWidth: { xs: 230, sm: 340 },
     }}>
       <Typography sx={{ fontFamily: MONO, fontSize: { xs: 7.5, sm: 9 }, letterSpacing: '0.42em', color: 'rgba(180,200,235,0.5)' }}>
         MONEY OS
@@ -224,10 +223,10 @@ function Identity({ lens, windowInfo, scale }) {
         }}>
           {windowInfo.from} — {windowInfo.to}
           <br />
-          {windowInfo.events} EVENT{windowInfo.events === 1 ? '' : 'S'} IN FIELD
-          {windowInfo.anomalies > 0 && ` · ${windowInfo.anomalies} ANOMALOUS`}
+          {windowInfo.events} PURCHASE{windowInfo.events === 1 ? '' : 'S'}
+          {windowInfo.outliers > 0 && ` · ${windowInfo.outliers} UNUSUAL`}
           {/* Say so when the window reaches back further than the data does,
-              rather than letting empty space read as missing transactions. */}
+              rather than letting empty space read as missing purchases. */}
           {windowInfo.events > 0 && windowInfo.covered < windowInfo.days && (
             <>
               <br />
@@ -242,23 +241,19 @@ function Identity({ lens, windowInfo, scale }) {
   );
 }
 
-function StateBlock({ summary, windowInfo, projection, focus }) {
-  const net = summary?.netBalance ?? 0;
+function StateBlock({ field, windowInfo, pull, focus }) {
   // The block yields to whatever the user is currently interrogating.
-  if (projection) {
-    const span = projection.periods * projection.periodDays;
-    const spanTxt = span >= 365 ? `${(span / 365).toFixed(1)} yrs`
-      : span >= 60 ? `${Math.round(span / 30)} months` : `${span} days`;
+  if (pull) {
     return (
       <Box sx={{ ...blockSx, ...stateBlockPos, opacity: 1 }}>
         <Typography sx={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.3em', color: accents.cyan }}>
-          PROJECTING
+          SPENT HERE SO FAR
         </Typography>
         <Typography sx={{ fontSize: { xs: 21, sm: 30 }, fontWeight: 250, color: '#eef2fa', fontVariantNumeric: 'tabular-nums', lineHeight: 1.15 }}>
-          {moneySmart(projection.total)}
+          {moneySmart(pull.spent)}
         </Typography>
         <Typography sx={{ fontFamily: MONO, fontSize: 10, color: 'rgba(180,200,235,0.65)', letterSpacing: '0.08em' }}>
-          {projection.label.toUpperCase()} · {projection.periods}× · {spanTxt}
+          {pull.label.toUpperCase()} · {pull.shown}/{pull.visits} VISITS · SINCE {pull.since}
         </Typography>
       </Box>
     );
@@ -272,28 +267,35 @@ function StateBlock({ summary, windowInfo, projection, focus }) {
         <Typography sx={{ fontSize: { xs: 21, sm: 30 }, fontWeight: 250, color: '#eef2fa', fontVariantNumeric: 'tabular-nums', lineHeight: 1.15 }}>
           {moneySmart(focus.amount)}
         </Typography>
-        <Typography sx={{ fontFamily: MONO, fontSize: 10, color: focus.isAnomaly ? accents.amber : 'rgba(180,200,235,0.6)', letterSpacing: '0.08em' }}>
-          {focus.isAnomaly
-            ? `${focus.anomalyRatio.toFixed(1)}× USUAL · ${focus.date}`
-            : focus.isRecurring ? `RECURRING ${focus.occurrences}× · ${focus.date}` : focus.date}
+        <Typography sx={{ fontFamily: MONO, fontSize: 10, color: focus.isOutlier ? accents.amber : 'rgba(180,200,235,0.6)', letterSpacing: '0.08em' }}>
+          {focus.isOutlier
+            ? `${focus.ratioToTypical.toFixed(1)}× USUAL · ${focus.date}`
+            : focus.isHabit ? `HABIT · ${focus.visits}× · ${focus.date}` : focus.date}
         </Typography>
       </Box>
     );
   }
+  if (!windowInfo) return null;
   return (
     <Box sx={{ ...blockSx, ...stateBlockPos }}>
       <Typography sx={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.3em', color: 'rgba(180,200,235,0.5)' }}>
-        NET POSITION
+        SPENT IN WINDOW
       </Typography>
       <Typography sx={{
         fontSize: { xs: 21, sm: 30 }, fontWeight: 250, lineHeight: 1.15, fontVariantNumeric: 'tabular-nums',
-        color: net >= 0 ? accents.mint : accents.red,
+        color: '#eef2fa',
       }}>
-        {moneySmart(net)}
+        {moneySmart(windowInfo.spent)}
       </Typography>
-      {windowInfo && (
-        <Typography sx={{ fontFamily: MONO, fontSize: 10, color: 'rgba(180,200,235,0.5)', letterSpacing: '0.08em' }}>
-          {moneySmart(windowInfo.spent)} OUT · {moneySmart(summary?.totalIncome ?? 0)} IN
+      <Typography sx={{ fontFamily: MONO, fontSize: 10, color: 'rgba(180,200,235,0.5)', letterSpacing: '0.08em' }}>
+        {windowInfo.events} PURCHASE{windowInfo.events === 1 ? '' : 'S'}
+      </Typography>
+      {field?.signature && (
+        <Typography sx={{
+          fontFamily: MONO, fontSize: { xs: 8, sm: 9 }, color: 'rgba(120,200,240,0.55)',
+          letterSpacing: '0.12em', mt: 0.6, display: { xs: 'none', sm: 'block' },
+        }}>
+          {field.signature.join(' · ')}
         </Typography>
       )}
     </Box>
@@ -433,17 +435,17 @@ function Legend({ dim }) {
   };
   return (
     <Box sx={{
-      position: 'absolute', bottom: { xs: 52, sm: 24 }, left: 0, right: 0,
+      position: 'absolute', bottom: { xs: 76, sm: 24 }, left: 0, right: 0,
       display: 'flex', justifyContent: 'center', pointerEvents: 'none', px: 2,
       opacity: dim ? 0.18 : 0.5,
       transition: 'opacity 900ms cubic-bezier(0.32,0.72,0,1)',
     }}>
       {/* The full legend only fits a wide viewport; phones get the essentials. */}
       <Typography sx={{ ...common, fontSize: 9, display: { xs: 'none', md: 'block' } }}>
-        drag · orbit &nbsp;|&nbsp; scroll · dolly &nbsp;|&nbsp; move · attract &nbsp;|&nbsp; drag a recurring star · project &nbsp;|&nbsp; 1–6 lens &nbsp;|&nbsp; [ ] scale
+        drag · orbit &nbsp;|&nbsp; scroll · dolly &nbsp;|&nbsp; move · attract &nbsp;|&nbsp; drag a habit · unfurl history &nbsp;|&nbsp; 1–6 lens &nbsp;|&nbsp; [ ] scale
       </Typography>
       <Typography sx={{ ...common, fontSize: 8.5, display: { xs: 'none', sm: 'block', md: 'none' } }}>
-        drag · orbit &nbsp;|&nbsp; scroll · dolly &nbsp;|&nbsp; drag a pattern · project
+        drag · orbit &nbsp;|&nbsp; scroll · dolly &nbsp;|&nbsp; drag a habit · unfurl
       </Typography>
       <Typography sx={{ ...common, fontSize: 7.5, letterSpacing: '0.22em', display: { xs: 'block', sm: 'none' } }}>
         drag · orbit &nbsp;|&nbsp; pinch · dolly
@@ -499,23 +501,23 @@ function AboutTrigger({ onClick }) {
 const DISCLOSURE = [
   {
     k: 'WHAT PULSE IS',
-    v: `Pulse is an analytical representation of your recorded financial activity. It is a way of looking at transactions you have already logged — not a ledger, not a statement, and not a live connection to any bank.`,
+    v: `Pulse is a computational portrait of your spending — how often you buy, how much, where, and in what pattern. It reflects transactions you have already logged. It carries no income, no balance, and no live connection to any bank.`,
   },
   {
     k: 'DATA COMPLETENESS',
-    v: `Every figure here is derived from the transactions present in Money OS for the selected period. If transactions are missing, delayed, duplicated, or miscategorised, the field will reflect that. Accuracy depends entirely on the completeness of your imported and manually entered data.`,
+    v: `Every figure here is derived from the spending transactions present in Money OS for the selected window. If purchases are missing, delayed, duplicated, or miscategorised, the field will reflect that. Accuracy depends entirely on the completeness of your imported and manually entered data.`,
   },
   {
     k: 'HOW FIGURES ARE DERIVED',
-    v: `Category shares, spending velocity, recurring patterns and anomaly flags are computed from your own history using simple statistical rules — for example, a transaction is flagged anomalous when it exceeds three times the median for its category. Projections extend an observed recurring amount forward at its observed cadence; they assume nothing changes, which is rarely true.`,
+    v: `Category shares, purchase frequency, recurring habits and outlier flags are computed from your own history using simple statistical rules — for example, a purchase is flagged unusual when it sits far outside the typical range for its category. Habits are merchants you have returned to at least twice. Dragging one reveals your actual past visits and what they have cost so far — this is history, never a projection of what is still to come.`,
   },
   {
     k: 'NOT FINANCIAL ADVICE',
-    v: `Nothing in Pulse is financial, investment, tax or legal advice. Visualisations, patterns and projections are descriptive only, and should not be relied upon as a recommendation to take or avoid any financial action. Consider speaking to a qualified professional before making decisions.`,
+    v: `Nothing in Pulse is financial, investment, tax or legal advice. Patterns and figures shown are descriptive only — a picture of what you have already spent — and should not be relied upon as a recommendation to spend, save, or avoid any purchase.`,
   },
   {
-    k: 'MAY DIFFER FROM YOUR BANK',
-    v: `Balances, net positions and projections shown here may differ from your actual bank or account records, due to timing, pending transactions, fees, interest, or data that has not been captured. Always treat your bank or provider's own records as authoritative.`,
+    k: 'MAY DIFFER FROM YOUR STATEMENTS',
+    v: `Totals shown here reflect only the transactions recorded in Money OS, and may differ from your bank or card statements due to timing, refunds, duplicate entries, or purchases that were never logged. Treat your own statements as the authoritative record of what you actually spent.`,
   },
 ];
 
@@ -628,10 +630,10 @@ function AboutOverlay({ onClose }) {
 
 function Boot() {
   const lines = useMemo(() => ([
-    'INITIALIZING FIELD',
-    'RESOLVING GRAVITY WELLS',
-    'DETECTING RECURRING PATTERNS',
-    'PLOTTING TRANSACTIONS',
+    'READING PURCHASE HISTORY',
+    'MEASURING FREQUENCY',
+    'DETECTING HABITS',
+    'PLOTTING THE FIELD',
   ]), []);
   const [step, setStep] = useState(0);
   useEffect(() => {

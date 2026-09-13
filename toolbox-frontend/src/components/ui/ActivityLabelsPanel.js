@@ -90,15 +90,23 @@ function SwitchButton({ option, active, reduce, onSelect }) {
  * same actions, one place. The segmented control keeps both one tap away.
  *
  * Data-true: a category's figure is the server's own category_breakdown total
- * for the active date scope — the exact number the Insights tab shows for the
- * same row. Categories with no spend in the scope say so in words rather than
- * displaying a fabricated ₹0 bar. Tags carry no per-tag total from the API, so
- * none is invented; they simply show no figure.
+ * for the active date scope, and a tag's is the server's tag_breakdown — the
+ * same share-only accounting (net_spending), just grouped by tag instead of
+ * category. Rows with no spend in the scope say so in words rather than
+ * displaying a fabricated ₹0 bar.
+ *
+ * One real difference between the two lists: category is one-per-expense, so
+ * category shares sum to the scope total and "% of scope" means something.
+ * Tags are many-to-many — an expense tagged both "Travel" and "Food" is
+ * credited in full to each — so tag totals are not a partition of the scope
+ * total, and a tag's bar shows its share of the *tagged* total, not the
+ * whole scope (see tagScopeTotal below).
  */
 export default function ActivityLabelsPanel({
   categories = [],
   tags = [],
   breakdown = [],
+  tagBreakdown = [],
   scopeLabel,
   segment,
   onSegmentChange,
@@ -109,6 +117,7 @@ export default function ActivityLabelsPanel({
   onEditTag,
   onDeleteTag,
   onSelectCategory,
+  onSelectTag,
 }) {
   const spendByName = React.useMemo(() => {
     const map = new Map();
@@ -119,9 +128,26 @@ export default function ActivityLabelsPanel({
     return map;
   }, [breakdown]);
 
+  const tagSpendByName = React.useMemo(() => {
+    const map = new Map();
+    (tagBreakdown || []).forEach((t) => {
+      const amt = Math.abs(Number(t.amount) || 0);
+      if (amt > 0) map.set(t.name, amt);
+    });
+    return map;
+  }, [tagBreakdown]);
+
   const scopeTotal = React.useMemo(
     () => Array.from(spendByName.values()).reduce((s, v) => s + v, 0),
     [spendByName],
+  );
+
+  // Not the scope total — tag totals double-count a multi-tagged expense, so
+  // summing them can exceed real spend. This is only a denominator for each
+  // tag's own bar, the same way scopeTotal is for categories.
+  const tagScopeTotal = React.useMemo(
+    () => Array.from(tagSpendByName.values()).reduce((s, v) => s + v, 0),
+    [tagSpendByName],
   );
 
   // Spent categories first, biggest first; the unused ones keep their own
@@ -138,8 +164,21 @@ export default function ActivityLabelsPanel({
     return [...withSpend, ...without];
   }, [categories, spendByName]);
 
+  // Same ordering rule as categories, applied to tags.
+  const orderedTags = React.useMemo(() => {
+    const withSpend = [];
+    const without = [];
+    tags.forEach((t) => {
+      const amount = tagSpendByName.get(t.name);
+      (amount ? withSpend : without).push({ ...t, amount });
+    });
+    withSpend.sort((a, b) => b.amount - a.amount);
+    without.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    return [...withSpend, ...without];
+  }, [tags, tagSpendByName]);
+
   const isCategories = segment === 'categories';
-  const list = isCategories ? orderedCategories : tags;
+  const list = isCategories ? orderedCategories : orderedTags;
 
   const rowActions = (item, onEdit, onDelete, noun) => (
     <>
@@ -200,7 +239,7 @@ export default function ActivityLabelsPanel({
           <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
             {isCategories
               ? `What each category cost you · ${scopeLabel}`
-              : 'Cross-category tags for slicing the timeline'}
+              : `What each tag cost you · ${scopeLabel}`}
           </Typography>
         </Box>
         <Button
@@ -276,13 +315,20 @@ export default function ActivityLabelsPanel({
                 />
               </Reveal>
             ))
-            : tags.map((t, i) => (
+            : orderedTags.map((t, i) => (
               <Reveal key={t.id} index={i} step={26} maxDelay={260}>
                 <ActivityBarRow
                   index={i}
                   dense
                   color={t.color || accents.amber}
                   label={t.name}
+                  sublabel={t.amount
+                    ? `${money(t.amount)} ${scopeLabel.toLowerCase()}`
+                    : `Nothing tagged ${scopeLabel.toLowerCase()}`}
+                  amount={t.amount}
+                  pct={t.amount && tagScopeTotal ? (t.amount / tagScopeTotal) * 100 : null}
+                  onSelect={t.amount ? () => onSelectTag(t.id) : undefined}
+                  selectHint="Opens these transactions"
                   actions={rowActions(t, onEditTag, onDeleteTag, 'tag')}
                 />
               </Reveal>
@@ -293,6 +339,12 @@ export default function ActivityLabelsPanel({
       {isCategories && scopeTotal > 0 && (
         <Typography sx={{ fontSize: 11.5, color: 'text.disabled', mt: 1.5, display: 'block' }}>
           Shares are of {money(scopeTotal)} tracked {scopeLabel.toLowerCase()}.
+        </Typography>
+      )}
+      {!isCategories && tagScopeTotal > 0 && (
+        <Typography sx={{ fontSize: 11.5, color: 'text.disabled', mt: 1.5, display: 'block' }}>
+          Shares are of tagged spend, not the whole scope — a purchase tagged
+          more than once counts in full toward each of its tags.
         </Typography>
       )}
     </Box>

@@ -249,6 +249,14 @@ export default function ExpenseTrackerPage() {
    selectTab(0);
    feedback('open');
  };
+ // Same idea, for a tag row — tags are multi-select in the filter sheet, so
+ // this replaces rather than adds to whatever tag filter was already active.
+ const drillIntoTag = (tagId) => {
+   setFilters(prev => ({ ...prev, tags: [String(tagId)] }));
+   setPagination(prev => ({ ...prev, page: 0 }));
+   selectTab(0);
+   feedback('open');
+ };
  // Filters live in a sheet, opened on demand — a modal that springs open
  // unasked on page load is never "there's room for it," just a surprise.
  const [filtersOpen, setFiltersOpen] = useState(false);
@@ -1637,6 +1645,7 @@ export default function ExpenseTrackerPage() {
              categories={categories}
              tags={tags}
              breakdown={summary?.categoryBreakdown}
+             tagBreakdown={summary?.tagBreakdown}
              scopeLabel={scopeLabel}
              segment={labelSegment}
              onSegmentChange={setLabelSegment}
@@ -1647,6 +1656,7 @@ export default function ExpenseTrackerPage() {
              onEditTag={(t) => openTagForm(t)}
              onDeleteTag={askDeleteTag}
              onSelectCategory={drillIntoCategory}
+             onSelectTag={drillIntoTag}
            />
          </Box>
        )}

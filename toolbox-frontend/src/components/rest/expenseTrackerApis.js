@@ -1204,6 +1204,16 @@ export const getExpenseSummary = async (filters = {}) => {
                     name,
                     amount: parseFloat(amount)
                 })
+            ) : [],
+            // A tag can sit on several expenses at once, so — unlike categories —
+            // this is not a partition of total_expenses; a bill tagged both
+            // "Travel" and "Food" is credited in full to each. See tag_breakdown
+            // in the backend's net_spending for the accounting rule.
+            tagBreakdown: data.tag_breakdown ? Object.entries(data.tag_breakdown).map(
+                ([name, amount]) => ({
+                    name,
+                    amount: parseFloat(amount)
+                })
             ) : []
         };
     } catch (error) {

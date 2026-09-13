@@ -1,8 +1,10 @@
 import BoltRoundedIcon from '@mui/icons-material/BoltRounded';
 import TrendingUpRoundedIcon from '@mui/icons-material/TrendingUpRounded';
 import AutorenewRoundedIcon from '@mui/icons-material/AutorenewRounded';
+import PriceChangeRoundedIcon from '@mui/icons-material/PriceChangeRounded';
 import HandshakeRoundedIcon from '@mui/icons-material/HandshakeRounded';
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
+import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import { accents } from '../../theme/tokens';
 
@@ -12,8 +14,10 @@ const KIND_ICON = {
   bill_overdraw: AccountBalanceWalletRoundedIcon,
   category_spike: TrendingUpRoundedIcon,
   subscription_renewed: AutorenewRoundedIcon,
+  subscription_price_changed: PriceChangeRoundedIcon,
   split_stale: HandshakeRoundedIcon,
   low_runway: BoltRoundedIcon,
+  inactive_logging: EditNoteRoundedIcon,
 };
 
 const SEVERITY_TONE = {

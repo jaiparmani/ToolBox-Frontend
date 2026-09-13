@@ -94,7 +94,7 @@ function Metric({ label, shortLabel, value, format = 'smart', sub, accent, spark
       >
         {isMobile && shortLabel ? shortLabel : label}
       </Typography>
-      <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 0.75, mt: 0.3 }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 0.75, mt: 0.3, minWidth: 0 }}>
         <Typography
           component="div"
           sx={{
@@ -103,18 +103,23 @@ function Metric({ label, shortLabel, value, format = 'smart', sub, accent, spark
             fontWeight: 750,
             color: 'text.primary',
             lineHeight: 1.15,
+            flex: '1 1 auto',
+            minWidth: 0,
           }}
           noWrap
         >
           <AnimatedNumber value={value} format={format} />
         </Typography>
-        {sparkData && sparkData.length > 2 && (
+        {/* Decorative, and the first thing to give up its width — the number
+            clipping (rather than ellipsizing) on a phone was this sparkline's
+            fixed width leaving the figure no room to shrink into. */}
+        {sparkData && sparkData.length > 2 && !isMobile && (
           <Box sx={{ flexShrink: 0, mb: 0.2, opacity: 0.75 }}>
             <MiniSparkline
               values={sparkData}
               color={accent || (dark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.25)')}
-              width={isMobile ? 40 : 52}
-              height={isMobile ? 16 : 20}
+              width={52}
+              height={20}
             />
           </Box>
         )}

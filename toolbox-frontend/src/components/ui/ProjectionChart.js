@@ -6,16 +6,17 @@ import { money } from './money';
 
 /**
  * The cash-flow projection — a restrained area+line of the real projected
- * balance, and the dashboard's signature interaction. Hover (or drag) anywhere
- * and a guideline snaps to the nearest day: a dot rides the line, a readout
- * shows that day's exact balance and date, and the endpoint quiets down so the
- * point you're inspecting leads. One accent (green), a dashed zero baseline,
- * markers at the lowest point and next income. Pure data — every point is
- * projection.series[i].balance.
+ * balance, and the dashboard's signature interaction. Hover, tap, or drag
+ * anywhere and a guideline snaps to the nearest day: a dot rides the line, a
+ * readout shows that day's exact balance and date, and the endpoint quiets
+ * down so the point you're inspecting leads. One accent (green), a dashed
+ * zero baseline, markers at the lowest point and next income. Pure data —
+ * every point is projection.series[i].balance.
  *
  * The SVG stretches to width (preserveAspectRatio none); the interactive
  * overlay is real DOM positioned in %, so text and the dot stay crisp and
- * un-stretched. Touch drags work; nothing animates per-frame.
+ * un-stretched. A tap pins the readout in place (touch has no hover to fall
+ * back to, so lifting the finger keeps it visible); nothing animates per-frame.
  */
 export default function ProjectionChart({ series = [], low, nextIncomeDate, height = 190, accent = accents.mint, onScrub }) {
   const gid = React.useId();
@@ -39,12 +40,11 @@ export default function ProjectionChart({ series = [], low, nextIncomeDate, heig
     return { W, H, padY, min, max, xPx, yPx, xPct, yPct, line, area: `${line} L${W},${H} L0,${H} Z`, zeroY: yPx(0) };
   }, [pts]);
 
-  if (!geom) return <Box sx={{ height, borderRadius: 2, border: '1px solid', borderColor: 'divider', opacity: 0.4 }} />;
-
-  const lowIdx = low?.date ? pts.findIndex((d) => d.date === low.date) : -1;
-  const incIdx = nextIncomeDate ? pts.findIndex((d) => d.date === nextIncomeDate) : -1;
-
-  const onMove = (e) => {
+  // Touch has no hover: a tap fires pointerdown with no move, and the pointer
+  // "leaves" the instant the finger lifts. So a touch pick pins the readout —
+  // it stays put after lift instead of vanishing — while mouse keeps the
+  // live hover-follow-then-clear behaviour.
+  const updateFromEvent = (e) => {
     const el = wrapRef.current; if (!el) return;
     const r = el.getBoundingClientRect();
     const frac = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
@@ -52,14 +52,25 @@ export default function ProjectionChart({ series = [], low, nextIncomeDate, heig
     setHover(idx);
     onScrub?.(pts[idx]);
   };
+  const onLeave = (e) => {
+    if (e.pointerType === 'touch') return; // keep the pinned readout after the finger lifts
+    setHover(null);
+    onScrub?.(null);
+  };
+
+  if (!geom) return <Box sx={{ height, borderRadius: 2, border: '1px solid', borderColor: 'divider', opacity: 0.4 }} />;
+
+  const lowIdx = low?.date ? pts.findIndex((d) => d.date === low.date) : -1;
+  const incIdx = nextIncomeDate ? pts.findIndex((d) => d.date === nextIncomeDate) : -1;
   const active = hover != null ? pts[hover] : null;
   const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 
   return (
     <Box
       ref={wrapRef}
-      onPointerMove={onMove}
-      onPointerLeave={() => { setHover(null); onScrub?.(null); }}
+      onPointerDown={updateFromEvent}
+      onPointerMove={updateFromEvent}
+      onPointerLeave={onLeave}
       sx={{ position: 'relative', width: '100%', height, touchAction: 'pan-y', cursor: 'crosshair' }}
     >
       <svg viewBox={`0 0 ${geom.W} ${geom.H}`} width="100%" height={height} preserveAspectRatio="none" role="img"

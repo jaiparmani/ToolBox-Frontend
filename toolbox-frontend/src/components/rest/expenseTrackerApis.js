@@ -150,7 +150,11 @@ export const transformExpenseForUI = (apiExpense) => {
         paymentMethod: apiExpense.payment_method,
         isRecurring: apiExpense.is_recurring,
         createdAt: apiExpense.created_at,
-        updatedAt: apiExpense.updated_at
+        updatedAt: apiExpense.updated_at,
+        // Present only on a just-created expense the backend thinks echoes one
+        // from the last few minutes (same amount, category, date) — a soft,
+        // dismissible nudge, never a block. See ExpenseViewSet.create.
+        duplicateWarning: apiExpense.duplicate_warning || null
     };
 };
 
@@ -884,6 +888,36 @@ export const actCopilotCard = async (id) => {
     } catch (error) { throw handleApiError(error, 'act on that card'); }
 };
 
+// ── Web Push — a real notification with no tab open, the same way a linked
+// Telegram account already gets one. See ui/pushNotifications.js for the
+// subscribe flow these back.
+export const getVapidPublicKey = async () => {
+    try {
+        const r = await authenticatedFetch(`${API_BASE_URL}/copilot/vapid-public-key/`);
+        return await r.json();
+    } catch (error) { throw handleApiError(error, 'read the push key'); }
+};
+
+export const subscribePush = async (subscription) => {
+    try {
+        await authenticatedFetch(`${API_BASE_URL}/copilot/subscribe/`, {
+            method: 'POST',
+            body: JSON.stringify(subscription),
+        });
+        return true;
+    } catch (error) { throw handleApiError(error, 'save this device for push'); }
+};
+
+export const unsubscribePush = async (endpoint) => {
+    try {
+        await authenticatedFetch(`${API_BASE_URL}/copilot/unsubscribe/`, {
+            method: 'POST',
+            body: JSON.stringify({ endpoint }),
+        });
+        return true;
+    } catch (error) { throw handleApiError(error, 'remove this device from push'); }
+};
+
 export const createRecurring = async (rule) => {
     try {
         const r = await authenticatedFetch(`${API_BASE_URL}/recurring/`, {
@@ -1148,6 +1182,11 @@ export const getExpenseSummary = async (filters = {}) => {
         const params = new URLSearchParams();
         if (filters.dateFrom) params.append('date_from', filters.dateFrom);
         if (filters.dateTo) params.append('date_to', filters.dateTo);
+        if (filters.amountMin) params.append('amount_min', filters.amountMin);
+        if (filters.amountMax) params.append('amount_max', filters.amountMax);
+        if (filters.category) params.append('category', filters.category);
+        if (filters.tags && filters.tags.length) params.append('tags', filters.tags.join(','));
+        if (filters.search) params.append('search', filters.search);
 
         const response = await authenticatedFetch(`${API_BASE_URL}/expenses/summary/?${params}`);
         const data = await response.json();
@@ -1169,6 +1208,29 @@ export const getExpenseSummary = async (filters = {}) => {
         };
     } catch (error) {
         throw handleApiError(error, 'fetch expense summary');
+    }
+};
+
+// What you typed before, for what you're typing now — matching past
+// descriptions plus the category/tags you most often paired with them.
+export const getEntrySuggestions = async (q, transactionType = 'expense') => {
+    try {
+        const params = new URLSearchParams({ q: q || '', type: transactionType });
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/entry_suggestions/?${params}`);
+        return await response.json();
+    } catch (error) {
+        throw handleApiError(error, 'fetch entry suggestions');
+    }
+};
+
+// All-time usage counts per category/tag id (as strings), for sorting
+// pickers by what you actually use instead of alphabetical order.
+export const getLabelUsage = async () => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/label_usage/`);
+        return await response.json();
+    } catch (error) {
+        throw handleApiError(error, 'fetch label usage');
     }
 };
 

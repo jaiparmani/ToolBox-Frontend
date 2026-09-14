@@ -20,6 +20,8 @@ export default function MpinField({
 }) {
   const inputRef = React.useRef(null);
   const rowRef = React.useRef(null);
+  const slotRefs = React.useRef([]);
+  const hasAnimated = React.useRef(false);
   const [focused, setFocused] = React.useState(false);
   const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
@@ -44,6 +46,25 @@ export default function MpinField({
     }
     inputRef.current?.focus();
   }, [status, reduce]);
+
+  // Cascade wave when all 6 digits are filled and no error
+  React.useEffect(() => {
+    if (value.length !== length || status !== 'idle') {
+      hasAnimated.current = false;
+      return;
+    }
+    if (reduce || hasAnimated.current) return;
+    hasAnimated.current = true;
+    slotRefs.current.forEach((el, i) => {
+      if (!el) return;
+      setTimeout(() => {
+        el.animate(
+          [{ transform: 'scale(1)' }, { transform: 'scale(1.22)' }, { transform: 'scale(1)' }],
+          { duration: 300, easing: 'cubic-bezier(0.34,1.56,0.64,1)', delay: 0 },
+        );
+      }, i * 55);
+    });
+  }, [value.length, length, status, reduce]);
 
   const color = status === 'error' ? accents.red : status === 'success' ? accents.mint : accents.cyan;
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
@@ -71,7 +92,7 @@ export default function MpinField({
           const filled = i < value.length;
           const active = focused && i === value.length && status !== 'success';
           return (
-            <Box key={i} sx={{
+            <Box key={i} ref={el => { slotRefs.current[i] = el; }} sx={{
               width: { xs: 42, sm: 48 }, height: { xs: 50, sm: 56 }, borderRadius: '14px',
               display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
               background: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.025)',

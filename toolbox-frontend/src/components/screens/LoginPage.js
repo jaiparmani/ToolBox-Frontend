@@ -194,6 +194,13 @@ export default function LoginPage() {
       };
   const panelTransition = { duration: reduce ? 0.18 : 0.34, ease: [0.32, 0.72, 0, 1] };
 
+  // Shared entrance animation factory for the left-panel elements.
+  const leftEntrance = (delay) => ({
+    initial: reduce ? { opacity: 0 } : { opacity: 0, x: -16 },
+    animate: { opacity: 1, x: 0 },
+    transition: { delay, duration: 0.4, ease: [0.32, 0.72, 0, 1] },
+  });
+
   return (
     <AuthShell maxWidth={{ xs: 430, md: 780 }}>
       {/* Header — brand + secure status (spans both columns) */}
@@ -220,24 +227,35 @@ export default function LoginPage() {
           pr: { md: 4 }, borderRight: { md: '1px solid' }, borderColor: { md: 'divider' },
           alignSelf: { md: 'stretch' }, justifyContent: { md: 'center' },
         }}>
-          <UnlockCrest />
+          <motion.div {...leftEntrance(0.05)}>
+            <UnlockCrest />
+          </motion.div>
           <Box sx={{ minWidth: 0, position: 'relative', flex: { xs: 1, md: 'unset' } }}>
-            <motion.div
-              key={heroTitle}
-              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
-            >
-              <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: { xs: 'clamp(1.4rem,6vw,1.6rem)', md: '1.9rem' }, letterSpacing: '-0.02em', lineHeight: 1.1, mt: { md: 2 } }}>
-                {heroTitle}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{heroSub}</Typography>
+            <motion.div {...leftEntrance(0.15)}>
+              <motion.div
+                key={heroTitle}
+                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
+              >
+                <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: { xs: 'clamp(1.4rem,6vw,1.6rem)', md: '1.9rem' }, letterSpacing: '-0.02em', lineHeight: 1.1, mt: { md: 2 } }}>
+                  {heroTitle}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{heroSub}</Typography>
+              </motion.div>
             </motion.div>
-            <ReassurancePoints />
+            <motion.div {...leftEntrance(0.25)}>
+              <ReassurancePoints />
+            </motion.div>
           </Box>
         </Box>
 
         {/* ── Interactive auth column ── */}
+        <motion.div
+          initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+        >
         <Box sx={{ minWidth: 0 }}>
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
       {info && (method === 'otp' ? otpStep === 'code' : method === 'mpin-reset' ? resetStep === 'confirm' : false) &&
@@ -259,10 +277,24 @@ export default function LoginPage() {
                 <Box sx={{ mb: 2 }}>{idField(true)}</Box>
                 <MpinField value={mpin} onChange={(v) => { setMpin(v); if (pinStatus === 'error') setPinStatus('idle'); }}
                   onComplete={(p) => doMpin(p)} status={pinStatus} disabled={loading || pinStatus === 'success'} autoFocus={false} />
-                <Button fullWidth variant="contained" size="large" disabled={loading || mpin.length !== 6 || pinStatus === 'success'}
-                  onClick={() => doMpin()} sx={{ mt: 2.25, py: 1.15 }}>
-                  {pinStatus === 'success' ? 'Unlocked ✓' : loading ? 'Unlocking…' : 'Unlock'}
-                </Button>
+                <Box sx={{ position: 'relative', mt: 2.25 }}>
+                  {mpin.length === 6 && pinStatus === 'idle' && !loading && !reduce && (
+                    <Box aria-hidden sx={{
+                      position: 'absolute', inset: 0, borderRadius: '8px', overflow: 'hidden',
+                      pointerEvents: 'none', zIndex: 1,
+                      '&::after': {
+                        content: '""', position: 'absolute', top: 0, left: '-60%', width: '40%', height: '100%',
+                        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)',
+                        '@keyframes unlockShimmer': { '0%': { left: '-60%' }, '100%': { left: '120%' } },
+                        animation: 'unlockShimmer 1.4s ease-in-out infinite',
+                      },
+                    }} />
+                  )}
+                  <Button fullWidth variant="contained" size="large" disabled={loading || mpin.length !== 6 || pinStatus === 'success'}
+                    onClick={() => doMpin()} sx={{ py: 1.15 }}>
+                    {pinStatus === 'success' ? 'Unlocked ✓' : loading ? 'Unlocking…' : 'Unlock'}
+                  </Button>
+                </Box>
                 {rememberRow}
                 <SecurityNote />
 
@@ -378,6 +410,7 @@ export default function LoginPage() {
             </Typography>
           </Box>
         </Box>{/* /interactive auth column */}
+        </motion.div>
       </Box>{/* /two-column grid */}
 
       {/* The signature success cinematic */}
@@ -489,4 +522,3 @@ function BackRow({ onClick, label, subtle }) {
     </Box>
   );
 }
-

@@ -166,6 +166,9 @@ export const transformUserForUI = (apiUser) => {
         lastName: apiUser.last_name,
         phone: apiUser.phone || '',
         hasMpin: apiUser.has_mpin === true, // whether a 6-digit MPIN is set (server-provided)
+        // Master switch for Telegram pings (expense/split/settle). Defaults to
+        // on, matching the server-side field's default.
+        telegramNotificationsEnabled: apiUser.telegram_notifications_enabled !== false,
         displayName: `${apiUser.first_name} ${apiUser.last_name}`.trim() || apiUser.username,
         dateJoined: new Date(apiUser.date_joined),
         isActive: apiUser.is_active !== false // Default to true if not specified
@@ -346,6 +349,20 @@ export const patchUserProfile = async (profileData, onSuccess, onError) => {
         if (onError) onError(handledError);
         throw handledError;
     }
+};
+
+/**
+ * Flip the Telegram notifications preference on its own — a single-field
+ * PATCH, so Settings doesn't need to resend the rest of the profile just to
+ * toggle this.
+ */
+export const setTelegramNotificationsEnabled = async (enabled) => {
+    const response = await authenticatedFetch(`${API_BASE_URL}/profile/`, {
+        method: 'PATCH',
+        body: JSON.stringify({ telegram_notifications_enabled: !!enabled })
+    });
+    const data = await response.json();
+    return transformUserForUI(data);
 };
 
 /**

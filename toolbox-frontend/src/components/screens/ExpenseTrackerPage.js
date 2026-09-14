@@ -300,13 +300,13 @@ export default function ExpenseTrackerPage() {
   */
  const deckSections = React.useMemo(() => [
    {
-     label: 'Expenses', icon: DashboardIcon, color: accents.blue,
+     label: 'Expenses', icon: DashboardIcon, color: accents.cyan,
      hint: pagination.total
        ? `${pagination.total} ${pagination.total === 1 ? 'transaction' : 'transactions'} · ${scopeLabel}`
        : undefined,
    },
    {
-     label: 'Labels', icon: LabelsIcon, color: accents.purple,
+     label: 'Labels', icon: LabelsIcon, color: accents.violet,
      hint: categories.length || tags.length
        ? `${categories.length} categories · ${tags.length} tags`
        : undefined,

@@ -96,7 +96,7 @@ export default function ProjectionChart({ series = [], low, nextIncomeDate, heig
           initial={reduce ? false : { pathLength: 0 }}
           whileInView={{ pathLength: 1 }}
           viewport={{ once: true, amount: 0.4 }}
-          transition={reduce ? { duration: 0 } : { duration: 1.1, ease: [0.32, 0.72, 0, 1] }}
+          transition={reduce ? { duration: 0 } : { duration: 0.9, ease: [0.32, 0.72, 0, 1] }}
         />
         {lowIdx >= 0 && (
           <>
@@ -108,6 +108,27 @@ export default function ProjectionChart({ series = [], low, nextIncomeDate, heig
         {/* endpoint — quiets while inspecting a day */}
         <circle cx={geom.W} cy={geom.yPx(pts[pts.length - 1].balance)} r={active ? 2.5 : 3.5} fill={accent} opacity={active ? 0.35 : 1} vectorEffect="non-scaling-stroke" style={{ transition: 'opacity .15s ease' }} />
       </svg>
+
+      {/* trailing glow dot — always-on marker at today's cumulative spend */}
+      {!active && pts.length > 0 && (
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute',
+            left: `${geom.xPct(pts.length - 1)}%`,
+            top: `${geom.yPct(pts[pts.length - 1].balance)}%`,
+            width: 16,
+            height: 16,
+            mt: '-8px',
+            ml: '-8px',
+            borderRadius: '50%',
+            bgcolor: accents.cyan,
+            filter: `drop-shadow(0 0 6px ${accents.cyan})`,
+            pointerEvents: 'none',
+            zIndex: 1,
+          }}
+        />
+      )}
 
       {/* interactive overlay (crisp DOM, positioned in %) */}
       {active && (

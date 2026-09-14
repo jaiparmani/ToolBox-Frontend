@@ -15,7 +15,9 @@ import {
   PageHeader, SectionHeader, Panel, EmptyState, AmountDisplay, SegmentedControl,
   BottomSheet, ConfirmDialog, ErrorBanner,
 } from '../ui';
-import { accents } from '../../theme/tokens';
+import { alpha } from '@mui/material/styles';
+import { motion } from 'framer-motion';
+import { accents, type } from '../../theme/tokens';
 import { feedback } from '../ui/feedback';
 import { RecurringSkeleton } from '../ui/Skeletons';
 
@@ -73,6 +75,17 @@ export default function RecurringPage() {
 
   const bills = useMemo(() => rules.filter(r => r.transaction_type === 'expense'), [rules]);
 
+  const nextBill = useMemo(() => {
+    const now = new Date();
+    const upcoming = bills
+      .filter(r => r.next_date && new Date(r.next_date) >= now)
+      .sort((a, b) => new Date(a.next_date) - new Date(b.next_date));
+    if (!upcoming[0]) return null;
+    const item = upcoming[0];
+    const daysUntil = Math.ceil((new Date(item.next_date) - now) / 86400000);
+    return { item, daysUntil };
+  }, [bills]);
+
   const openForm = () => { setForm(EMPTY_FORM); setFormOpen(true); };
 
   const save = async () => {
@@ -128,6 +141,48 @@ export default function RecurringPage() {
         />
         {/* Financial weather now lives once in the app top bar, not per-screen. */}
       </Reveal>
+
+      {!loading && nextBill && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: 'easeOut', delay: 0.1 }}
+        >
+          <Box sx={{
+            backgroundColor: alpha(accents.cyan, 0.06),
+            border: '1px solid',
+            borderColor: alpha(accents.cyan, 0.25),
+            borderRadius: 3,
+            p: 2,
+            mb: 2,
+            display: 'flex',
+            alignItems: 'baseline',
+            gap: 1,
+            flexWrap: 'wrap',
+          }}>
+            {nextBill.daysUntil > 1 ? (
+              <>
+                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+                  <Typography component="span" sx={{ fontSize: '2.5rem', fontWeight: 700, color: accents.cyan, fontFamily: type.displayFamily, lineHeight: 1 }}>
+                    {nextBill.daysUntil}
+                  </Typography>
+                  <Typography component="span" sx={{ fontSize: '0.65rem', letterSpacing: '0.1em', color: 'text.secondary', textTransform: 'uppercase', lineHeight: 1 }}>
+                    days
+                  </Typography>
+                </Box>
+                <Typography component="span" sx={{ fontSize: '0.9rem', color: 'text.secondary' }}>until</Typography>
+              </>
+            ) : (
+              <Typography component="span" sx={{ fontSize: '2.5rem', fontWeight: 700, color: accents.cyan, fontFamily: type.displayFamily, lineHeight: 1 }}>
+                {nextBill.daysUntil === 0 ? 'Due today' : 'Due tomorrow'}
+              </Typography>
+            )}
+            <Typography component="span" sx={{ fontSize: '0.9rem', color: 'text.primary' }}>
+              {nextBill.item.description} · ₹{Number(nextBill.item.amount).toLocaleString('en-IN')}
+            </Typography>
+          </Box>
+        </motion.div>
+      )}
 
       {loading ? (
         <RecurringSkeleton />

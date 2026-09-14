@@ -247,7 +247,7 @@ export default function LandingPage() {
               <Reveal index={0}>
                 <Eyebrow>Spent this month</Eyebrow>
                 <Typography component="div" sx={{ ...num, fontSize: { xs: '3.4rem', sm: '4.4rem', md: '4.9rem' }, fontWeight: 640, letterSpacing: '-0.05em', lineHeight: 0.9, mt: 1 }}>
-                  <AnimatedNumber value={spent} format="money" />
+                  <AnimatedNumber value={spent} format="money" initial={0} duration={700} />
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 1.5, flexWrap: 'wrap' }}>
                   <Typography sx={{ fontSize: 13.5, color: 'text.secondary' }}>

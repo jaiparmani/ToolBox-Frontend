@@ -339,7 +339,7 @@ export default function SplitsPage() {
   // "only show a hint once its data has actually loaded" rule Activity uses.
   const deckSections = React.useMemo(() => [
     {
-      label: 'Balances', icon: CallSplitIcon, color: accents.mint,
+      label: 'Balances', icon: CallSplitIcon, color: accents.cyan,
       hint: !state.loading
         ? (state.net === 0 ? 'All square' : `${state.net > 0 ? '+' : '−'}${money(Math.abs(state.net))}`)
         : undefined,
@@ -349,13 +349,13 @@ export default function SplitsPage() {
       hint: groups.length ? `${groups.length} ${groups.length === 1 ? 'group' : 'groups'}` : undefined,
     },
     {
-      label: 'Shared', icon: MoveToInboxIcon, color: accents.amber,
+      label: 'Shared', icon: MoveToInboxIcon, color: accents.mint,
       hint: shared.items.length
         ? `${money(shared.items.reduce((s, i) => s + (i.outstanding || 0), 0))} owed`
         : undefined,
     },
     {
-      label: 'History', icon: DoneAllIcon, color: accents.blue,
+      label: 'History', icon: DoneAllIcon, color: accents.amber,
       hint: !settledHistory.loading && settledHistory.items.length
         ? `${settledHistory.items.length} settled`
         : undefined,

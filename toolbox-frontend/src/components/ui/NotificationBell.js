@@ -91,6 +91,14 @@ export default function NotificationBell() {
   React.useEffect(() => {
     refresh();
 
+    // If this device already has notification permission, silently ensure a push
+    // subscription exists in the backend so the server can reach this device even
+    // when the app is closed. This covers: first load after granting permission,
+    // cleared site data, a new device, or the initial page open on mobile.
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      ensurePushSubscription();
+    }
+
     // Refresh on tab focus / visibility restore (covers the tab-was-hidden case).
     const onFocus = () => { if (!document.hidden) refresh(); };
     // In-app actions (e.g. adding a split) fire this window event to poke the

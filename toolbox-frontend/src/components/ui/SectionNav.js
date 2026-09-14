@@ -76,7 +76,7 @@ function NavItem({ section, active, mobile, reduce, onSelect, onKeyDown, itemRef
         minHeight: mobile ? 56 : 60,
         border: 'none', background: 'transparent', font: 'inherit', cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
-        color: active ? 'text.primary' : 'text.secondary',
+        color: active ? section.color : 'text.secondary',
         transition: `color ${motionTokens.fast}ms ${motionTokens.ease}`,
         '&:hover': { color: 'text.primary' },
         '&:focus-visible': { outline: `2px solid ${section.color}`, outlineOffset: -2, borderRadius: `${radius.md}px` },
@@ -100,10 +100,11 @@ function NavItem({ section, active, mobile, reduce, onSelect, onKeyDown, itemRef
             sx={{
               width: 30, height: 30, borderRadius: `${radius.sm}px`, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              backgroundColor: `${section.color}1f`,
+              backgroundColor: active ? `${section.color}1f` : 'transparent',
+              transition: `background-color ${motionTokens.fast}ms ${motionTokens.ease}`,
             }}
           >
-            <Icon sx={{ color: section.color, fontSize: 17 }} />
+            <Icon sx={{ fontSize: 17 }} />
           </Box>
         )}
         <Typography

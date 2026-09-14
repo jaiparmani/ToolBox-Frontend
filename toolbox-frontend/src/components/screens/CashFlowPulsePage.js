@@ -22,6 +22,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Typography } from '@mui/material';
+import { motion, useReducedMotion } from 'framer-motion';
 import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
 
 import { getExpenses } from '../rest/expenseTrackerApis';
@@ -629,44 +630,134 @@ function AboutOverlay({ onClose }) {
 /* ─── Boot ───────────────────────────────────────────────────────────────── */
 
 function Boot() {
-  const lines = useMemo(() => ([
-    'READING PURCHASE HISTORY',
-    'MEASURING FREQUENCY',
-    'DETECTING HABITS',
-    'PLOTTING THE FIELD',
-  ]), []);
-  const [step, setStep] = useState(0);
+  const shouldReduceMotion = useReducedMotion();
+
+  // ── Typewriter ──────────────────────────────────────────────────────────
+  const FULL_TEXT = 'READING PURCHASE HISTORY';
+  const [displayed, setDisplayed] = useState('');
+  const [cursorVisible, setCursorVisible] = useState(true);
+  const [typingDone, setTypingDone] = useState(false);
+
   useEffect(() => {
-    const id = setInterval(() => setStep(s => (s + 1) % lines.length), 900);
+    let i = 0;
+    const id = setInterval(() => {
+      i += 1;
+      setDisplayed(FULL_TEXT.slice(0, i));
+      if (i >= FULL_TEXT.length) {
+        clearInterval(id);
+        setTypingDone(true);
+      }
+    }, 35);
     return () => clearInterval(id);
-  }, [lines.length]);
+  }, []);
+
+  // Blinking cursor — stops once typing is done.
+  useEffect(() => {
+    if (typingDone) { setCursorVisible(false); return; }
+    const id = setInterval(() => setCursorVisible(v => !v), 530);
+    return () => clearInterval(id);
+  }, [typingDone]);
+
+  // ── Particle field ──────────────────────────────────────────────────────
+  // Positions are seeded once on mount and never recalculated.
+  const particles = useMemo(() =>
+    Array.from({ length: 35 }, (_, idx) => ({
+      id: idx,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      opacity: 0.15 + Math.random() * 0.2,
+      dx: (Math.random() - 0.5) * 40,
+      dy: (Math.random() - 0.5) * 40,
+      duration: 15 + Math.random() * 10,
+    }))
+  , []);
+
   return (
-    <Box sx={{
-      height: '100%', position: 'relative',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#04050a',
-    }}>
+    <motion.div
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.45, ease: [0.32, 0.72, 0, 1] }}
+      style={{
+        height: '100%', position: 'relative',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#04050a',
+      }}
+    >
+      {/* ── Constellation ─────────────────────────────────────────────── */}
+      <Box sx={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+        {particles.map(p => (
+          <motion.div
+            key={p.id}
+            style={{
+              position: 'absolute',
+              left: `${p.x}%`,
+              top: `${p.y}%`,
+              width: 2,
+              height: 2,
+              borderRadius: '50%',
+              background: '#ffffff',
+              opacity: shouldReduceMotion ? p.opacity * 0.6 : p.opacity,
+            }}
+            animate={shouldReduceMotion ? {} : {
+              x: [0, p.dx, 0],
+              y: [0, p.dy, 0],
+            }}
+            transition={shouldReduceMotion ? {} : {
+              duration: p.duration,
+              repeat: Infinity,
+              repeatType: 'mirror',
+              ease: 'easeInOut',
+            }}
+          />
+        ))}
+      </Box>
+
+      {/* ── Radial glow ───────────────────────────────────────────────── */}
       <Box sx={{
-        position: 'absolute', inset: 0,
+        position: 'absolute', inset: 0, pointerEvents: 'none',
         background: 'radial-gradient(circle at 50% 50%, rgba(100,210,255,0.05), transparent 60%)',
       }} />
+
+      {/* ── Spinner + typewriter text ──────────────────────────────────── */}
       <Box sx={{ position: 'relative', textAlign: 'center' }}>
+        {/* Custom SVG arc spinner */}
         <Box sx={{
-          width: 44, height: 44, mx: 'auto', mb: 3,
-          border: `1px solid ${accents.cyan}`, borderRadius: '50%', opacity: 0.35,
-          animation: 'breathe 2.4s ease-in-out infinite',
-          '@keyframes breathe': {
-            '0%, 100%': { transform: 'scale(0.82)', opacity: 0.2 },
-            '50%': { transform: 'scale(1)', opacity: 0.5 },
-          },
-          '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
-        }} />
+          width: 56, height: 56, mx: 'auto', mb: 3,
+          filter: `drop-shadow(0 0 8px ${accents.cyan})`,
+        }}>
+          <motion.svg
+            width="56" height="56" viewBox="0 0 56 56"
+            animate={shouldReduceMotion ? {} : { rotate: 360 }}
+            transition={shouldReduceMotion ? {} : { duration: 2.2, repeat: Infinity, ease: 'linear' }}
+          >
+            <circle
+              cx="28" cy="28" r="24"
+              fill="none"
+              stroke={accents.cyan}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeDasharray="60 96"
+            />
+          </motion.svg>
+        </Box>
+
+        {/* Typewriter text */}
         <Typography sx={{
           fontFamily: MONO, fontSize: 10, letterSpacing: '0.4em',
           color: accents.cyan, opacity: 0.65, textTransform: 'uppercase',
+          minHeight: '1.5em',
         }}>
-          {lines[step]}
+          {displayed}
+          {!typingDone && (
+            <Box
+              component="span"
+              sx={{ opacity: cursorVisible ? 1 : 0, transition: 'opacity 80ms', ml: '1px' }}
+            >
+              |
+            </Box>
+          )}
         </Typography>
       </Box>
-    </Box>
+    </motion.div>
   );
 }

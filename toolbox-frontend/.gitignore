@@ -21,3 +21,10 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Netlify CLI local state (site link, cached plugins, machine-local absolute
+# paths) - regenerates per machine via `netlify link`/`netlify build`. Was
+# previously committed and caused a real bug: this file's build.base/publish
+# paths kept getting silently rewritten to the last machine's absolute path,
+# breaking every cloud build until noticed (see commit 8599cf2).
+.netlify/

@@ -131,3 +131,69 @@ export const BalanceSkeleton = ({ rows = 2 }) => {
     </LoadingRegion>
   );
 };
+export const ProfileSkeleton = () => {
+  const reduce = useReducedMotion();
+  const anim = reduce ? false : 'pulse';
+  return (
+    <LoadingRegion label="Loading profile">
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+        <Skeleton animation={anim} variant="circular" width={72} height={72} />
+        <Box sx={{ flex: 1 }}>
+          <Skeleton animation={anim} width="45%" height={24} sx={{ mb: 0.75, transform: 'none' }} />
+          <Skeleton animation={anim} width="65%" height={14} sx={{ transform: 'none' }} />
+        </Box>
+      </Box>
+      {[0, 1, 2, 3].map(i => (
+        <Box key={i} sx={{ mb: 1.5 }}>
+          <Skeleton animation={anim} width="30%" height={12} sx={{ mb: 0.5, transform: 'none' }} />
+          <Skeleton animation={anim} width="100%" height={44} sx={{ borderRadius: 2, transform: 'none' }} />
+        </Box>
+      ))}
+    </LoadingRegion>
+  );
+};
+
+export const RecurringSkeleton = ({ rows = 4 }) => {
+  const reduce = useReducedMotion();
+  const anim = reduce ? false : 'pulse';
+  return (
+    <LoadingRegion label="Loading recurring items">
+      <Stack spacing={1.25}>
+        {Array.from({ length: rows }).map((_, i) => (
+          <Box key={i} sx={{
+            display: 'flex', alignItems: 'center', gap: 2,
+            p: 1.5, borderRadius: 3, border: '1px solid', borderColor: 'divider',
+          }}>
+            <Skeleton animation={anim} variant="circular" width={36} height={36} />
+            <Box sx={{ flex: 1 }}>
+              <Skeleton animation={anim} width={`${55 + (i % 3) * 12}%`} height={14} sx={{ mb: 0.5, transform: 'none' }} />
+              <Skeleton animation={anim} width={`${35 + (i % 2) * 15}%`} height={11} sx={{ transform: 'none' }} />
+            </Box>
+            <Skeleton animation={anim} width={56} height={20} sx={{ borderRadius: 1, transform: 'none' }} />
+          </Box>
+        ))}
+      </Stack>
+    </LoadingRegion>
+  );
+};
+
+export const ApiKeysSkeleton = ({ rows = 3 }) => {
+  const reduce = useReducedMotion();
+  const anim = reduce ? false : 'pulse';
+  return (
+    <LoadingRegion label="Loading API keys">
+      {Array.from({ length: rows }).map((_, i) => (
+        <Box key={i} sx={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          py: 1.5, borderBottom: '1px solid', borderColor: 'divider',
+        }}>
+          <Box>
+            <Skeleton animation={anim} width={`${100 + i * 20}px`} height={14} sx={{ mb: 0.5, transform: 'none' }} />
+            <Skeleton animation={anim} width={180} height={11} sx={{ transform: 'none' }} />
+          </Box>
+          <Skeleton animation={anim} width={64} height={30} sx={{ borderRadius: 1, transform: 'none' }} />
+        </Box>
+      ))}
+    </LoadingRegion>
+  );
+};

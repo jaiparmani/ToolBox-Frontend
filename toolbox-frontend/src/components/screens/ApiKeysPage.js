@@ -24,6 +24,7 @@ import {
 } from '../rest/userApis';
 import { PageHeader, Panel, EmptyState, ConfirmDialog } from '../ui';
 import { accents } from '../../theme/tokens';
+import { ApiKeysSkeleton } from '../ui/Skeletons';
 
 export default function ApiKeysPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -217,7 +218,11 @@ export default function ApiKeysPage() {
           </Typography>
         </Box>
 
-        {shortcutKeys.length === 0 && !shortcutLoading ? (
+        {shortcutLoading && shortcutKeys.length === 0 ? (
+          <Box sx={{ px: 2.5, pb: 2 }}>
+            <ApiKeysSkeleton rows={2} />
+          </Box>
+        ) : shortcutKeys.length === 0 ? (
           <Box sx={{ px: 2.5, pb: 4 }}>
             <EmptyState icon={ShortcutIcon} title="No shortcut keys"
               description="Generate a key above to connect an Apple Shortcut or automation." dense />
@@ -335,7 +340,11 @@ export default function ApiKeysPage() {
           </Typography>
         </Box>
 
-        {keys.length === 0 && !loading ? (
+        {loading && keys.length === 0 ? (
+          <Box sx={{ px: 2.5, pb: 2 }}>
+            <ApiKeysSkeleton rows={3} />
+          </Box>
+        ) : keys.length === 0 ? (
           <Box sx={{ px: 2.5, pb: 4 }}>
             <EmptyState icon={VpnKeyIcon} title="No keys stored"
               description="AI features fall back to the server's environment variable until you add one." dense />

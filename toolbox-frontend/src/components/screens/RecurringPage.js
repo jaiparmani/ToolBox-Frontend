@@ -17,6 +17,7 @@ import {
 } from '../ui';
 import { accents } from '../../theme/tokens';
 import { feedback } from '../ui/feedback';
+import { RecurringSkeleton } from '../ui/Skeletons';
 
 const CADENCE = [
   { id: 'daily', label: 'Daily' },
@@ -129,9 +130,7 @@ export default function RecurringPage() {
       </Reveal>
 
       {loading ? (
-        <Stack spacing={1.25}>
-          {[0, 1, 2].map(i => <Box key={i} sx={{ height: 68, borderRadius: 3, border: '1px solid', borderColor: 'divider', opacity: 0.4 }} />)}
-        </Stack>
+        <RecurringSkeleton />
       ) : rules.length === 0 ? (
         <Reveal index={1}>
           <Panel>

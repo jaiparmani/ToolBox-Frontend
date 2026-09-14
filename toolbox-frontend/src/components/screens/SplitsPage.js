@@ -19,6 +19,7 @@ import PaymentsIcon from '@mui/icons-material/Payments';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 import MoneyConstellation from '../ui/MoneyConstellation';
+import ActivityDeck from '../ui/ActivityDeck';
 import Reveal from '../ui/Reveal';
 import LendingAssistant from '../ui/LendingAssistant';
 import ErrorBanner from '../ui/ErrorBanner';
@@ -129,7 +130,6 @@ export default function SplitsPage() {
   const [shared, setShared] = useState({ loading: true, items: [] });
   const [sharedExpanded, setSharedExpanded] = useState(null);
   const [including, setIncluding] = useState(null);
-  const [showSettled, setShowSettled] = useState(true);
   const [settledHistory, setSettledHistory] = useState({ loading: false, items: [] });
 
   // Groups. `openGroup` switches the page into that group's own view rather
@@ -150,6 +150,14 @@ export default function SplitsPage() {
   // Bills you paid and split, but chose not to count as your own spending —
   // tracked here only, until you say otherwise.
   const [splitOnly, setSplitOnly] = useState([]);
+
+  // Splitting's own deck, the same swipeable four-section language Activity
+  // uses. Opening a group used to take over the *entire* page — quick-add,
+  // shared-with-you, history, all hidden behind `!openGroup` guards. Giving
+  // each concern its own tab means opening a group only replaces the Groups
+  // tab's own content; everything else stays one swipe away.
+  const [activeTab, setActiveTab] = useState(0);
+  const selectTab = React.useCallback((next) => setActiveTab(next), []);
 
   const load = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true }));
@@ -326,6 +334,33 @@ export default function SplitsPage() {
     });
     return [...byName.values()].sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
   }, [state.balances, state.youOwe]);
+
+  // One real figure per tab for the peek card behind a deck drag - the same
+  // "only show a hint once its data has actually loaded" rule Activity uses.
+  const deckSections = React.useMemo(() => [
+    {
+      label: 'Balances', icon: CallSplitIcon, color: accents.mint,
+      hint: !state.loading
+        ? (state.net === 0 ? 'All square' : `${state.net > 0 ? '+' : '−'}${money(Math.abs(state.net))}`)
+        : undefined,
+    },
+    {
+      label: 'Groups', icon: GroupsIcon, color: accents.violet,
+      hint: groups.length ? `${groups.length} ${groups.length === 1 ? 'group' : 'groups'}` : undefined,
+    },
+    {
+      label: 'Shared', icon: MoveToInboxIcon, color: accents.amber,
+      hint: shared.items.length
+        ? `${money(shared.items.reduce((s, i) => s + (i.outstanding || 0), 0))} owed`
+        : undefined,
+    },
+    {
+      label: 'History', icon: DoneAllIcon, color: accents.blue,
+      hint: !settledHistory.loading && settledHistory.items.length
+        ? `${settledHistory.items.length} settled`
+        : undefined,
+    },
+  ], [state.loading, state.net, groups.length, shared.items, settledHistory.loading, settledHistory.items.length]);
 
   /**
    * The bills behind one person's balance.
@@ -542,6 +577,11 @@ export default function SplitsPage() {
         <ErrorBanner error={error} onClose={() => setError(null)} />
         {/* Financial weather now lives once in the app top bar, not per-screen. */}
 
+        <ActivityDeck value={activeTab} onChange={selectTab} sections={deckSections}>
+
+        {/* ── Balances ─────────────────────────────────────────────────── */}
+        {activeTab === 0 && (
+        <Box key="tab-0">
         {/* Net position — the one figure you glance at */}
         <Reveal>
           <Paper
@@ -606,7 +646,6 @@ export default function SplitsPage() {
         </Reveal>
 
         {/* Add a split — plain language first, exact numbers if you'd rather */}
-        {!openGroup && (
           <Reveal index={1}>
             <Box
               sx={{
@@ -649,10 +688,9 @@ export default function SplitsPage() {
             </Box>
             <ThinkingHint show={quickAdd.loading} label="Working out the shares…" />
           </Reveal>
-        )}
 
         {/* Split-only bills you paid: not yet counted as your own spending */}
-        {!openGroup && splitOnly.length > 0 && (
+        {splitOnly.length > 0 && (
           <Reveal index={1}>
             <Box
               sx={{
@@ -695,6 +733,12 @@ export default function SplitsPage() {
           </Reveal>
         )}
 
+        </Box>
+        )}
+
+        {/* ── Groups ───────────────────────────────────────────────────── */}
+        {activeTab === 1 && (
+        <Box key="tab-1">
         {/* Groups: a way in, above everything else */}
         {!openGroup && (
           <Reveal>
@@ -709,7 +753,26 @@ export default function SplitsPage() {
           </Reveal>
         )}
 
-        {openGroup ? (
+        {!openGroup && groups.length === 0 && (
+          <Paper
+            elevation={0}
+            sx={{ p: { xs: 4, sm: 5 }, borderRadius: 4, textAlign: 'center', border: '1px dashed', borderColor: 'divider' }}
+          >
+            <GroupsIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1.5 }} />
+            <Typography variant="body1" sx={{ fontWeight: 600 }}>No groups yet</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              A flat, a trip, a regular table — start one above.
+            </Typography>
+          </Paper>
+        )}
+
+        {!openGroup && groups.length > 0 && (
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
+            Pick a group above to see its ledger.
+          </Typography>
+        )}
+
+        {openGroup && (
           /* ---- The group universe ---- */
           <Box>
             <Box display="flex" alignItems="center" gap={1} sx={{ mb: 2 }}>
@@ -917,7 +980,14 @@ export default function SplitsPage() {
               </>
             ) : null}
           </Box>
-        ) : state.loading ? (
+        )}
+        </Box>
+        )}
+
+        {/* ── Balances, continued: the ledger itself ──────────────────────── */}
+        {activeTab === 0 && (
+        <Box key="tab-0b">
+        {state.loading ? (
           <BalanceSkeleton />
         ) : people.length === 0 ? (
           <Paper
@@ -1151,9 +1221,14 @@ export default function SplitsPage() {
             )}
           </>
         )}
+        </Box>
+        )}
 
+        {/* ── Shared with you ──────────────────────────────────────────── */}
+        {activeTab === 2 && (
+        <Box key="tab-2">
         {/* Bills other people split with you, grouped by who paid. */}
-        {!openGroup && shared.items.length > 0 && (
+        {shared.items.length > 0 && (
           <Reveal index={2}>
             <Box sx={{ mt: 3 }}>
               <Box display="flex" alignItems="baseline" justifyContent="space-between" sx={{ px: 0.5, mb: 1 }}>
@@ -1312,36 +1387,28 @@ export default function SplitsPage() {
           </Reveal>
         )}
 
-        {/* Settled history — tucked away until needed */}
-        {!openGroup && (
-          <Reveal index={3}>
-            <Box sx={{ mt: 3 }}>
-              <Box
-                display="flex" alignItems="center" justifyContent="center"
-                sx={{
-                  cursor: 'pointer', py: 1, opacity: 0.7,
-                  '&:hover': { opacity: 1 },
-                  transition: 'opacity 0.2s ease',
-                }}
-                onClick={() => { setShowSettled(prev => !prev); }}
-              >
-                <DoneAllIcon sx={{ fontSize: 14, mr: 0.75, color: 'text.secondary' }} />
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: '0.04em' }}>
-                  {showSettled ? 'Hide settled' : 'Settled history'}
-                </Typography>
-              </Box>
-              <AnimatePresence initial={false}>
-              {showSettled && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 34 }}
-                  style={{ overflow: 'hidden' }}
-                >
+        {shared.items.length === 0 && (
+          <Paper
+            elevation={0}
+            sx={{ p: { xs: 4, sm: 5 }, borderRadius: 4, textAlign: 'center', border: '1px dashed', borderColor: 'divider' }}
+          >
+            <MoveToInboxIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1.5 }} />
+            <Typography variant="body1" sx={{ fontWeight: 600 }}>Nothing shared with you</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              When someone splits a bill with you, it shows up here first.
+            </Typography>
+          </Paper>
+        )}
+        </Box>
+        )}
+
+        {/* ── History ──────────────────────────────────────────────────── */}
+        {activeTab === 3 && (
+        <Box key="tab-3">
+          <Reveal>
                 <Paper
                   elevation={0}
-                  sx={{ p: 2, mt: 0.5, borderRadius: 4, border: '1px solid', borderColor: 'divider', textAlign: 'left' }}
+                  sx={{ p: 2, borderRadius: 4, border: '1px solid', borderColor: 'divider', textAlign: 'left' }}
                 >
                   {settledHistory.loading ? (
                     <LinearProgress sx={{ borderRadius: 999 }} />
@@ -1376,17 +1443,16 @@ export default function SplitsPage() {
                     </Stack>
                   )}
                 </Paper>
-                </motion.div>
-              )}
-              </AnimatePresence>
-            </Box>
           </Reveal>
+        </Box>
         )}
 
+        {/* ── Balances, continued: the AI surface ──────────────────────── */}
         {/* A distinct AI surface, scoped to lending only — kept apart from the
             app's spending analysis. Lives on the everyone view, not inside a
             group. */}
-        {!openGroup && !state.loading && <LendingAssistant />}
+        {activeTab === 0 && !state.loading && <LendingAssistant />}
+        </ActivityDeck>
 
         <SettleConfirmSheet
           open={settle.open}

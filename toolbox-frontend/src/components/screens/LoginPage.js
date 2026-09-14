@@ -32,10 +32,15 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
   const reduce = useReducedMotion();
+  const initialSaved = React.useRef((() => {
+    try { return localStorage.getItem('toolbox_last_identifier') || ''; } catch { return ''; }
+  })());
   const [method, setMethod] = useState('mpin');       // 'mpin' | 'otp' | 'password' | 'mpin-reset'
   const [otpStep, setOtpStep] = useState('identify');  // 'identify' | 'code'
   const [resetStep, setResetStep] = useState('request'); // 'request' | 'confirm'
-  const [identifier, setIdentifier] = useState('');
+  const [identifier, setIdentifier] = useState(() => {
+    try { return localStorage.getItem('toolbox_last_identifier') || ''; } catch { return ''; }
+  });
   const [password, setPassword] = useState('');
   const [mpin, setMpin] = useState('');
   const [pinStatus, setPinStatus] = useState('idle');  // 'idle' | 'error' | 'success'
@@ -47,7 +52,10 @@ export default function LoginPage() {
   const [unlocked, setUnlocked] = useState(null);      // null | { label } → plays the success overlay
 
   const finish = () => { window.location.href = '/'; };
-  const succeed = (label) => setUnlocked({ label });   // hand off to the unlock cinematic
+  const succeed = (label) => {
+    try { if (identifier.trim()) localStorage.setItem('toolbox_last_identifier', identifier.trim()); } catch { /* private mode */ }
+    setUnlocked({ label });
+  };   // hand off to the unlock cinematic
 
   // ---- MPIN (primary) ----
   const doMpin = async (pin) => {
@@ -151,7 +159,10 @@ export default function LoginPage() {
     : method === 'mpin-reset' ? 'Reset your MPIN'
     : method === 'otp' ? 'Sign in with a code'
     : 'Sign in with a password';
-  const heroSub = method === 'mpin' ? 'Enter your 6-digit MPIN'
+  const heroSub = method === 'mpin'
+    ? (initialSaved.current && identifier === initialSaved.current
+        ? 'Welcome back — enter your MPIN'
+        : 'Enter your 6‑digit MPIN')
     : method === 'mpin-reset' ? (resetStep === 'request' ? "We'll email you a reset code" : `Enter the code we sent, then choose a new MPIN`)
     : method === 'otp' ? (otpStep === 'identify' ? "We'll email you a one-time code" : `Enter the code we sent for ${identifier}`)
     : 'Use your account password';
@@ -174,13 +185,28 @@ export default function LoginPage() {
   // said so, which made it a feature nobody could find. Naming all three is
   // the whole fix - people type what the field asks for.
   const idField = (autoFocus) => (
-    <TextField
-      fullWidth label="Mobile, email or username" value={identifier} required autoFocus={autoFocus}
-      autoComplete="username"
-      helperText="Your mobile number works here too"
-      onChange={(e) => setIdentifier(e.target.value)}
-      InputProps={{ startAdornment: <InputAdornment position="start"><PersonIcon /></InputAdornment> }}
-    />
+    <Box>
+      <TextField
+        fullWidth label="Mobile, email or username" value={identifier} required autoFocus={autoFocus}
+        autoComplete="username"
+        helperText="Your mobile number works here too"
+        onChange={(e) => setIdentifier(e.target.value)}
+        InputProps={{ startAdornment: <InputAdornment position="start"><PersonIcon /></InputAdornment> }}
+      />
+      {initialSaved.current && identifier === initialSaved.current && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
+          <Link component="button" type="button" variant="caption" underline="hover"
+            sx={{ color: 'text.disabled', fontSize: '0.75rem' }}
+            onClick={() => {
+              setIdentifier('');
+              initialSaved.current = '';
+              try { localStorage.removeItem('toolbox_last_identifier'); } catch { /* */ }
+            }}>
+            Not you?
+          </Link>
+        </Box>
+      )}
+    </Box>
   );
 
   // Motion for the mode-switch: content slides + fades, the card height morphs
@@ -276,7 +302,7 @@ export default function LoginPage() {
               <Box>
                 <Box sx={{ mb: 2 }}>{idField(true)}</Box>
                 <MpinField value={mpin} onChange={(v) => { setMpin(v); if (pinStatus === 'error') setPinStatus('idle'); }}
-                  onComplete={(p) => doMpin(p)} status={pinStatus} disabled={loading || pinStatus === 'success'} autoFocus={false} />
+                  onComplete={(p) => doMpin(p)} status={pinStatus} disabled={loading || pinStatus === 'success'} autoFocus={!!initialSaved.current} />
                 <Box sx={{ position: 'relative', mt: 2.25 }}>
                   {mpin.length === 6 && pinStatus === 'idle' && !loading && !reduce && (
                     <Box aria-hidden sx={{

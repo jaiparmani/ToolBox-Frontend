@@ -550,10 +550,10 @@ export default function LandingPage() {
         )}
       </Box>
 
-      {/* floating add (mobile-friendly, always reachable) */}
+      {/* floating add — desktop only; mobile uses the bottom tab bar centre slot */}
       <Fab ref={fabPress.ref} onClick={() => openExpenseForm()} aria-label="Add expense"
         {...fabPress.bindEvents}
-        sx={{ position: 'fixed', bottom: { xs: 20, md: 28 }, right: { xs: 20, md: 28 }, zIndex: 20, bgcolor: GREEN, color: '#04150e', boxShadow: '0 8px 24px -6px rgba(0,0,0,0.5)', '&:hover': { bgcolor: GREEN, filter: 'brightness(1.05)' } }}>
+        sx={{ position: 'fixed', bottom: { xs: 20, md: 28 }, right: { xs: 20, md: 28 }, zIndex: 20, bgcolor: GREEN, color: '#04150e', boxShadow: '0 8px 24px -6px rgba(0,0,0,0.5)', '&:hover': { bgcolor: GREEN, filter: 'brightness(1.05)' }, display: { xs: 'none', md: 'inline-flex' } }}>
         <AddRoundedIcon />
       </Fab>
 

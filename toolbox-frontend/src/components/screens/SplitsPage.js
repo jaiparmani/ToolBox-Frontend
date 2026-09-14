@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '@mui/material/styles';
 import {
-  Box, Button, Card, CardContent, Chip, Container, Fab, IconButton,
+  Box, Button, Card, CardContent, Container, Fab, IconButton,
   Paper, Snackbar, Alert, Stack, Typography,
 } from '@mui/material';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
@@ -27,9 +28,11 @@ import { BalanceSkeleton } from '../ui/Skeletons';
 import SwipeAction from '../ui/SwipeAction';
 import ManualSplitDialog from '../ui/ManualSplitDialog';
 import ThinkingHint from '../ui/ThinkingHint';
-import { AnimatePresence, motion, LayoutGroup } from 'framer-motion';
+import AnimatedNumber from '../ui/AnimatedNumber';
+import TiltCard from '../motion/TiltCard';
+import { AnimatePresence, motion, LayoutGroup, useReducedMotion } from 'framer-motion';
 import { money, moneySmart, relativeDay } from '../ui/money';
-import { accents, radius, type } from '../../theme/tokens';
+import { accents, flowColor, radius, type, motion as motionTokens } from '../../theme/tokens';
 import { feedback } from '../ui/feedback';
 import GroupStrip from '../ui/GroupStrip';
 import SettleConfirmSheet from '../ui/SettleConfirmSheet';
@@ -87,6 +90,325 @@ function optimisticSettle(prev, person) {
   const balances = prev.balances.filter(b => b.personId !== person.personId);
   const totalOwed = Math.max(0, prev.totalOwed - amt);
   return { ...prev, balances, totalOwed, net: totalOwed - prev.totalYouOwe };
+}
+
+const heroNumSx = { fontFamily: type.displayFamily, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.03em' };
+
+/**
+ * The one figure the page exists to answer, and the one real ratio behind it.
+ *
+ * Not a card with a number and two stat rows bolted underneath - the bar IS
+ * the two totals, drawn to scale, so the eye reads "how much of my situation
+ * is each direction" before it even parses the digits. Both raw figures are
+ * still printed below it, in full - the bar is a ratio, never a replacement
+ * for the exact number.
+ */
+function NetPositionHero({ netPositive, net, totalOwed, totalYouOwe, onRefresh, posColor, negColor }) {
+  const mode = useTheme().palette.mode;
+  const reduce = useReducedMotion();
+  const flowIn = flowColor.in[mode];
+  const flowOut = flowColor.out[mode];
+  const total = totalOwed + totalYouOwe;
+  const inPct = total > 0 ? (totalOwed / total) * 100 : 0;
+  const settled = total === 0;
+
+  return (
+    <TiltCard max={4} sx={{ mb: 2 }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2.5, sm: 3 }, borderRadius: `${radius.xl}px`, textAlign: 'center',
+          border: '1px solid', borderColor: 'divider',
+          position: 'relative', overflow: 'hidden',
+        }}
+      >
+        {/* A slow, ambient breathe behind the number — tied to the same
+            direction as the figure itself, never a decoration on its own. */}
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute', top: '-45%', left: '50%', transform: 'translateX(-50%)',
+            width: 320, height: 180, borderRadius: '50%',
+            background: `radial-gradient(ellipse, ${netPositive ? posColor : negColor}20 0%, transparent 72%)`,
+            pointerEvents: 'none',
+            animation: reduce ? 'none' : 'toolbox-hero-breathe 5s ease-in-out infinite',
+            '@keyframes toolbox-hero-breathe': {
+              '0%, 100%': { opacity: 0.7, transform: 'translateX(-50%) scale(1)' },
+              '50%': { opacity: 1, transform: 'translateX(-50%) scale(1.08)' },
+            },
+          }}
+        />
+        <Box display="flex" alignItems="center" justifyContent="center" gap={1} sx={{ mb: 0.75, position: 'relative' }}>
+          <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.1em', fontSize: '0.65rem' }}>
+            {settled ? 'All square' : netPositive ? 'You are owed' : 'You owe'}
+          </Typography>
+          <IconButton size="small" onClick={onRefresh} aria-label="Refresh balances" sx={{ ml: 0.25 }}>
+            <RefreshIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+        </Box>
+        <Typography
+          component="div"
+          sx={{
+            position: 'relative',
+            ...heroNumSx, fontWeight: 700,
+            fontSize: { xs: '2.8rem', sm: '3.4rem' }, lineHeight: 1,
+            color: settled ? 'text.secondary' : netPositive ? posColor : negColor,
+          }}
+        >
+          <AnimatedNumber value={Math.abs(net)} />
+        </Typography>
+
+        {!settled && (
+          <>
+            {/* The ratio, to scale — the only spectacle here, and it is pure data. */}
+            <Box
+              aria-hidden
+              sx={{
+                position: 'relative', display: 'flex', mt: 2.5, height: 8, borderRadius: `${radius.pill}px`,
+                overflow: 'hidden',
+                bgcolor: mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+                boxShadow: mode === 'dark' ? 'inset 0 1px 2px rgba(0,0,0,0.35)' : 'inset 0 1px 2px rgba(0,0,0,0.06)',
+              }}
+            >
+              <Box
+                component={motion.div}
+                initial={reduce ? false : { scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 210, damping: 26 }}
+                style={{ transformOrigin: 'left center' }}
+                sx={{
+                  width: `${inPct}%`,
+                  background: `linear-gradient(90deg, ${flowIn}cc, ${flowIn})`,
+                  boxShadow: `0 0 10px ${flowIn}55`,
+                }}
+              />
+              <Box
+                component={motion.div}
+                initial={reduce ? false : { scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 210, damping: 26, delay: 0.06 }}
+                style={{ transformOrigin: 'right center' }}
+                sx={{
+                  width: `${100 - inPct}%`,
+                  background: `linear-gradient(90deg, ${flowOut}, ${flowOut}cc)`,
+                  boxShadow: `0 0 10px ${flowOut}55`,
+                }}
+              />
+            </Box>
+            <Box display="flex" justifyContent="space-between" sx={{ position: 'relative', mt: 1.1, px: 0.25 }}>
+              <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
+                <Box component="span" sx={{ ...heroNumSx, fontWeight: 650, color: flowIn }}>{money(totalOwed)}</Box>
+                {' owed to you'}
+              </Typography>
+              <Typography sx={{ fontSize: 12.5, color: 'text.secondary', textAlign: 'right' }}>
+                <Box component="span" sx={{ ...heroNumSx, fontWeight: 650, color: flowOut }}>{money(totalYouOwe)}</Box>
+                {' you owe'}
+              </Typography>
+            </Box>
+          </>
+        )}
+      </Paper>
+    </TiltCard>
+  );
+}
+
+// A stable colour per name, drawn from the accent wheel — the same person
+// always lands on the same hue across a session, without a Person id lookup.
+const AVATAR_HUES = [accents.blue, accents.violet, accents.cyan, accents.amber, accents.purple, accents.mint];
+function hueForName(name) {
+  let h = 0;
+  for (let i = 0; i < (name || '').length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_HUES[h % AVATAR_HUES.length];
+}
+function initialsForName(name) {
+  const parts = (name || '?').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
+}
+
+/** A colored initials badge — the one recurring "who" mark across Shared. */
+function PersonAvatar({ name, size = 40 }) {
+  const hue = hueForName(name);
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        width: size, height: size, borderRadius: '50%', flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: `linear-gradient(155deg, ${hue}38, ${hue}1c)`,
+        border: '1px solid', borderColor: `${hue}4a`,
+        color: hue, fontWeight: 700, fontSize: size * 0.38,
+        letterSpacing: '-0.01em',
+      }}
+    >
+      {initialsForName(name)}
+    </Box>
+  );
+}
+
+/**
+ * "Count it" as your own spending — a pill that morphs, not a static chip.
+ * The icon crossfades with a small spring pop so the state change reads as
+ * something that just happened, not a label that was always there.
+ */
+function CountToggle({ counted, busy, onClick, label }) {
+  return (
+    <Box
+      component="button"
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-label={label}
+      sx={{
+        border: '1px solid', borderColor: counted ? `${accents.mint}66` : 'divider',
+        bgcolor: counted ? `${accents.mint}16` : 'transparent',
+        color: counted ? accents.mint : 'text.secondary',
+        borderRadius: `${radius.pill}px`,
+        px: 1.4, py: 0.5, fontSize: 12.5, fontWeight: 650,
+        display: 'inline-flex', alignItems: 'center', gap: 0.5,
+        cursor: busy ? 'default' : 'pointer', font: 'inherit',
+        opacity: busy ? 0.6 : 1,
+        transition: `background-color ${motionTokens.normal}ms ${motionTokens.ease}, border-color ${motionTokens.normal}ms ${motionTokens.ease}, color ${motionTokens.normal}ms ${motionTokens.ease}`,
+        '&:hover': busy ? undefined : { borderColor: counted ? accents.mint : 'text.disabled' },
+      }}
+    >
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.span
+          key={counted ? 'on' : 'off'}
+          initial={{ opacity: 0, scale: 0.5, rotate: -25 }}
+          animate={{ opacity: 1, scale: 1, rotate: 0 }}
+          exit={{ opacity: 0, scale: 0.5 }}
+          transition={{ type: 'spring', stiffness: 520, damping: 20 }}
+          style={{ display: 'inline-flex' }}
+        >
+          {counted ? <CheckCircleIcon sx={{ fontSize: 14 }} /> : <AddIcon sx={{ fontSize: 14 }} />}
+        </motion.span>
+      </AnimatePresence>
+      {counted ? 'Counted' : 'Count'}
+    </Box>
+  );
+}
+
+/**
+ * One payer's bills, as a card with real depth. Two thin sibling edges peek
+ * out from behind it when there's more than one bill underneath - a bill
+ * *stack*, not a lone card that happens to hold several rows once opened.
+ * Reduced motion still gets the same layered look; only the tilt is a motion
+ * effect, and TiltCard already turns itself off for that.
+ */
+function SharedPayerCard({ personName, group, expanded, onToggle, including, onToggleInclude, onPay, onEdit }) {
+  const stacked = group.items.length > 1;
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -40, transition: { duration: 0.25 } }}
+    >
+      <Box sx={{ position: 'relative' }}>
+        {stacked && (
+          <Box aria-hidden sx={{
+            position: 'absolute', left: 10, right: 10, bottom: -6, height: 14,
+            borderRadius: '0 0 12px 12px', border: '1px solid', borderColor: 'divider',
+            borderTop: 'none', bgcolor: 'background.paper', opacity: 0.6,
+          }} />
+        )}
+        <TiltCard max={3} sx={{ position: 'relative' }}>
+          <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', overflow: 'visible' }}>
+            <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+              <Box
+                display="flex" alignItems="center" gap={1.5}
+                sx={{ cursor: 'pointer' }}
+                onClick={onToggle}
+              >
+                <PersonAvatar name={personName} size={38} />
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 650 }} noWrap>
+                    {personName}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {group.items.length} {group.items.length === 1 ? 'bill' : 'bills'}
+                  </Typography>
+                </Box>
+                <Box textAlign="right" sx={{ flexShrink: 0 }}>
+                  <SplitAmount direction="you_owe" amount={group.total} />
+                </Box>
+              </Box>
+
+              <AnimatePresence initial={false}>
+              {expanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 34 }}
+                  style={{ overflow: 'hidden' }}
+                >
+                <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+                  <Stack spacing={1}>
+                  {group.items.map((item) => (
+                    <Box
+                      key={item.id}
+                      sx={{ p: 1.25, borderRadius: 2.5, bgcolor: 'action.hover' }}
+                    >
+                      <Box display="flex" alignItems="flex-start" justifyContent="space-between" gap={1.5}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                            {item.description}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {money(item.expenseTotal)} total · {relativeDay(item.date)}
+                            {item.settledAmount > 0 ? ` · ${money(item.settledAmount)} paid` : ''}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ flexShrink: 0 }}>
+                          <SplitAmount direction="you_owe" amount={item.outstanding} />
+                        </Box>
+                      </Box>
+
+                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.75, flexWrap: 'wrap' }}>
+                        {item.canInclude && (
+                          <CountToggle
+                            counted={item.includeInExpenses}
+                            busy={including === item.id}
+                            onClick={() => onToggleInclude(item)}
+                            label={item.includeInExpenses
+                              ? `Stop counting ${item.description} as your spending`
+                              : `Count ${item.description} as your spending`}
+                          />
+                        )}
+                        <Box sx={{ flex: 1 }} />
+                        <IconButton
+                          size="small"
+                          aria-label={`Pay on ${item.description}`}
+                          onClick={() => onPay(item)}
+                          sx={{ color: accents.mint }}
+                        >
+                          <PaymentsIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                        {item.canEdit && (
+                          <IconButton
+                            size="small"
+                            aria-label={`Edit the ${item.description} bill`}
+                            onClick={() => onEdit(item)}
+                          >
+                            <EditIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        )}
+                      </Stack>
+                    </Box>
+                  ))}
+                  </Stack>
+                </Box>
+                </motion.div>
+              )}
+              </AnimatePresence>
+            </CardContent>
+          </Card>
+        </TiltCard>
+      </Box>
+    </motion.div>
+  );
 }
 
 /**
@@ -582,67 +904,19 @@ export default function SplitsPage() {
         {/* ── Balances ─────────────────────────────────────────────────── */}
         {activeTab === 0 && (
         <Box key="tab-0">
-        {/* Net position — the one figure you glance at */}
+        {/* Net position — the one figure you glance at, and the one real
+            ratio behind it. Every pixel of the bar below is (owed / total) or
+            (owe / total) — no width here is invented. */}
         <Reveal>
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 2.5, sm: 3 }, mb: 2, borderRadius: 4, textAlign: 'center',
-              border: '1px solid', borderColor: 'divider',
-              position: 'relative', overflow: 'hidden',
-            }}
-          >
-            {/* Subtle accent glow behind the number */}
-            <Box
-              aria-hidden
-              sx={{
-                position: 'absolute', top: '-40%', left: '50%', transform: 'translateX(-50%)',
-                width: 280, height: 140, borderRadius: '50%',
-                background: `radial-gradient(ellipse, ${netPositive ? posColor : negColor}18 0%, transparent 70%)`,
-                pointerEvents: 'none',
-              }}
-            />
-            <Box display="flex" alignItems="center" justifyContent="center" gap={1} sx={{ mb: 0.75, position: 'relative' }}>
-              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.1em', fontSize: '0.65rem' }}>
-                {netPositive ? 'You are owed' : 'You owe'}
-              </Typography>
-              <IconButton size="small" onClick={load} aria-label="Refresh balances" sx={{ ml: 0.25 }}>
-                <RefreshIcon sx={{ fontSize: 14 }} />
-              </IconButton>
-            </Box>
-            <Typography
-              sx={{
-                position: 'relative',
-                fontFamily: type.displayFamily, fontWeight: 700, letterSpacing: '-0.04em',
-                fontSize: { xs: '2.8rem', sm: '3.4rem' }, lineHeight: 1,
-                fontVariantNumeric: 'tabular-nums',
-                color: netPositive ? posColor : negColor,
-              }}
-            >
-              {money(Math.abs(state.net))}
-            </Typography>
-            <Stack
-              direction="row"
-              sx={{ mt: 2.5, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}
-            >
-              <Box sx={{ flex: 1, borderRight: '1px solid', borderColor: 'divider' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.3, mb: 0.5, fontWeight: 500, letterSpacing: '0.04em' }}>
-                  Owed to you
-                </Typography>
-                <Typography sx={{ fontWeight: 700, color: posColor, fontVariantNumeric: 'tabular-nums', fontSize: '1.05rem' }}>
-                  +{money(state.totalOwed)}
-                </Typography>
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.3, mb: 0.5, fontWeight: 500, letterSpacing: '0.04em' }}>
-                  You owe
-                </Typography>
-                <Typography sx={{ fontWeight: 700, color: state.totalYouOwe > 0 ? negColor : 'text.secondary', fontVariantNumeric: 'tabular-nums', fontSize: '1.05rem' }}>
-                  {state.totalYouOwe > 0 ? '−' : ''}{money(state.totalYouOwe)}
-                </Typography>
-              </Box>
-            </Stack>
-          </Paper>
+          <NetPositionHero
+            netPositive={netPositive}
+            net={state.net}
+            totalOwed={state.totalOwed}
+            totalYouOwe={state.totalYouOwe}
+            onRefresh={load}
+            posColor={posColor}
+            negColor={negColor}
+          />
         </Reveal>
 
         {/* Add a split — plain language first, exact numbers if you'd rather */}
@@ -1230,17 +1504,17 @@ export default function SplitsPage() {
         {/* Bills other people split with you, grouped by who paid. */}
         {shared.items.length > 0 && (
           <Reveal index={2}>
-            <Box sx={{ mt: 3 }}>
-              <Box display="flex" alignItems="baseline" justifyContent="space-between" sx={{ px: 0.5, mb: 1 }}>
+            <Box sx={{ mt: 1 }}>
+              <Box display="flex" alignItems="baseline" justifyContent="space-between" sx={{ px: 0.5, mb: 1.5 }}>
                 <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 650 }}>
                   Shared with you
                 </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                  {money(shared.items.reduce((s, i) => s + (i.outstanding || 0), 0))} total
+                <Typography sx={{ ...heroNumSx, fontSize: 13, fontWeight: 700, color: accents.amber }}>
+                  {money(shared.items.reduce((s, i) => s + (i.outstanding || 0), 0))}
                 </Typography>
               </Box>
 
-              <Stack spacing={1.25}>
+              <Stack spacing={1.5}>
                 <AnimatePresence initial={false}>
                 {(() => {
                   const byPerson = new Map();
@@ -1252,133 +1526,17 @@ export default function SplitsPage() {
                     group.total += item.outstanding || 0;
                   });
                   return [...byPerson.entries()].map(([personName, group]) => (
-                    <motion.div
+                    <SharedPayerCard
                       key={personName}
-                      layout
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, x: -40, transition: { duration: 0.25 } }}
-                    >
-                    <Card
-                      elevation={0}
-                      sx={{
-                        borderRadius: 3, border: '1px solid', borderColor: 'divider',
-                        overflow: 'visible',
-                      }}
-                    >
-                      <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
-                        <Box
-                          display="flex" alignItems="center" justifyContent="space-between" gap={2}
-                          sx={{ cursor: 'pointer' }}
-                          onClick={() => setSharedExpanded(prev =>
-                            prev === personName ? null : personName
-                          )}
-                        >
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>
-                              {personName}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {group.items.length} {group.items.length === 1 ? 'bill' : 'bills'}
-                            </Typography>
-                          </Box>
-                          <Box textAlign="right" sx={{ flexShrink: 0 }}>
-                            <SplitAmount direction="you_owe" amount={group.total} />
-                          </Box>
-                        </Box>
-
-                        <AnimatePresence initial={false}>
-                        {sharedExpanded === personName && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ type: 'spring', stiffness: 400, damping: 34 }}
-                            style={{ overflow: 'hidden' }}
-                          >
-                          <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
-                            <Stack spacing={1}>
-                            {group.items.map((item) => (
-                              <Box
-                                key={item.id}
-                                sx={{
-                                  p: 1.25, borderRadius: 2.5,
-                                  bgcolor: 'action.hover',
-                                }}
-                              >
-                                <Box display="flex" alignItems="flex-start" justifyContent="space-between" gap={1.5}>
-                                  <Box sx={{ minWidth: 0 }}>
-                                    <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
-                                      {item.description}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {money(item.expenseTotal)} total · {relativeDay(item.date)}
-                                      {item.settledAmount > 0
-                                        ? ` · ${money(item.settledAmount)} paid`
-                                        : ''}
-                                    </Typography>
-                                  </Box>
-                                  <Box sx={{ flexShrink: 0 }}>
-                                    <SplitAmount direction="you_owe" amount={item.outstanding} />
-                                  </Box>
-                                </Box>
-
-                                <Stack
-                                  direction="row" spacing={0.5} alignItems="center"
-                                  sx={{ mt: 0.75, flexWrap: 'wrap' }}
-                                >
-                                  {item.canInclude && (
-                                    item.includeInExpenses ? (
-                                      <Chip
-                                        icon={<CheckCircleIcon />}
-                                        label="Counted"
-                                        size="small"
-                                        onClick={() => toggleInExpenses(item)}
-                                        disabled={including === item.id}
-                                        sx={{ color: accents.mint, borderColor: accents.mint, height: 24 }}
-                                        variant="outlined"
-                                      />
-                                    ) : (
-                                      <Chip
-                                        icon={<AddIcon />}
-                                        label="Count"
-                                        size="small"
-                                        onClick={() => toggleInExpenses(item)}
-                                        disabled={including === item.id}
-                                        variant="outlined"
-                                        sx={{ height: 24 }}
-                                      />
-                                    )
-                                  )}
-                                  <Box sx={{ flex: 1 }} />
-                                  <IconButton
-                                    size="small"
-                                    aria-label={`Pay on ${item.description}`}
-                                    onClick={() => setPartial({ open: true, item, saving: false, error: null })}
-                                    sx={{ color: accents.mint }}
-                                  >
-                                    <PaymentsIcon sx={{ fontSize: 16 }} />
-                                  </IconButton>
-                                  {item.canEdit && (
-                                    <IconButton
-                                      size="small"
-                                      aria-label={`Edit the ${item.description} bill`}
-                                      onClick={() => setEditSplit({ open: true, item, saving: false })}
-                                    >
-                                      <EditIcon sx={{ fontSize: 16 }} />
-                                    </IconButton>
-                                  )}
-                                </Stack>
-                              </Box>
-                            ))}
-                            </Stack>
-                          </Box>
-                          </motion.div>
-                        )}
-                        </AnimatePresence>
-                      </CardContent>
-                    </Card>
-                    </motion.div>
+                      personName={personName}
+                      group={group}
+                      expanded={sharedExpanded === personName}
+                      onToggle={() => setSharedExpanded(prev => (prev === personName ? null : personName))}
+                      including={including}
+                      onToggleInclude={toggleInExpenses}
+                      onPay={(item) => setPartial({ open: true, item, saving: false, error: null })}
+                      onEdit={(item) => setEditSplit({ open: true, item, saving: false })}
+                    />
                   ));
                 })()}
                 </AnimatePresence>

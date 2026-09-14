@@ -158,7 +158,7 @@ export default function LandingPage() {
     dismissedKey: lastReport ? `${lastReport.year}-${String(lastReport.month).padStart(2, '0')}` : '',
   });
 
-  // open quick-add with the "a" shortcut (when not typing)
+  // open quick-add with the "a" shortcut (when not typing) or the mobile bottom-bar FAB
   useEffect(() => {
     const onKey = (e) => {
       if (e.key.toLowerCase() === 'a' && !e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -167,8 +167,13 @@ export default function LandingPage() {
         e.preventDefault(); openExpenseForm();
       }
     };
+    const onAdd = () => openExpenseForm();
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('toolbox:add-expense', onAdd);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('toolbox:add-expense', onAdd);
+    };
   }, []);
 
   const name = user?.firstName || user?.first_name || user?.username || 'there';

@@ -136,6 +136,12 @@ export default function StoryPage() {
   const openExpenseForm = () => {
     setExpenseForm({ open: true, editing: false, data: { ...BLANK_EXPENSE } });
   };
+
+  useEffect(() => {
+    const onAdd = () => openExpenseForm();
+    window.addEventListener('toolbox:add-expense', onAdd);
+    return () => window.removeEventListener('toolbox:add-expense', onAdd);
+  }, []);
   const closeExpenseForm = () => setExpenseForm({ open: false, editing: false, data: {} });
 
   const saveExpense = async () => {

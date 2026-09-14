@@ -197,3 +197,44 @@ export const ApiKeysSkeleton = ({ rows = 3 }) => {
     </LoadingRegion>
   );
 };
+
+export const StorySkeleton = () => {
+  const reduce = useReducedMotion();
+  const anim = reduce ? false : 'pulse';
+  return (
+    <LoadingRegion label="Loading today's story">
+      {/* Cover: greeting + hero number */}
+      <Box sx={{ textAlign: 'center', py: 4, px: 2 }}>
+        <Skeleton animation={anim} width={140} height={14} sx={{ mx: 'auto', mb: 1, transform: 'none' }} />
+        <Skeleton animation={anim} width={200} height={36} sx={{ mx: 'auto', mb: 2.5, transform: 'none', borderRadius: 2 }} />
+        <Skeleton animation={anim} width={100} height={12} sx={{ mx: 'auto', mb: 0.75, transform: 'none' }} />
+        <Skeleton animation={anim} width={260} height={72} sx={{ mx: 'auto', mb: 1, transform: 'none', borderRadius: 2 }} />
+        <Skeleton animation={anim} width={180} height={14} sx={{ mx: 'auto', transform: 'none' }} />
+      </Box>
+      {/* Stat row */}
+      <Box sx={{ display: 'flex', gap: 1.5, px: 2, mb: 3 }}>
+        {[0, 1, 2].map((i) => (
+          <Box key={i} sx={{ flex: 1, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
+            <Skeleton animation={anim} width="50%" height={11} sx={{ mb: 0.75, transform: 'none' }} />
+            <Skeleton animation={anim} width="70%" height={20} sx={{ transform: 'none' }} />
+          </Box>
+        ))}
+      </Box>
+      {/* Chart ghost */}
+      <Box sx={{ px: 2, mb: 3 }}>
+        <svg width="100%" height={120} style={{ display: 'block' }}>
+          <defs>
+            <linearGradient id="storyChartFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+          <path d="M0,100 C60,95 100,70 160,60 S260,40 320,35 S420,25 480,20 S560,18 620,16 L620,120 L0,120 Z"
+            fill="url(#storyChartFill)" />
+          <path d="M0,100 C60,95 100,70 160,60 S260,40 320,35 S420,25 480,20 S560,18 620,16"
+            fill="none" stroke="#06b6d4" strokeWidth="1.5" strokeOpacity="0.3" />
+        </svg>
+      </Box>
+    </LoadingRegion>
+  );
+};

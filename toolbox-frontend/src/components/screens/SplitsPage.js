@@ -441,7 +441,7 @@ export default function SplitsPage() {
   };
 
   const onManualSplitCreated = (result) => {
-    setSuccess(`Split ${money(result.expense.amount)} with ${result.splits.length} ` +
+    setSuccess(`Split ${money(result.amount)} with ${result.splits.length} ` +
       `${result.splits.length === 1 ? 'person' : 'people'}`);
     feedback('success');
     load(); loadShared(); loadSplitOnly();

@@ -510,7 +510,12 @@ export const createSplitManually = async ({ amount, description, categoryId, dat
         });
         const data = await response.json();
         return {
-            expense: transformExpenseForUI(data.expense),
+            billId: data.bill_id,
+            // Present only when the bill was also added to expenses - the
+            // creator can choose not to, so this may be null.
+            expense: data.expense ? transformExpenseForUI(data.expense) : null,
+            amount: parseFloat(data.amount || 0),
+            description: data.description,
             splits: data.splits || [],
             yourShare: parseFloat(data.your_share || 0),
             owedToYou: parseFloat(data.owed_to_you || 0)
@@ -581,10 +586,10 @@ export const getSplits = async ({ personId, owedToUserId, settled, direction, in
     }
 };
 
-export const addSplitToExpenses = async (expenseId) => {
-    const response = await authenticatedFetch(`${API_BASE_URL}/expenses/${expenseId}/`, {
-        method: 'PATCH',
-        body: JSON.stringify({ split_only: false })
+export const addSplitToExpenses = async (billId) => {
+    const response = await authenticatedFetch(`${API_BASE_URL}/splits/add_to_expenses/`, {
+        method: 'POST',
+        body: JSON.stringify({ bill_id: billId })
     });
     return response.json();
 };

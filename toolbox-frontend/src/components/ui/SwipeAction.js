@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
 import { animate } from 'framer-motion';
 import { feedback } from './feedback';
 
@@ -34,6 +34,7 @@ export default function SwipeAction({
   color = '#FF453A', secondaryColor = '#0A84FF',
   icon, secondaryIcon,
   label = 'Delete', secondaryLabel = 'Edit',
+  confirmMessage = 'This cannot be undone.',
   direction = 'left', threshold = 96, borderRadius = 12,
   sx,
 }) {
@@ -50,6 +51,7 @@ export default function SwipeAction({
   });
   const [revealed, setRevealed] = React.useState(0);
   const [revealDir, setRevealDir] = React.useState('left');
+  const [confirming, setConfirming] = React.useState(false);
 
   const reduce = typeof window !== 'undefined'
     && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -174,10 +176,10 @@ export default function SwipeAction({
     const velocity = getVelocity();
     const projectedEnd = dx + project(velocity);
 
-    // Left swipe (primary action — delete)
+    // Left swipe (primary action — delete): snap back then confirm
     if (dx < 0 && onAction) {
       if (projectedEnd < -threshold) {
-        springTo(-400, velocity, () => onAction?.());
+        springTo(0, velocity, () => setConfirming(true));
         return;
       }
     }
@@ -248,6 +250,29 @@ export default function SwipeAction({
       >
         {children}
       </Box>
+
+      <Dialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        PaperProps={{ sx: { borderRadius: 3, px: 0.5 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, pb: 0.5 }}>{label}?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>{confirmMessage}</DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ pb: 2, px: 2, gap: 1 }}>
+          <Button onClick={() => setConfirming(false)} variant="outlined" sx={{ borderRadius: 2, flex: 1 }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => { setConfirming(false); onAction?.(); }}
+            variant="contained"
+            sx={{ borderRadius: 2, flex: 1, bgcolor: color, '&:hover': { bgcolor: color, filter: 'brightness(0.9)' } }}
+          >
+            {label}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

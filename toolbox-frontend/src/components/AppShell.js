@@ -25,6 +25,7 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import MoreHorizRoundedIcon from '@mui/icons-material/MoreHorizRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import ArticleRoundedIcon from '@mui/icons-material/ArticleRounded';
+import GavelRoundedIcon from '@mui/icons-material/GavelRounded';
 
 import { authUtils } from './rest/authUtils';
 import { clearAllData } from './rest/userApis';
@@ -57,6 +58,7 @@ const NAV = [
   { seg: 'pulse', label: 'Pulse', icon: FavoriteBorderRoundedIcon, tone: accents.red },
   { seg: 'splits', label: 'Shared', icon: CallSplitIcon, tone: accents.amber },
   { seg: 'guide', label: 'Guide', icon: ArticleRoundedIcon, tone: accents.cyan },
+  { seg: 'verdict', label: 'Verdict', icon: GavelRoundedIcon, tone: '#F5C518' },
 ];
 
 const LEARN = [];
@@ -244,6 +246,7 @@ const MORE_ITEMS = [
   NAV.find((n) => n.seg === 'recurring'),
   NAV.find((n) => n.seg === 'splits'),
   NAV.find((n) => n.seg === 'pulse'),
+  NAV.find((n) => n.seg === 'verdict'),
   NAV.find((n) => n.seg === 'guide'),
 ];
 

@@ -24,6 +24,7 @@ const MoneyUniversePage   = lazy(() => import('./screens/MoneyUniversePage'))
 const CashFlowPulsePage   = lazy(() => import('./screens/CashFlowPulsePage'))
 const GuidePage           = lazy(() => import('./screens/GuidePage'))
 const ShareTargetPage     = lazy(() => import('./screens/ShareTargetPage'))
+const CrimeScenePage      = lazy(() => import('./screens/CrimeScenePage'))
 
 const Spinner = () => (
   <Box display="flex" alignItems="center" justifyContent="center" minHeight="200px">
@@ -67,6 +68,7 @@ export default function Router() {
           <Route path="/how-to"         element={<Navigate to="/guide" replace />} />
           <Route path="/api-keys"       element={<ApiKeysPage />} />
           <Route path="/share"          element={<ShareTargetPage />} />
+          <Route path="/verdict"        element={<CrimeScenePage />} />
           <Route path="/health-tracker" element={<Navigate to="/" replace />} />
           <Route path="/hobby-tracker"  element={<Navigate to="/" replace />} />
           <Route path="/array-sum"      element={<Navigate to="/" replace />} />

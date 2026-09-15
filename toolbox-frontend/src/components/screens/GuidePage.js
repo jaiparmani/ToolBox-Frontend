@@ -382,6 +382,8 @@ const JUMPS = [
   { id: 'capture', label: 'Adding expenses' },
   { id: 'assistant', label: 'The assistant' },
   { id: 'ai', label: 'AI features' },
+  { id: 'home-screen', label: 'Home screen' },
+  { id: 'ease', label: 'Quick flow' },
   { id: 'gestures', label: 'Hidden gestures' },
   { id: 'sharing', label: 'Sharing bills' },
   { id: 'forecast', label: 'Your forecast' },
@@ -617,10 +619,97 @@ export default function GuidePage() {
             Every Monday morning, a 2-sentence push notification compares last week against the week
             before.
           </Item>
+          <Item title="Financial age score">
+            A five-level rating &mdash; Student, Starter, Builder, Owner, Free &mdash; based on your
+            income, savings rate, and spending habits. Two sentences explain exactly where you stand
+            and what moves the needle next.
+          </Item>
+          <Item title="Tap to log from a notification">
+            On Android, push notifications show a <strong>Log expense</strong> reply field. Type{' '}
+            <em>&ldquo;40 chai&rdquo;</em> directly in the notification banner and it is saved
+            without opening the app.
+          </Item>
+          <Item title="Smart shortcuts bar">
+            Your top 5 categories from the last 30 days appear as one-tap chips at the top of the
+            home screen. Tap any chip to open the expense composer with that category pre-filled.
+          </Item>
+          <Item title="Streak counter">
+            Tracks how many consecutive days you have logged at least one expense. Milestone labels
+            appear at 7, 30, and 100 days — visible in the greeting card at the top of the home
+            screen.
+          </Item>
+          <Item title="Money mood">
+            Tap one of five emoji once a day to record how you feel about today&apos;s spending.
+            Stored locally on your device; patterns surface over time.
+          </Item>
         </Section>
 
-        {/* ── 5. Gestures ── */}
-        <Section id="gestures" index={5} eyebrow="Undiscoverable by design" title="Gestures worth knowing">
+        {/* ── 5. Home screen ── */}
+        <Section id="home-screen" index={5} eyebrow="Always in view" title="The home screen, explained">
+          <P sx={{ mb: 1 }}>
+            The top of the home screen changes through the day. Everything below it is persistent.
+          </P>
+          <Item title="Personalised greeting card">
+            The first card adapts to the time of day: a morning summary, an afternoon pace check,
+            an evening prompt to catch anything missed, and a quiet night recap. It knows your
+            name, today&rsquo;s total, and your daily average &mdash; all without set-up.
+          </Item>
+          <Item title="Streak counter">
+            Runs inside the greeting card. It counts consecutive days with at least one expense
+            logged. The label changes at 7, 30, and 100 days.
+          </Item>
+          <Item title="Smart shortcuts bar">
+            Your five most-used categories from the last 30 days as one-tap chips. Tap any chip
+            and the expense composer opens with that category pre-filled.
+          </Item>
+          <Item title="Money mood">
+            One tap, once a day. Five emoji from 😄 to 😔 record how today&rsquo;s spending felt.
+            Stored on this device; nothing is sent to a server.
+          </Item>
+          <Item title="Month forecast tile">
+            Your projected end-of-month total, a progress bar, and the three categories driving the
+            overage. Turns amber and then red as you close in on the limit.
+          </Item>
+          <Item title="Monthly narrative">
+            A short paragraph at the close of each month: what happened, what pattern stood out,
+            what to watch next month. Tap the refresh icon to regenerate.
+          </Item>
+        </Section>
+
+        {/* ── 6. Ease / quick flow ── */}
+        <Section id="ease" index={6} eyebrow="Fewer taps" title="Getting out of your way">
+          <P sx={{ mb: 1 }}>
+            Features built around the moment you are adding something quickly and just want it done.
+          </P>
+          <Item title="Expense templates">
+            After saving an expense, a <strong>Pin as template</strong> link appears above the Save
+            button. Pinned templates become chips at the top of the composer &mdash; tap one to fill
+            all four fields at once. Up to four templates; tap &times; on a chip to remove it.
+          </Item>
+          <Item title="Smart date inference">
+            If you log an expense between midnight and 4&nbsp;am, a banner asks whether the expense
+            belongs to today or yesterday. One tap corrects the date without re-opening the form.
+          </Item>
+          <Item title="Confirm-and-continue card">
+            After a quick add, a 56&nbsp;px bar slides up from the bottom showing what was just
+            saved. Three actions &mdash; dismiss, edit, or delete &mdash; are reachable for four
+            seconds before it clears automatically. Keeps the screen uncluttered while still giving
+            you an undo.
+          </Item>
+          <Item title="Swipe to delete with undo">
+            Swipe a row left on Activity to delete it. A five-second snackbar at the bottom lets
+            you restore it before it is gone.
+          </Item>
+          <Item title="Home screen shortcuts">
+            Long-press the Money OS icon on your phone&rsquo;s home screen. A menu appears with
+            two shortcuts: <strong>Quick Add</strong> (opens the composer immediately) and{' '}
+            <strong>Ask</strong> (opens the assistant). Works on Android and iOS once the app is
+            added to the home screen.
+          </Item>
+        </Section>
+
+        {/* ── 7. Gestures ── */}
+        <Section id="gestures" index={7} eyebrow="Undiscoverable by design" title="Gestures worth knowing">
           <P sx={{ mb: 1.5 }}>
             Nothing on screen advertises these, and they are the fastest way to work.
           </P>
@@ -650,7 +739,7 @@ export default function GuidePage() {
         </Section>
 
         {/* ── 6. Sharing ── */}
-        <Section id="sharing" index={6} eyebrow="Splits and groups" title="Sharing a bill with someone">
+        <Section id="sharing" index={8} eyebrow="Splits and groups" title="Sharing a bill with someone">
           <P>
             Go to <strong>Activity</strong> and open the <strong>Splits</strong> tab. Either
             describe the bill &mdash; <em>&ldquo;split 1200 dinner with raj and priya&rdquo;</em>{' '}
@@ -686,7 +775,7 @@ export default function GuidePage() {
         </Section>
 
         {/* ── 7. Forecast ── */}
-        <Section id="forecast" index={7} eyebrow="Recurring and Inbox" title="How the forecast is made">
+        <Section id="forecast" index={9} eyebrow="Recurring and Inbox" title="How the forecast is made">
           <P>
             <strong>Recurring</strong> is the input for everything predictive in the app. Add your
             rent and subscriptions as recurring bills, each with a cadence
@@ -701,7 +790,7 @@ export default function GuidePage() {
         </Section>
 
         {/* ── 8. The map ── */}
-        <Section id="map" index={8} eyebrow="Wayfinding" title="Where everything lives">
+        <Section id="map" index={10} eyebrow="Wayfinding" title="Where everything lives">
           <P sx={{ mb: 1.5 }}>The sidebar, in order. Each row here goes to that screen.</P>
           <Box sx={{ mx: { xs: -1.25, sm: -1.5 } }}>
             <MapRow icon={DashboardIcon} tone={accents.blue} label="Home" to="/dashboard" onGo={navigate}>
@@ -737,7 +826,7 @@ export default function GuidePage() {
         </Section>
 
         {/* ── 9. Account ── */}
-        <Section id="account" index={9} eyebrow="Sign-in and settings" title="Your account">
+        <Section id="account" index={11} eyebrow="Sign-in and settings" title="Your account">
           <Item title="A 6-digit MPIN is the normal way in">
             The sign-in screen leads with the PIN pad. <strong>Use Email OTP instead</strong> and
             a password sign-in are behind links on that same screen, and{' '}
@@ -759,7 +848,7 @@ export default function GuidePage() {
         </Section>
 
         {/* ── 10. Keyboard ── */}
-        <Section id="keyboard" index={10} eyebrow="Reference" title="Keyboard shortcuts">
+        <Section id="keyboard" index={12} eyebrow="Reference" title="Keyboard shortcuts">
           <Box
             component="table"
             sx={{ width: '100%', maxWidth: `${MEASURE + 8}ch`, borderCollapse: 'collapse', mt: 0.5 }}

@@ -58,6 +58,8 @@ import ActivityLabelDialog from '../ui/ActivityLabelDialog';
 import { TransactionStoryDrawer, buildStoryFromExpense, PageHeader } from '../ui';
 import DashMonthForecast from '../ui/DashMonthForecast';
 import PersonalisedHomeCard from '../ui/PersonalisedHomeCard';
+import SmartShortcutsBar from '../ui/SmartShortcutsBar';
+import MoneyMood from '../ui/MoneyMood';
 import CursorGlow from '../motion/CursorGlow';
 import AssistantOrb from '../ui/AssistantOrb';
 import { accents, color, radius } from '../../theme/tokens';
@@ -476,7 +478,8 @@ export default function ExpenseTrackerPage() {
  };
 
  // Form handlers
- const openExpenseForm = (expense = null) => {
+ // options.categoryId pre-fills the category picker for new expenses (e.g. from SmartShortcutsBar)
+ const openExpenseForm = (expense = null, options = {}) => {
    if (expense) {
      setExpenseForm({
        open: true,
@@ -502,7 +505,7 @@ export default function ExpenseTrackerPage() {
          id: null,
          amount: '',
          description: '',
-         categoryId: '',
+         categoryId: options.categoryId || '',
          date: new Date(),
          tagIds: [],
          location: '',
@@ -516,6 +519,13 @@ export default function ExpenseTrackerPage() {
 
  const closeExpenseForm = () => {
    setExpenseForm({ open: false, editing: false, data: {} });
+ };
+
+ // Called from SmartShortcutsBar — looks up the category id by name so the
+ // composer opens with the right picker value already selected.
+ const handleCategoryShortcut = (categoryName) => {
+   const cat = categories.find((c) => c.name === categoryName);
+   openExpenseForm(null, { categoryId: cat?.id || '' });
  };
 
  const saveExpense = async () => {
@@ -1373,6 +1383,12 @@ export default function ExpenseTrackerPage() {
          <Box key="tab-0" sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
            {/* Personalised greeting card — time-of-day aware, loads independently */}
            <PersonalisedHomeCard onQuickAdd={() => openExpenseForm()} />
+
+           {/* Smart shortcuts — top 5 categories from last 30 days as one-tap chips */}
+           <SmartShortcutsBar onCategorySelect={handleCategoryShortcut} />
+
+           {/* Money mood — daily financial feeling, stored in localStorage */}
+           <MoneyMood />
 
            {/* Ask result — the question is asked from the one Assistant (⌘K);
                when it answers, the reading lands here as its own card. */}

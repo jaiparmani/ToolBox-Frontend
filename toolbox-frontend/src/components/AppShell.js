@@ -24,6 +24,7 @@ import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import MoreHorizRoundedIcon from '@mui/icons-material/MoreHorizRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import ArticleRoundedIcon from '@mui/icons-material/ArticleRounded';
 
 import { authUtils } from './rest/authUtils';
 import { clearAllData } from './rest/userApis';
@@ -55,6 +56,7 @@ const NAV = [
   { seg: 'reports', label: 'Insights', icon: AutoGraphIcon, tone: accents.purple },
   { seg: 'pulse', label: 'Pulse', icon: FavoriteBorderRoundedIcon, tone: accents.red },
   { seg: 'splits', label: 'Shared', icon: CallSplitIcon, tone: accents.amber },
+  { seg: 'guide', label: 'Guide', icon: ArticleRoundedIcon, tone: accents.cyan },
 ];
 
 const LEARN = [];
@@ -242,6 +244,7 @@ const MORE_ITEMS = [
   NAV.find((n) => n.seg === 'recurring'),
   NAV.find((n) => n.seg === 'splits'),
   NAV.find((n) => n.seg === 'pulse'),
+  NAV.find((n) => n.seg === 'guide'),
 ];
 
 /** Compact bottom sheet for secondary nav destinations. */
@@ -274,7 +277,7 @@ function MoreSheet({ open, onClose, onNavigate }) {
       </Box>
 
       {/* Nav grid */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, mb: 1.5 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))', gap: 1, mb: 1.5 }}>
         {MORE_ITEMS.filter(Boolean).map((item) => {
           const Icon = item.icon;
           return (

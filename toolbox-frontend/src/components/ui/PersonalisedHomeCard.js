@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { authUtils } from '../rest/authUtils';
 import { accents, radius } from '../../theme/tokens';
 import { money } from './money';
+import StreakCounter from './StreakCounter';
 
 // Dynamic base URL — mirrors the pattern in expenseTrackerApis.js
 const getApiBase = () => {
@@ -235,6 +236,9 @@ export default function PersonalisedHomeCard({ onQuickAdd }) {
               <Skeleton variant="text" width="38%" sx={{ fontSize: 12 }} />
             </Box>
           ) : bodyContent}
+
+          {/* Streak counter — rendered below body text, before the CTA */}
+          <StreakCounter />
         </Box>
 
         {/* Right: Quick add CTA — only during morning/afternoon/evening when relevant */}

@@ -20,6 +20,8 @@ import PaymentsIcon from '@mui/icons-material/Payments';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 import MoneyConstellation from '../ui/MoneyConstellation';
+import SplitUniverse from '../ui/SplitUniverse';
+import ParticleFlow from '../motion/ParticleFlow';
 import ActivityDeck from '../ui/ActivityDeck';
 import Reveal from '../ui/Reveal';
 import LendingAssistant from '../ui/LendingAssistant';
@@ -52,19 +54,22 @@ import {
 } from '@mui/material';
 
 /**
- * Send a ribbon of particles between a settled person's node and you, tied to
- * the real amount. Reads live DOM positions, so it must fire before the list
- * re-renders the node away. A no-op if the nodes aren't on screen.
+ * Send a ribbon of particles between a settled person's body and the star,
+ * tied to the real amount. Reads live screen positions off the universe's own
+ * ref API, so it must fire before the list re-renders the body away. A no-op
+ * if the universe isn't mounted (e.g. reduced motion, or it hasn't measured
+ * yet) or the person has no on-screen body.
  */
-function fireSettleFlow(person, amount) {
-  if (typeof window === 'undefined') return;
-  const node = document.querySelector(`[data-mc-node="${person.id}"]`);
-  const centre = document.querySelector('[data-mc-center]');
-  if (!node || !centre) return;
+function fireSettleFlow(universeApi, person, amount) {
+  if (typeof window === 'undefined' || !universeApi) return;
+  const point = universeApi.getPoint(person.id);
+  const centre = universeApi.getCentre();
+  if (!point || !centre) return;
   const owedByMe = person.net < 0;
+  universeApi.spawnNova(person.id);
   window.dispatchEvent(new CustomEvent('toolbox:flow', { detail: {
-    from: owedByMe ? centre : node,      // you owe → money leaves you; they owe → comes home
-    to: owedByMe ? node : centre,
+    from: owedByMe ? centre : point,      // you owe → money leaves you; they owe → comes home
+    to: owedByMe ? point : centre,
     amount: Math.abs(amount || person.net || 0),
     color: owedByMe ? accents.amber : accents.cyan,
   }}));
@@ -425,6 +430,11 @@ function SharedPayerCard({ personName, group, expanded, onToggle, including, onT
  */
 export default function SplitsPage() {
   const { isAuthenticated, isLoading } = useAuth();
+
+  // The split universe's own ref API (getPoint/getCentre/spawnNova) — set once
+  // the canvas has measured itself, read by runSettle to fire the particle
+  // flow and the supernova from the right live screen position.
+  const universeRef = React.useRef(null);
 
   const [state, setState] = useState({
     loading: true, balances: [], youOwe: [], totalOwed: 0, totalYouOwe: 0, net: 0,
@@ -848,7 +858,7 @@ export default function SplitsPage() {
     const owedByMe = person.net < 0;
     const snapshot = state;
     if (sheet) setSettle(prev => ({ ...prev, settling: true, error: null }));
-    fireSettleFlow(person, person.net);
+    fireSettleFlow(universeRef.current, person, person.net);
     setState(prev => optimisticSettle(prev, person));
     if (selected?.id === person.id) setSelected(null);
     try {
@@ -894,6 +904,10 @@ export default function SplitsPage() {
 
   return (
     <>
+      {/* The one app-wide particle layer money-in-motion rides on. Not
+          mounted anywhere else yet, so it lives here for now — this is the
+          only screen that dispatches toolbox:flow. */}
+      <ParticleFlow />
       <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 12, position: 'relative' }}>
         <Box sx={{ position: 'relative', zIndex: 1 }}>
         <ErrorBanner error={error} onClose={() => setError(null)} />
@@ -1291,16 +1305,12 @@ export default function SplitsPage() {
         ) : (
           <>
             <Reveal index={1}>
-              <Paper
-                elevation={0}
-                sx={{ p: { xs: 1, sm: 2 }, mb: 2, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}
-              >
-                <MoneyConstellation
-                  people={people}
-                  selectedId={selected?.id}
-                  onSelect={openPerson}
-                />
-              </Paper>
+              <SplitUniverse
+                people={people}
+                selectedId={selected?.id}
+                onSelect={openPerson}
+                onReady={(api) => { universeRef.current = api; }}
+              />
             </Reveal>
 
             <Box

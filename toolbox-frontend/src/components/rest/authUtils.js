@@ -8,9 +8,45 @@
 // device signed in across restarts (DRF tokens don't expire), sessionStorage
 // keeps it only until the tab/browser closes. Reads consult both, so a token in
 // either place counts as signed in.
+//
+// We also mirror the token into IndexedDB (DB: "money_os", store: "auth", key:
+// "auth_token") so the service worker can read it without access to localStorage
+// — used for the tap-from-notification inline reply feature.
 
 const TOKEN_KEY = 'authToken';
 const USER_KEY = 'authUser';
+
+// --- IndexedDB mirror for the service worker ---
+
+function _openMoneyOsDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('money_os', 1);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('auth')) {
+        db.createObjectStore('auth');
+      }
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function saveTokenToIDB(token) {
+  if (!token || typeof indexedDB === 'undefined') return;
+  _openMoneyOsDb().then((db) => {
+    const tx = db.transaction('auth', 'readwrite');
+    tx.objectStore('auth').put(token, 'auth_token');
+  }).catch(() => { /* IDB unavailable — graceful no-op */ });
+}
+
+function clearTokenFromIDB() {
+  if (typeof indexedDB === 'undefined') return;
+  _openMoneyOsDb().then((db) => {
+    const tx = db.transaction('auth', 'readwrite');
+    tx.objectStore('auth').delete('auth_token');
+  }).catch(() => { /* IDB unavailable — graceful no-op */ });
+}
 
 const read = (key) => {
   try { return localStorage.getItem(key) ?? sessionStorage.getItem(key); }
@@ -39,6 +75,8 @@ export const authUtils = {
 
   // Store the token (and optionally the user) after a successful login/register.
   // `remember` (default true) → persist across restarts; false → this session only.
+  // Also mirrors the token to IndexedDB so the service worker can read it for
+  // tap-from-notification inline replies.
   login: (token, user, remember = true) => {
     const store = remember ? localStorage : sessionStorage;
     // Never leave a copy in the other store, so the chosen lifetime is honoured.
@@ -48,6 +86,8 @@ export const authUtils = {
       if (token) store.setItem(TOKEN_KEY, token);
       if (user) store.setItem(USER_KEY, JSON.stringify(user));
     } catch { /* private mode: stay in memory for this page load */ }
+    // Mirror to IDB for the service worker (fire-and-forget).
+    if (token) saveTokenToIDB(token);
   },
 
   // Update the cached user in whichever store currently holds the token.
@@ -63,6 +103,8 @@ export const authUtils = {
     // Clear the old pre-token keys too, so a stale session can't linger.
     clearBoth('userid');
     clearBoth('username');
+    // Remove from IDB so the service worker can't log expenses after sign-out.
+    clearTokenFromIDB();
   },
 
   // The Authorization header for authenticated requests (empty when logged out).

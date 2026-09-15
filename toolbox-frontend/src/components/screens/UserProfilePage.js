@@ -23,6 +23,8 @@ import { accents } from '../../theme/tokens';
 import { getFeedbackPrefs, setFeedbackPrefs, feedback } from '../ui/feedback';
 import { TelegramConnect, ShortcutConnect } from '../ui';
 import { ProfileSkeleton } from '../ui/Skeletons';
+import SpendingPersonalityCard from '../ui/SpendingPersonalityCard';
+import FinancialAgeCard from '../ui/FinancialAgeCard';
 
 /**
  * Profile, rebuilt as a single scrollable column of glass cards rather than a
@@ -231,8 +233,18 @@ export default function UserProfilePage() {
           </Paper>
         </Reveal>
 
-        {/* Your details */}
+        {/* Spending personality — model-written profile from last 90 days */}
         <Reveal index={1}>
+          <SpendingPersonalityCard />
+        </Reveal>
+
+        {/* Financial age score — maturity level + personalised description */}
+        <Reveal index={2}>
+          <FinancialAgeCard />
+        </Reveal>
+
+        {/* Your details */}
+        <Reveal index={2}>
           <SectionCard icon={<PersonIcon />} title="Your details"
             action={
               <Button size="small" startIcon={editing ? <CheckIcon /> : <EditIcon />}

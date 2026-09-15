@@ -14,6 +14,9 @@ import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { PageHeader, ChartContainer, EmptyState } from '../ui';
 
 import MonthlyNarrativeCard from '../ui/MonthlyNarrativeCard';
+import FinancialAgeCard from '../ui/FinancialAgeCard';
+import SentimentReportCard from '../ui/SentimentReportCard';
+import SpendingPersonalityCard from '../ui/SpendingPersonalityCard';
 import InsightsMonthTrend from '../insights/InsightsMonthTrend';
 import InsightsCategoryDelta from '../insights/InsightsCategoryDelta';
 import InsightsDailyRhythm from '../insights/InsightsDailyRhythm';
@@ -173,6 +176,21 @@ export default function ReportsPage() {
             {/* 1b. Monthly narrative — model-written prose summary of the month */}
             <Reveal index={1}>
               <MonthlyNarrativeCard year={year} month={month} />
+            </Reveal>
+
+            {/* 1b2. Financial age score — maturity level + personalised description */}
+            <Reveal index={1}>
+              <FinancialAgeCard />
+            </Reveal>
+
+            {/* 1c. Regret Score — sentiment breakdown across all time */}
+            <Reveal index={1}>
+              <SentimentReportCard />
+            </Reveal>
+
+            {/* 1c. Spending personality — 90-day behavioural profile */}
+            <Reveal index={1}>
+              <SpendingPersonalityCard />
             </Reveal>
 
             {/* 2. Where it went — categories with per-category MoM delta */}

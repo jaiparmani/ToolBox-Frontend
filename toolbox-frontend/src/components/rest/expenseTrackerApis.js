@@ -1303,6 +1303,50 @@ export const getCategoryMergeSuggestions = async () => {
     }
 };
 
+export const getSpendingPersonality = async () => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/spending_personality/`);
+        return await response.json();
+    } catch (error) {
+        if (error.status === 404) return null;
+        throw handleApiError(error, 'fetch spending personality');
+    }
+};
+
+export const getFinancialAgeScore = async () => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/financial_age_score/`);
+        return await response.json();
+    } catch (error) {
+        if (error.status === 404) return null;
+        throw handleApiError(error, 'fetch financial age score');
+    }
+};
+
+// Regret Score — set sentiment on a single expense
+export const setSentiment = async (expenseId, sentiment) => {
+    try {
+        const response = await authenticatedFetch(
+            `${API_BASE_URL}/expenses/${expenseId}/set_sentiment/`,
+            { method: 'POST', body: JSON.stringify({ sentiment }) },
+        );
+        return await response.json();
+    } catch (error) {
+        throw handleApiError(error, 'set sentiment');
+    }
+};
+
+// Regret Score — get the sentiment report
+export const getSentimentReport = async () => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/sentiment_report/`);
+        return await response.json();
+    } catch (error) {
+        if (error.status === 404) return null;
+        throw handleApiError(error, 'fetch sentiment report');
+    }
+};
+
 // Utility function for array sum (keeping existing functionality)
 export const getArraySumApi = (values, onSuccess, onError) => {
     const queryString = values.join(',');

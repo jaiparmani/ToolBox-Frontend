@@ -381,6 +381,7 @@ const JUMPS = [
   { id: 'start', label: 'Start here' },
   { id: 'capture', label: 'Adding expenses' },
   { id: 'assistant', label: 'The assistant' },
+  { id: 'ai', label: 'AI features' },
   { id: 'gestures', label: 'Hidden gestures' },
   { id: 'sharing', label: 'Sharing bills' },
   { id: 'forecast', label: 'Your forecast' },
@@ -557,8 +558,69 @@ export default function GuidePage() {
           </Callout>
         </Section>
 
-        {/* ── 4. Gestures ── */}
-        <Section id="gestures" index={4} eyebrow="Undiscoverable by design" title="Gestures worth knowing">
+        {/* ── 4. AI features ── */}
+        <Section id="ai" index={4} eyebrow="Always working" title="What the AI does">
+          <P sx={{ mb: 1 }}>
+            Some of these run quietly in the background; others respond to something you tap or type.
+            None of them require set-up.
+          </P>
+          <Item title="Smart fill">
+            As you type a description, past expenses surface as suggestions with the right category
+            already filled in. Press Tab or tap to accept.
+          </Item>
+          <Item title="Quick add">
+            Type any expense in plain language &mdash; &ldquo;20 chai 100 vada pav&rdquo; &mdash; and
+            the AI parses amount, description, and category in one go. Works with voice input too.
+          </Item>
+          <Item title="Merchant memory">
+            The first time you log a Swiggy order, the AI notes the category. Every Swiggy expense
+            after that inherits it automatically &mdash; no re-typing.
+          </Item>
+          <Item title="Location detect">
+            Tap the crosshair icon in the expense form. The app reads your GPS and fills the merchant
+            name without you typing it.
+          </Item>
+          <Item title="Financial assistant">
+            Press <Kbd>⌘K</Kbd> and ask anything from your own data &mdash;{' '}
+            <em>&ldquo;how much did I spend on food last month?&rdquo;</em> or{' '}
+            <em>&ldquo;who owes me the most?&rdquo;</em> The AI answers from your real figures.
+          </Item>
+          <Item title="Monthly narrative">
+            At the close of each month, the app writes a 3-sentence story: what happened, what
+            pattern emerged, what to watch. It appears in Today.
+          </Item>
+          <Item title="Month forecast">
+            From mid-month, a projected end-of-month total appears, based on your current pace and
+            your recurring bills.
+          </Item>
+          <Item title="Spending personality">
+            After 15 or more expenses, a short profile describes your habits in plain language, drawn
+            entirely from your actual patterns.
+          </Item>
+          <Item title="Regret score">
+            After logging an expense, optionally rate it: felt good, neutral, or regret. Over time, a
+            picture forms of which categories bring you joy and which bring guilt.
+          </Item>
+          <Item title="Anomaly alerts">
+            If a single expense is three times your daily average, a push notification flags it and
+            explains why it stood out.
+          </Item>
+          <Item title="Behaviour nudge">
+            Four delivery orders in one week, and the app notes the pattern quietly &mdash; just the
+            fact, no lecture.
+          </Item>
+          <Item title="Category merge suggestions">
+            Overlapping categories like &ldquo;Zomato&rdquo;, &ldquo;Food Delivery&rdquo;, and
+            &ldquo;Eating Out&rdquo; prompt a suggestion to merge them into one.
+          </Item>
+          <Item title="Weekly brief">
+            Every Monday morning, a 2-sentence push notification compares last week against the week
+            before.
+          </Item>
+        </Section>
+
+        {/* ── 5. Gestures ── */}
+        <Section id="gestures" index={5} eyebrow="Undiscoverable by design" title="Gestures worth knowing">
           <P sx={{ mb: 1.5 }}>
             Nothing on screen advertises these, and they are the fastest way to work.
           </P>
@@ -587,8 +649,8 @@ export default function GuidePage() {
           </P>
         </Section>
 
-        {/* ── 5. Sharing ── */}
-        <Section id="sharing" index={5} eyebrow="Splits and groups" title="Sharing a bill with someone">
+        {/* ── 6. Sharing ── */}
+        <Section id="sharing" index={6} eyebrow="Splits and groups" title="Sharing a bill with someone">
           <P>
             Go to <strong>Activity</strong> and open the <strong>Splits</strong> tab. Either
             describe the bill &mdash; <em>&ldquo;split 1200 dinner with raj and priya&rdquo;</em>{' '}
@@ -623,8 +685,8 @@ export default function GuidePage() {
           </Box>
         </Section>
 
-        {/* ── 6. Forecast ── */}
-        <Section id="forecast" index={6} eyebrow="Recurring and Inbox" title="How the forecast is made">
+        {/* ── 7. Forecast ── */}
+        <Section id="forecast" index={7} eyebrow="Recurring and Inbox" title="How the forecast is made">
           <P>
             <strong>Recurring</strong> is the input for everything predictive in the app. Add your
             rent and subscriptions as recurring bills, each with a cadence
@@ -638,8 +700,8 @@ export default function GuidePage() {
           </P>
         </Section>
 
-        {/* ── 7. The map ── */}
-        <Section id="map" index={7} eyebrow="Wayfinding" title="Where everything lives">
+        {/* ── 8. The map ── */}
+        <Section id="map" index={8} eyebrow="Wayfinding" title="Where everything lives">
           <P sx={{ mb: 1.5 }}>The sidebar, in order. Each row here goes to that screen.</P>
           <Box sx={{ mx: { xs: -1.25, sm: -1.5 } }}>
             <MapRow icon={DashboardIcon} tone={accents.blue} label="Home" to="/dashboard" onGo={navigate}>
@@ -674,8 +736,8 @@ export default function GuidePage() {
           </Box>
         </Section>
 
-        {/* ── 8. Account ── */}
-        <Section id="account" index={8} eyebrow="Sign-in and settings" title="Your account">
+        {/* ── 9. Account ── */}
+        <Section id="account" index={9} eyebrow="Sign-in and settings" title="Your account">
           <Item title="A 6-digit MPIN is the normal way in">
             The sign-in screen leads with the PIN pad. <strong>Use Email OTP instead</strong> and
             a password sign-in are behind links on that same screen, and{' '}
@@ -696,8 +758,8 @@ export default function GuidePage() {
           </Item>
         </Section>
 
-        {/* ── 9. Keyboard ── */}
-        <Section id="keyboard" index={9} eyebrow="Reference" title="Keyboard shortcuts">
+        {/* ── 10. Keyboard ── */}
+        <Section id="keyboard" index={10} eyebrow="Reference" title="Keyboard shortcuts">
           <Box
             component="table"
             sx={{ width: '100%', maxWidth: `${MEASURE + 8}ch`, borderCollapse: 'collapse', mt: 0.5 }}

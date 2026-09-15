@@ -249,6 +249,44 @@ export default function ExpenseComposer({
   const suggestDebounce = React.useRef(null);
   const descriptionRef = React.useRef(null);
 
+  // Pinned expense templates — loaded from localStorage, up to 4 entries.
+  const [templates, setTemplates] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem('expense_templates') || '[]'); }
+    catch { return []; }
+  });
+
+  const pinAsTemplate = () => {
+    const tpl = {
+      description: (data.description || '').trim(),
+      amount: data.amount,
+      categoryId: data.categoryId,
+      transactionType: data.transactionType || 'expense',
+    };
+    setTemplates(prev => {
+      // Replace existing entry with same description, then prepend, then cap at 4
+      const next = [tpl, ...prev.filter(t => t.description.toLowerCase() !== tpl.description.toLowerCase())].slice(0, 4);
+      try { localStorage.setItem('expense_templates', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const removeTemplate = (idx) => {
+    setTemplates(prev => {
+      const next = prev.filter((_, i) => i !== idx);
+      try { localStorage.setItem('expense_templates', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const fillFromTemplate = (tpl) => {
+    onChange({
+      description: tpl.description,
+      amount: tpl.amount,
+      categoryId: tpl.categoryId,
+      transactionType: tpl.transactionType || 'expense',
+    });
+  };
+
   const typeId = data.transactionType || 'expense';
   const activeType = TYPE_META[typeId] || DEFAULT_TYPE;
   const heroColor = activeType.color;
@@ -338,6 +376,9 @@ export default function ExpenseComposer({
       setCatDraft(null); setTagDraft(null); setCatError(null); setTagError(null);
       setSuggestions({ descriptions: [], category_id: null, tag_ids: [] });
       setShowSuggestions(false);
+      // Re-read templates so a chip pinned in a previous session shows up.
+      try { setTemplates(JSON.parse(localStorage.getItem('expense_templates') || '[]')); }
+      catch { setTemplates([]); }
       const t = setTimeout(() => amountRef.current?.focus(), 250);
       getLabelUsage()
         .then((u) => setLabelUsage({ categories: u?.categories || {}, tags: u?.tags || {} }))
@@ -848,6 +889,47 @@ export default function ExpenseComposer({
         ) : (
           /* ── Single-entry form ── */
           <>
+            {/* Templates — pinned one-tap fills; × on hover removes */}
+            {templates.length > 0 && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2 }}>
+                {templates.map((tpl, i) => (
+                  <Box
+                    key={i}
+                    sx={{
+                      display: 'inline-flex', alignItems: 'center',
+                      height: 28, pl: 1.25, pr: 0.5,
+                      borderRadius: `${radius.pill}px`,
+                      border: '1px solid', borderColor: (t) => color.hairline[t.palette.mode],
+                      bgcolor: (t) => color.sunken[t.palette.mode],
+                      cursor: 'pointer', gap: 0.5,
+                      transition: `all ${motionTokens.fast}ms ${motionTokens.ease}`,
+                      '&:hover': { borderColor: heroColor, bgcolor: `${heroColor}0d` },
+                      '& .tpl-remove': { display: 'none' },
+                      '&:hover .tpl-remove': { display: 'flex' },
+                    }}
+                    onClick={() => fillFromTemplate(tpl)}
+                  >
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                      {tpl.description} · {money(tpl.amount)}
+                    </Typography>
+                    <IconButton
+                      className="tpl-remove"
+                      size="small"
+                      onClick={(e) => { e.stopPropagation(); removeTemplate(i); }}
+                      aria-label="Remove template"
+                      sx={{
+                        width: 18, height: 18, borderRadius: '50%',
+                        color: 'text.disabled', p: 0,
+                        '&:hover': { color: accents.red },
+                      }}
+                    >
+                      <CloseIcon sx={{ fontSize: 12 }} />
+                    </IconButton>
+                  </Box>
+                ))}
+              </Box>
+            )}
+
             {/* Description input — styled as a cohesive surface. Past
                 descriptions that match what you're typing drop down below it
                 (Apple Design §1: respond to input, don't wait for you to
@@ -1184,6 +1266,23 @@ export default function ExpenseComposer({
           pb: fullScreen ? 'calc(env(safe-area-inset-bottom) + 16px)' : 2,
         }}
       >
+        {/* Pin as template — quiet link, only when there's enough to save */}
+        {!batchMode && !editing && (data.description || '').trim().length >= 3 && parseFloat(data.amount) > 0 && (
+          <Box
+            component="button"
+            onClick={pinAsTemplate}
+            aria-label="Pin this expense as a template"
+            sx={{
+              display: 'block', width: '100%', textAlign: 'center',
+              mb: 1.25, fontSize: 12, color: 'text.disabled', cursor: 'pointer',
+              background: 'none', border: 'none', padding: 0, fontFamily: 'inherit',
+              transition: `color ${motionTokens.fast}ms ${motionTokens.ease}`,
+              '&:hover': { color: heroColor },
+            }}
+          >
+            Pin as template
+          </Box>
+        )}
         {batchMode ? (
           <Button
             fullWidth size="large" variant="contained" onClick={runBatch} disabled={committing}

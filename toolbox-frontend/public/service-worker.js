@@ -12,6 +12,42 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+// ---------------------------------------------------------------------------
+// IndexedDB helper — reads the auth token mirrored here by authUtils.login().
+// DB: "money_os"  |  store: "auth"  |  key: "auth_token"
+// ---------------------------------------------------------------------------
+function getAuthToken() {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open('money_os', 1);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('auth')) {
+          db.createObjectStore('auth');
+        }
+      };
+      req.onsuccess = (e) => {
+        try {
+          const db = e.target.result;
+          const tx = db.transaction('auth', 'readonly');
+          const get = tx.objectStore('auth').get('auth_token');
+          get.onsuccess = () => resolve(get.result || null);
+          get.onerror = () => resolve(null);
+        } catch {
+          resolve(null);
+        }
+      };
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Push: show notification with an inline-reply action so users can log an
+// expense directly from the banner without opening the app.
+// ---------------------------------------------------------------------------
 self.addEventListener('push', (event) => {
   let data = { title: 'Money OS', body: '', url: '/' };
   try {
@@ -29,6 +65,16 @@ self.addEventListener('push', (event) => {
         badge: '/logo192.png',
         data: { url: data.url || '/' },
         tag: data.url || undefined,
+        // Inline-reply action: Android Chrome shows a text field; iOS shows a
+        // plain button (graceful degradation — type:'text' is ignored there).
+        actions: [
+          {
+            action: 'reply',
+            type: 'text',
+            title: 'Log expense',
+            placeholder: '40 chai…',
+          },
+        ],
       }),
       self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
         clients.forEach((c) => c.postMessage({ type: 'toolbox:notify-refresh' }));
@@ -37,11 +83,64 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// Focus an already-open tab on this origin if one exists; otherwise open one
-// at the card's own route (e.g. /splits, /recurring) rather than always the
-// dashboard, so the notification actually lands where it's about.
+// ---------------------------------------------------------------------------
+// Notification click / reply
+// ---------------------------------------------------------------------------
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+
+  // --- Inline reply: log the expense without opening the app ---
+  if (event.action === 'reply') {
+    const text = (event.reply || '').trim();
+    if (!text) return;
+
+    event.waitUntil(
+      getAuthToken().then((token) => {
+        if (!token) {
+          return self.registration.showNotification('Money OS', {
+            body: 'Couldn\'t log — open the app to sign in first.',
+            icon: '/logo192.png',
+            tag: 'log-error',
+            silent: true,
+          });
+        }
+
+        return fetch('https://jaiparmani.pythonanywhere.com/api/expenses/expenses/quick_add/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Token ' + token,
+          },
+          body: JSON.stringify({ text }),
+        })
+          .then((r) => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          })
+          .then((data) => {
+            const description = data.description || text;
+            const amount = data.amount != null ? '₹' + data.amount : '';
+            return self.registration.showNotification('Logged ✓', {
+              body: description + (amount ? ' — ' + amount : ''),
+              icon: '/favicon.svg',
+              tag: 'log-confirm',
+              silent: true,
+            });
+          })
+          .catch(() => {
+            return self.registration.showNotification('Money OS', {
+              body: 'Couldn\'t log — open the app and try again.',
+              icon: '/logo192.png',
+              tag: 'log-error',
+              silent: true,
+            });
+          });
+      })
+    );
+    return;
+  }
+
+  // --- Default: focus an already-open tab or open one at the card's route ---
   const url = event.notification.data?.url || '/';
 
   event.waitUntil(

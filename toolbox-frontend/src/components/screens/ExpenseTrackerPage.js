@@ -30,7 +30,7 @@ import {
   getTags, createTag, updateTag, deleteTag,
   getExpenseSummary, quickAddExpense, bulkAddExpenses,
   generateExpenseInsight, getLatestExpenseInsight, askExpenses,
-  getSplits, getCategoryMergeSuggestions,
+  getSplits, getCategoryMergeSuggestions, setSentiment,
 } from '../rest/expenseTrackerApis';
 
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
@@ -57,6 +57,7 @@ import ActivityLabelsPanel from '../ui/ActivityLabelsPanel';
 import ActivityLabelDialog from '../ui/ActivityLabelDialog';
 import { TransactionStoryDrawer, buildStoryFromExpense, PageHeader } from '../ui';
 import DashMonthForecast from '../ui/DashMonthForecast';
+import PersonalisedHomeCard from '../ui/PersonalisedHomeCard';
 import CursorGlow from '../motion/CursorGlow';
 import AssistantOrb from '../ui/AssistantOrb';
 import { accents, color, radius } from '../../theme/tokens';
@@ -197,6 +198,21 @@ export default function ExpenseTrackerPage() {
    }
    // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [searchParams]);
+
+ // Handle PWA manifest shortcut URLs: ?action=quick-add opens the composer,
+ // ?action=ask opens the ToolBox assistant. Runs once on mount so the action
+ // isn't replayed on every filter change.
+ useEffect(() => {
+   const action = searchParams.get('action');
+   if (!action) return;
+   setSearchParams({}, { replace: true });
+   if (action === 'quick-add') {
+     openExpenseForm();
+   } else if (action === 'ask') {
+     window.dispatchEvent(new Event('toolbox:command-palette'));
+   }
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, []);
  const [pagination, setPagination] = useState({
    page: 0,
    pageSize: 10,
@@ -263,6 +279,38 @@ export default function ExpenseTrackerPage() {
  const [undoOpen, setUndoOpen] = useState(false);
  const undoTimerRef = React.useRef(null);
  const pendingDeleteIdRef = React.useRef(null);
+
+ // Sentiment quick-pick: null or the newly created expense id
+ const [sentimentExpenseId, setSentimentExpenseId] = useState(null);
+ const sentimentTimerRef = React.useRef(null);
+
+ // Smart date inference: set after a new expense added between midnight and 4am
+ const [datePromptExpense, setDatePromptExpense] = useState(null);
+
+ // Quick-confirm card: shown after quick_add succeeds
+ const [quickConfirmCard, setQuickConfirmCard] = useState(null);
+ const quickConfirmTimerRef = React.useRef(null);
+
+ const showSentimentPrompt = React.useCallback((expenseId) => {
+   if (sentimentTimerRef.current) clearTimeout(sentimentTimerRef.current);
+   setSentimentExpenseId(expenseId);
+   sentimentTimerRef.current = setTimeout(() => {
+     setSentimentExpenseId(null);
+     sentimentTimerRef.current = null;
+   }, 6000);
+ }, []);
+
+ const dismissSentiment = React.useCallback(() => {
+   if (sentimentTimerRef.current) { clearTimeout(sentimentTimerRef.current); sentimentTimerRef.current = null; }
+   setSentimentExpenseId(null);
+ }, []);
+
+ const handleSentiment = React.useCallback(async (value) => {
+   const id = sentimentExpenseId;
+   dismissSentiment();
+   if (!id) return;
+   try { await setSentiment(id, value); } catch { /* best-effort */ }
+ }, [sentimentExpenseId, dismissSentiment]);
 
  // Category merge suggestions
  const [mergeSuggestions, setMergeSuggestions] = useState([]);
@@ -500,9 +548,16 @@ export default function ExpenseTrackerPage() {
      } else {
        const created = await addExpenseApi(expenseForm.data);
        setSuccess('Expense added successfully!');
+       if (created?.id) showSentimentPrompt(created.id);
        if (created?.duplicateWarning) {
          const d = created.duplicateWarning;
          setDuplicateWarning(`Looks like a duplicate of "${d.description}" (${money(parseFloat(d.amount))}) added moments ago.`);
+       }
+       // Smart date inference: between midnight and 4am the entered expense
+       // might actually be from the previous day — ask once, non-blocking.
+       const nowHour = new Date().getHours();
+       if (nowHour >= 0 && nowHour < 4 && created?.id) {
+         setDatePromptExpense({ id: created.id });
        }
      }
      feedback('success');
@@ -545,6 +600,21 @@ export default function ExpenseTrackerPage() {
      const amountText = saved.displayAmount || formatCurrency(saved.amount);
      const categoryText = saved.category?.name ? ` \u00b7 ${saved.category.name}` : '';
      setSuccess(`Added "${saved.description}" \u2014 ${amountText}${categoryText}`);
+     if (saved?.id) showSentimentPrompt(saved.id);
+     // Show a slim confirm card so the user can immediately edit or undo
+     // without hunting for the row in the list.
+     if (quickConfirmTimerRef.current) clearTimeout(quickConfirmTimerRef.current);
+     setQuickConfirmCard({
+       id: saved.id,
+       description: saved.description,
+       amountText,
+       categoryName: saved.category?.name || '',
+       expense: saved,
+     });
+     quickConfirmTimerRef.current = setTimeout(() => {
+       setQuickConfirmCard(null);
+       quickConfirmTimerRef.current = null;
+     }, 4000);
      setQuickAddText('');
      loadExpenses();
      loadSummary();
@@ -1068,6 +1138,163 @@ export default function ExpenseTrackerPage() {
        }
      />
 
+     {/* Sentiment quick-pick — "How did that feel?" */}
+     <Snackbar
+       open={!!sentimentExpenseId}
+       anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+       sx={{ bottom: { xs: 140, md: 80 } }}
+     >
+       <Box sx={{
+         display: 'flex', alignItems: 'center', gap: 1.5,
+         px: 2, py: 1.25,
+         borderRadius: 3,
+         bgcolor: 'background.paper',
+         border: '1px solid',
+         borderColor: 'divider',
+         boxShadow: 4,
+       }}>
+         <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, flexShrink: 0 }}>
+           How did that feel?
+         </Typography>
+         <Tooltip title="Felt good">
+           <IconButton size="small" onClick={() => handleSentiment('good')} aria-label="Felt good"
+             sx={{ fontSize: 20, '&:hover': { bgcolor: `${accents.green}22` } }}>
+             😊
+           </IconButton>
+         </Tooltip>
+         <Tooltip title="Neutral">
+           <IconButton size="small" onClick={() => handleSentiment('neutral')} aria-label="Neutral"
+             sx={{ fontSize: 20, '&:hover': { bgcolor: 'action.hover' } }}>
+             😐
+           </IconButton>
+         </Tooltip>
+         <Tooltip title="Regret">
+           <IconButton size="small" onClick={() => handleSentiment('regret')} aria-label="Regret"
+             sx={{ fontSize: 20, '&:hover': { bgcolor: `${accents.red}22` } }}>
+             😔
+           </IconButton>
+         </Tooltip>
+         <IconButton size="small" onClick={dismissSentiment} aria-label="Dismiss" sx={{ ml: 0.5 }}>
+           <CloseIcon fontSize="small" />
+         </IconButton>
+       </Box>
+     </Snackbar>
+
+     {/* Smart date inference — "is this from today or yesterday?" */}
+     <Snackbar
+       open={!!datePromptExpense}
+       autoHideDuration={8000}
+       onClose={() => setDatePromptExpense(null)}
+       anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+       sx={{ bottom: { xs: 140, md: 80 } }}
+     >
+       <Box sx={{
+         display: 'flex', alignItems: 'center', gap: 1.5,
+         px: 2, py: 1.25,
+         borderRadius: 3,
+         bgcolor: 'background.paper',
+         border: '1px solid',
+         borderColor: 'divider',
+         boxShadow: 4,
+       }}>
+         <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, flexShrink: 0 }}>
+           Is this from today or yesterday?
+         </Typography>
+         <Button size="small" color="inherit" onClick={() => setDatePromptExpense(null)}>Today</Button>
+         <Button size="small" color="inherit" onClick={async () => {
+           const id = datePromptExpense?.id;
+           setDatePromptExpense(null);
+           if (!id) return;
+           const d = new Date();
+           d.setDate(d.getDate() - 1);
+           try {
+             await updateExpense(id, { date: d.toISOString().slice(0, 10) });
+             loadExpenses();
+           } catch { setError('Could not update the date'); }
+         }}>Yesterday</Button>
+         <IconButton size="small" onClick={() => setDatePromptExpense(null)} aria-label="Dismiss" sx={{ ml: 0.5 }}>
+           <CloseIcon fontSize="small" />
+         </IconButton>
+       </Box>
+     </Snackbar>
+
+     {/* Quick-confirm card — slides up after quick_add, auto-dismisses in 4s */}
+     <AnimatePresence>
+       {quickConfirmCard && (
+         <Box
+           key="quick-confirm-card"
+           component={framerMotion.div}
+           initial={{ y: '100%', opacity: 0 }}
+           animate={{ y: 0, opacity: 1 }}
+           exit={{ y: '100%', opacity: 0 }}
+           transition={{ type: 'spring', damping: 30, stiffness: 350 }}
+           sx={{
+             position: 'fixed',
+             bottom: { xs: 'calc(72px + env(safe-area-inset-bottom))', md: 0 },
+             left: 0, right: 0,
+             zIndex: 1400,
+             height: 56,
+             display: 'flex', alignItems: 'center',
+             px: 2, gap: 1,
+             background: (t) => t.palette.mode === 'dark' ? '#1c1c22' : '#f5f5f7',
+             border: '0.5px solid',
+             borderColor: 'divider',
+             borderRadius: '12px 12px 0 0',
+             boxShadow: '0 -4px 24px rgba(0,0,0,0.22)',
+           }}
+         >
+           <Typography sx={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'text.primary', minWidth: 0 }} noWrap>
+             {quickConfirmCard.description}
+             {' · '}
+             {quickConfirmCard.amountText}
+             {quickConfirmCard.categoryName ? ` · ${quickConfirmCard.categoryName}` : ''}
+           </Typography>
+           <Tooltip title="Dismiss">
+             <IconButton
+               size="small"
+               aria-label="Dismiss"
+               onClick={() => { clearTimeout(quickConfirmTimerRef.current); setQuickConfirmCard(null); }}
+             >
+               <CloseIcon fontSize="small" />
+             </IconButton>
+           </Tooltip>
+           <Tooltip title="Edit">
+             <IconButton
+               size="small"
+               aria-label="Edit"
+               onClick={() => {
+                 clearTimeout(quickConfirmTimerRef.current);
+                 const exp = quickConfirmCard.expense;
+                 setQuickConfirmCard(null);
+                 openExpenseForm({ ...exp, type: exp.transaction_type || exp.type || 'expense' });
+               }}
+             >
+               <EditIcon fontSize="small" />
+             </IconButton>
+           </Tooltip>
+           <Tooltip title="Delete">
+             <IconButton
+               size="small"
+               aria-label="Delete"
+               sx={{ color: accents.red }}
+               onClick={async () => {
+                 clearTimeout(quickConfirmTimerRef.current);
+                 const id = quickConfirmCard.id;
+                 setQuickConfirmCard(null);
+                 try {
+                   await deleteExpense(id);
+                   setExpenses(prev => prev.filter(e => e.id !== id));
+                   loadSummary();
+                 } catch { setError('Could not delete expense'); }
+               }}
+             >
+               <DeleteIcon fontSize="small" />
+             </IconButton>
+           </Tooltip>
+         </Box>
+       )}
+     </AnimatePresence>
+
      {/* Headline figures */}
      <Box sx={{ mb: { xs: 2, sm: 3 } }}>
        {!summary && loading ? (
@@ -1144,6 +1371,9 @@ export default function ExpenseTrackerPage() {
        {/* Expenses Tab */}
        {activeTab === 0 && (
          <Box key="tab-0" sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
+           {/* Personalised greeting card — time-of-day aware, loads independently */}
+           <PersonalisedHomeCard onQuickAdd={() => openExpenseForm()} />
+
            {/* Ask result — the question is asked from the one Assistant (⌘K);
                when it answers, the reading lands here as its own card. */}
            {ask.answer && (

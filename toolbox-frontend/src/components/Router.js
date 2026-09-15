@@ -1,116 +1,81 @@
-import React from 'react'
+import React, { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { authUtils } from './rest/authUtils'
 import DashboardLayoutBasic from './DashboardLayout'
-import ExpenseTrackerPage from './screens/ExpenseTrackerPage'
-import ReportsPage from './screens/ReportsPage'
+import { Box, CircularProgress } from '@mui/material'
+
+// Critical path — always eager (first paint, auth gate)
 import LoginPage from './screens/LoginPage'
-import UserRegistrationPage from './screens/UserRegistrationPage'
-import UserProfilePage from './screens/UserProfilePage'
 import LandingPage from './screens/LandingPage'
-import StoryPage from './screens/StoryPage'
-import InboxPage from './screens/InboxPage'
-import RecurringPage from './screens/RecurringPage'
-import ForgotPasswordPage from './screens/ForgotPasswordPage'
-import ResetPasswordPage from './screens/ResetPasswordPage'
-import ApiKeysPage from './screens/ApiKeysPage'
-import SplitsPage from './screens/SplitsPage'
-import MoneyUniversePage from './screens/MoneyUniversePage'
-import CashFlowPulsePage from './screens/CashFlowPulsePage'
-import GuidePage from './screens/GuidePage'
-import ShareTargetPage from './screens/ShareTargetPage'
-import { Box, CircularProgress, Typography } from '@mui/material'
 
-// Loading Component
-const LoadingSpinner = () => (
-  <Box
-    display="flex"
-    flexDirection="column"
-    alignItems="center"
-    justifyContent="center"
-    minHeight="200px"
-    padding={3}
-  >
-    <CircularProgress size={40} sx={{ mb: 2 }} />
-    <Typography variant="body1" color="text.secondary">
-      Loading...
-    </Typography>
+// Everything else — lazy chunks, loaded on first navigation to that route
+const ExpenseTrackerPage  = lazy(() => import('./screens/ExpenseTrackerPage'))
+const ReportsPage         = lazy(() => import('./screens/ReportsPage'))
+const UserRegistrationPage = lazy(() => import('./screens/UserRegistrationPage'))
+const UserProfilePage     = lazy(() => import('./screens/UserProfilePage'))
+const StoryPage           = lazy(() => import('./screens/StoryPage'))
+const InboxPage           = lazy(() => import('./screens/InboxPage'))
+const RecurringPage       = lazy(() => import('./screens/RecurringPage'))
+const ForgotPasswordPage  = lazy(() => import('./screens/ForgotPasswordPage'))
+const ResetPasswordPage   = lazy(() => import('./screens/ResetPasswordPage'))
+const ApiKeysPage         = lazy(() => import('./screens/ApiKeysPage'))
+const SplitsPage          = lazy(() => import('./screens/SplitsPage'))
+const MoneyUniversePage   = lazy(() => import('./screens/MoneyUniversePage'))
+const CashFlowPulsePage   = lazy(() => import('./screens/CashFlowPulsePage'))
+const GuidePage           = lazy(() => import('./screens/GuidePage'))
+const ShareTargetPage     = lazy(() => import('./screens/ShareTargetPage'))
+
+const Spinner = () => (
+  <Box display="flex" alignItems="center" justifyContent="center" minHeight="200px">
+    <CircularProgress size={32} />
   </Box>
-);
+)
 
-// Protected Route Component
 const ProtectedRoute = ({ children }) => {
-   const isAuthenticated = authUtils.isAuthenticated()
+  const isAuthenticated = authUtils.isAuthenticated()
+  return isAuthenticated ? children : <Navigate to="/login" replace />
+}
 
-   return isAuthenticated ? children : <Navigate to="/login" replace />
- }
-
-// Public Route Component (redirects to dashboard if already authenticated)
 const PublicRoute = ({ children }) => {
   const isAuthenticated = authUtils.isAuthenticated()
-
   return !isAuthenticated ? children : <Navigate to="/" replace />
 }
 
 export default function Router() {
   const location = useLocation();
-  // No global page-transition wrapper here: it would re-mount the whole app
-  // shell on every navigation. The shell persists (see AppShell), the auth
-  // screens animate themselves (AuthShell), and only the routed content inside
-  // the shell transitions — so navigation reads as spatial continuity, not a
-  // full-screen flash.
   return (
-    <Routes location={location}>
-      {/* Public Routes */}
-      <Route path="/login" element={
-        <PublicRoute>
-          <LoginPage />
-        </PublicRoute>
-      } />
+    <Suspense fallback={<Spinner />}>
+      <Routes location={location}>
+        <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><UserRegistrationPage /></PublicRoute>} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-      <Route path="/register" element={
-        <PublicRoute>
-          <UserRegistrationPage />
-        </PublicRoute>
-      } />
+        <Route element={<ProtectedRoute><DashboardLayoutBasic /></ProtectedRoute>}>
+          <Route path="/"               element={<LandingPage />} />
+          <Route path="/dashboard"      element={<LandingPage />} />
+          <Route path="/story"          element={<StoryPage />} />
+          <Route path="/inbox"          element={<InboxPage />} />
+          <Route path="/recurring"      element={<RecurringPage />} />
+          <Route path="/profile"        element={<UserProfilePage />} />
+          <Route path="/expense-tracker" element={<ExpenseTrackerPage />} />
+          <Route path="/universe"       element={<MoneyUniversePage />} />
+          <Route path="/pulse"          element={<CashFlowPulsePage />} />
+          <Route path="/reports"        element={<ReportsPage />} />
+          <Route path="/splits"         element={<SplitsPage />} />
+          <Route path="/guide"          element={<GuidePage />} />
+          <Route path="/how-to"         element={<Navigate to="/guide" replace />} />
+          <Route path="/api-keys"       element={<ApiKeysPage />} />
+          <Route path="/share"          element={<ShareTargetPage />} />
+          <Route path="/health-tracker" element={<Navigate to="/" replace />} />
+          <Route path="/hobby-tracker"  element={<Navigate to="/" replace />} />
+          <Route path="/array-sum"      element={<Navigate to="/" replace />} />
+          <Route path="/qr-generator"   element={<Navigate to="/" replace />} />
+        </Route>
 
-      {/* Forgot-password flow (public; reachable while signed out) */}
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
-
-
-      {/* Protected app: one shell (sidebar + header), all pages nested inside */}
-      <Route element={<ProtectedRoute><DashboardLayoutBasic /></ProtectedRoute>}>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/dashboard" element={<LandingPage />} />
-        <Route path="/story" element={<StoryPage />} />
-        <Route path="/inbox" element={<InboxPage />} />
-        <Route path="/recurring" element={<RecurringPage />} />
-        <Route path="/profile" element={<UserProfilePage />} />
-        <Route path="/expense-tracker" element={<ExpenseTrackerPage />} />
-        <Route path="/universe" element={<MoneyUniversePage />} />
-        <Route path="/pulse" element={<CashFlowPulsePage />} />
-        <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/splits" element={<SplitsPage />} />
-        {/* The app's own manual — how to drive the parts you can't see. */}
-        <Route path="/guide" element={<GuidePage />} />
-        <Route path="/how-to" element={<Navigate to="/guide" replace />} />
-        {/* API Keys is admin-only tooling — reachable by URL, kept out of the nav */}
-        <Route path="/api-keys" element={<ApiKeysPage />} />
-        {/* Web Share Target — Android PWA share sheet from PhonePe/GPay */}
-        <Route path="/share" element={<ShareTargetPage />} />
-        {/* Retired sections (health, hobby, array-sum, qr) redirect home */}
-        <Route path="/health-tracker" element={<Navigate to="/" replace />} />
-        <Route path="/hobby-tracker" element={<Navigate to="/" replace />} />
-        <Route path="/array-sum" element={<Navigate to="/" replace />} />
-        <Route path="/qr-generator" element={<Navigate to="/" replace />} />
-      </Route>
-
-      {/* Legacy routes - redirect to dashboard */}
-      <Route path="/about" element={<Navigate to="/" replace />} />
-
-      {/* Catch all route */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="/about" element={<Navigate to="/" replace />} />
+        <Route path="*"      element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }

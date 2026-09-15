@@ -93,7 +93,8 @@ export default function Router() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/splits" element={<SplitsPage />} />
         {/* The app's own manual — how to drive the parts you can't see. */}
-        <Route path="/how-to" element={<GuidePage />} />
+        <Route path="/guide" element={<GuidePage />} />
+        <Route path="/how-to" element={<Navigate to="/guide" replace />} />
         {/* API Keys is admin-only tooling — reachable by URL, kept out of the nav */}
         <Route path="/api-keys" element={<ApiKeysPage />} />
         {/* Web Share Target — Android PWA share sheet from PhonePe/GPay */}

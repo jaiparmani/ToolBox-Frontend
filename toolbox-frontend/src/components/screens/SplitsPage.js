@@ -22,6 +22,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import MoneyConstellation from '../ui/MoneyConstellation';
 import SplitUniverse from '../ui/SplitUniverse';
 import ParticleFlow from '../motion/ParticleFlow';
+import AuroraBackground from '../motion/AuroraBackground';
 import ActivityDeck from '../ui/ActivityDeck';
 import Reveal from '../ui/Reveal';
 import LendingAssistant from '../ui/LendingAssistant';
@@ -98,6 +99,20 @@ function optimisticSettle(prev, person) {
 }
 
 const heroNumSx = { fontFamily: type.displayFamily, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.03em' };
+
+// framer-motion wants its `ease` as a bezier array, not the CSS string form
+// `theme/tokens.js` exports for plain `transition:` properties — same curve
+// (motionTokens.ease's "settle"), just serialized the way this library needs.
+const EASE_SETTLE = [0.32, 0.72, 0, 1];
+
+// What the quick-add box teaches while it's empty — real shapes of the same
+// one thing it does, not a single static hint.
+const QUICK_ADD_EXAMPLES = [
+  'split 1200 dinner with raj and priya',
+  'split 3600 goa trip three ways',
+  'arjun paid 850 for the movie, split with me',
+  'split 500 auto fare with priya',
+];
 
 /**
  * The one figure the page exists to answer, and the one real ratio behind it.
@@ -477,7 +492,11 @@ export default function SplitsPage() {
   // 1200 dinner with raj and priya"); "Exact" opens the full dialog for named
   // numbers instead. Both are the entry point now that splitting lives here.
   const [quickAdd, setQuickAdd] = useState({ text: '', loading: false });
+  const [quickAddFocused, setQuickAddFocused] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  // Counting one shared-only bill into your own spending — tracked per-item so
+  // its "Count" pill can show busy without disturbing its siblings.
+  const [countingId, setCountingId] = useState(null);
 
   // Bills you paid and split, but chose not to count as your own spending —
   // tracked here only, until you say otherwise.
@@ -552,6 +571,17 @@ export default function SplitsPage() {
   useEffect(() => {
     if (isAuthenticated) { load(); loadGroups(); loadShared(); loadSettledHistory(); loadSplitOnly(); }
   }, [isAuthenticated, load, loadGroups, loadShared, loadSettledHistory, loadSplitOnly]);
+
+  // The quick-add placeholder cycles through real examples so the one-line
+  // capture teaches itself — paused the moment there's real text or focus, and
+  // held on the first phrase under reduced motion rather than looping.
+  const [quickAddPhrase, setQuickAddPhrase] = useState(0);
+  const reduceMotion = useReducedMotion();
+  useEffect(() => {
+    if (reduceMotion || quickAddFocused || quickAdd.text) return undefined;
+    const id = setInterval(() => setQuickAddPhrase(p => (p + 1) % QUICK_ADD_EXAMPLES.length), 2600);
+    return () => clearInterval(id);
+  }, [reduceMotion, quickAddFocused, quickAdd.text]);
 
   // The edit dialog needs the category list; fetch it once, quietly, and let
   // the dialog say so if it hasn't arrived.
@@ -817,12 +847,16 @@ export default function SplitsPage() {
   // A bill you paid and split, moved from "tracked only" into your own
   // expenses — the flip side of toggleInExpenses, for the other direction.
   const addToExpenses = async (expenseId) => {
+    setCountingId(expenseId);
     try {
       await addSplitToExpenses(expenseId);
+      feedback('success');
       setSuccess('Added to your expenses');
       setSplitOnly(prev => prev.filter(s => s.expenseId !== expenseId));
     } catch (err) {
       setError(err.message || 'Could not update');
+    } finally {
+      setCountingId(null);
     }
   };
 
@@ -908,6 +942,9 @@ export default function SplitsPage() {
           mounted anywhere else yet, so it lives here for now — this is the
           only screen that dispatches toolbox:flow. */}
       <ParticleFlow />
+      {/* Shared didn't have its own weather, unlike Home/Today — a flat page
+          under a living app. Same signature moment, same real signal. */}
+      <AuroraBackground />
       <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 12, position: 'relative' }}>
         <Box sx={{ position: 'relative', zIndex: 1 }}>
         <ErrorBanner error={error} onClose={() => setError(null)} />
@@ -937,42 +974,101 @@ export default function SplitsPage() {
           <Reveal index={1}>
             <Box
               sx={{
-                display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap',
-                p: 1, mb: 2, borderRadius: `${radius.lg}px`,
-                border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper',
+                position: 'relative', p: '1px', mb: 2, borderRadius: `${radius.lg + 1}px`,
+                // The glow lives in a gradient border, not a box-shadow — cheap,
+                // GPU-friendly, and it reads as "this box is listening" the
+                // instant you focus it, then settles back to a plain hairline.
+                background: quickAddFocused
+                  ? `linear-gradient(120deg, ${accents.violet}, ${accents.cyan}, ${accents.violet})`
+                  : 'transparent',
+                backgroundSize: '200% 200%',
+                animation: quickAddFocused && !reduceMotion ? 'toolbox-quickadd-flow 3.2s ease infinite' : 'none',
+                transition: `background ${motionTokens.normal}ms ${motionTokens.ease}`,
+                '@keyframes toolbox-quickadd-flow': {
+                  '0%, 100%': { backgroundPosition: '0% 50%' },
+                  '50%': { backgroundPosition: '100% 50%' },
+                },
               }}
             >
-              <TextField
-                size="small"
-                variant="standard"
-                sx={{ flex: 1, minWidth: 200, px: 1 }}
-                InputProps={{ disableUnderline: true, sx: { fontSize: 14 } }}
-                inputProps={{ 'aria-label': 'Describe a shared bill' }}
-                placeholder='"split 1200 dinner with raj and priya"'
-                value={quickAdd.text}
-                onChange={(e) => setQuickAdd(prev => ({ ...prev, text: e.target.value }))}
-                disabled={quickAdd.loading}
-                onKeyDown={(e) => { if (e.key === 'Enter') runQuickAdd(); }}
-              />
-              <Button
-                variant="contained"
-                size="small"
-                onClick={runQuickAdd}
-                disabled={quickAdd.loading || !quickAdd.text.trim()}
-                startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
-                sx={{ borderRadius: `${radius.pill}px`, px: 2 }}
+              <Box
+                sx={{
+                  display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap',
+                  p: 1, borderRadius: `${radius.lg}px`,
+                  border: '1px solid', borderColor: quickAddFocused ? 'transparent' : 'divider',
+                  bgcolor: 'background.paper',
+                }}
               >
-                {quickAdd.loading ? 'Splitting…' : 'Split'}
-              </Button>
-              <Button
-                size="small"
-                color="inherit"
-                onClick={() => setManualOpen(true)}
-                startIcon={<AddIcon sx={{ fontSize: 16 }} />}
-                sx={{ borderRadius: `${radius.pill}px`, color: 'text.secondary' }}
-              >
-                Exact
-              </Button>
+                <AutoAwesomeIcon
+                  sx={{
+                    fontSize: 17, ml: 0.5, color: quickAddFocused ? accents.violet : 'text.disabled',
+                    transition: `color ${motionTokens.normal}ms ${motionTokens.ease}`,
+                  }}
+                />
+                <Box sx={{ flex: 1, minWidth: 200, position: 'relative' }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    variant="standard"
+                    InputProps={{ disableUnderline: true, sx: { fontSize: 14 } }}
+                    inputProps={{ 'aria-label': 'Describe a shared bill' }}
+                    value={quickAdd.text}
+                    onChange={(e) => setQuickAdd(prev => ({ ...prev, text: e.target.value }))}
+                    onFocus={() => setQuickAddFocused(true)}
+                    onBlur={() => setQuickAddFocused(false)}
+                    disabled={quickAdd.loading}
+                    onKeyDown={(e) => { if (e.key === 'Enter') runQuickAdd(); }}
+                  />
+                  {/* A real placeholder can't crossfade between phrases, so an
+                      absolutely-positioned twin carries the animated examples
+                      and steps aside the instant there's real text or focus. */}
+                  {!quickAdd.text && !quickAddFocused && (
+                    <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                      <AnimatePresence mode="wait">
+                        <Box
+                          component={motion.span}
+                          key={quickAddPhrase}
+                          initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -6 }}
+                          transition={{ duration: motionTokens.normal / 1000, ease: EASE_SETTLE }}
+                          sx={{ fontSize: 14, color: 'text.disabled' }}
+                        >
+                          "{QUICK_ADD_EXAMPLES[quickAddPhrase]}"
+                        </Box>
+                      </AnimatePresence>
+                    </Box>
+                  )}
+                </Box>
+                <Button
+                  component={motion.button}
+                  whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+                  variant="contained"
+                  size="small"
+                  onClick={runQuickAdd}
+                  disabled={quickAdd.loading || !quickAdd.text.trim()}
+                  startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+                  sx={{
+                    borderRadius: `${radius.pill}px`, px: 2,
+                    background: `linear-gradient(135deg, ${accents.violet}, ${accents.blue})`,
+                    boxShadow: `0 2px 12px ${accents.violet}40`,
+                    '&:hover': { background: `linear-gradient(135deg, ${accents.violet}, ${accents.blue})`, boxShadow: `0 3px 16px ${accents.violet}55` },
+                    '&.Mui-disabled': { background: 'action.disabledBackground' },
+                  }}
+                >
+                  {quickAdd.loading ? 'Splitting…' : 'Split'}
+                </Button>
+                <Button
+                  component={motion.button}
+                  whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+                  size="small"
+                  color="inherit"
+                  onClick={() => setManualOpen(true)}
+                  startIcon={<AddIcon sx={{ fontSize: 16 }} />}
+                  sx={{ borderRadius: `${radius.pill}px`, color: 'text.secondary' }}
+                >
+                  Exact
+                </Button>
+              </Box>
             </Box>
             <ThinkingHint show={quickAdd.loading} label="Working out the shares…" />
           </Reveal>
@@ -992,29 +1088,34 @@ export default function SplitsPage() {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 You paid these but they aren't counted in your spending yet.
               </Typography>
-              {splitOnly.map((s) => (
+              {splitOnly.map((s, i) => (
                 <Box
+                  component={motion.div}
                   key={s.id}
+                  initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: motionTokens.normal / 1000, ease: EASE_SETTLE, delay: reduceMotion ? 0 : i * 0.05 }}
                   sx={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    gap: 2, flexWrap: 'wrap', py: 1,
+                    gap: 1.5, flexWrap: 'wrap', py: 1.1,
                     borderTop: '1px solid', borderColor: 'divider',
                   }}
                 >
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{s.description}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {s.personName} owes {money(s.amount)}{s.paidBy ? ` · paid by ${s.paidBy}` : ''}
-                    </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+                    <PersonAvatar name={s.personName} size={32} />
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{s.description}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {s.personName} owes {money(s.amount)}{s.paidBy ? ` · paid by ${s.paidBy}` : ''}
+                      </Typography>
+                    </Box>
                   </Box>
-                  <Button
-                    size="small"
-                    variant="outlined"
+                  <CountToggle
+                    counted={false}
+                    busy={countingId === s.expenseId}
                     onClick={() => addToExpenses(s.expenseId)}
-                    sx={{ borderRadius: `${radius.pill}px` }}
-                  >
-                    Count it as spending
-                  </Button>
+                    label={`Count ${s.description} as your spending`}
+                  />
                 </Box>
               ))}
             </Box>
@@ -1366,16 +1467,19 @@ export default function SplitsPage() {
                         sx={{ cursor: 'pointer' }}
                         onClick={() => openPerson(selected?.id === person.id ? null : person)}
                       >
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.3 }} noWrap>
-                            {person.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {person.net === 0
-                              ? 'all settled'
-                              : person.net > 0 ? 'owes you' : 'you owe them'}
-                            {person.unsettled ? ` · ${person.unsettled} ${person.unsettled === 1 ? 'bill' : 'bills'}` : ''}
-                          </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+                          <PersonAvatar name={person.name} size={36} />
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.3 }} noWrap>
+                              {person.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {person.net === 0
+                                ? 'all settled'
+                                : person.net > 0 ? 'owes you' : 'you owe them'}
+                              {person.unsettled ? ` · ${person.unsettled} ${person.unsettled === 1 ? 'bill' : 'bills'}` : ''}
+                            </Typography>
+                          </Box>
                         </Box>
                         <Box textAlign="right" sx={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography

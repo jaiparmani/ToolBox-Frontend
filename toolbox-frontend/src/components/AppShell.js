@@ -23,6 +23,7 @@ import DeleteSweepIcon from '@mui/icons-material/DeleteSweepRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import MoreHorizRoundedIcon from '@mui/icons-material/MoreHorizRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 
 import { authUtils } from './rest/authUtils';
 import { clearAllData } from './rest/userApis';
@@ -226,108 +227,231 @@ function AskButton({ compact }) {
   );
 }
 
-// Bottom nav destinations for mobile. The centre slot (index 2) is rendered
-// as an elevated FAB, not a flat action, so it is null in this array.
+// Home | Activity | [FAB] | Insights | More
 const BOTTOM_ITEMS = [
-  NAV.find((n) => n.seg === 'dashboard'),       // Home
-  NAV.find((n) => n.seg === 'expense-tracker'), // Activity
-  null,                                          // centre FAB placeholder
-  NAV.find((n) => n.seg === 'splits'),          // Shared
-  { seg: null, label: 'More', icon: MoreHorizRoundedIcon }, // opens drawer
+  NAV.find((n) => n.seg === 'dashboard'),
+  NAV.find((n) => n.seg === 'expense-tracker'),
+  null,
+  NAV.find((n) => n.seg === 'reports'),
+  { seg: null, label: 'More', icon: MoreHorizRoundedIcon },
 ];
+
+// Items surfaced in the "More" bottom sheet
+const MORE_ITEMS = [
+  NAV.find((n) => n.seg === 'story'),
+  NAV.find((n) => n.seg === 'recurring'),
+  NAV.find((n) => n.seg === 'splits'),
+  NAV.find((n) => n.seg === 'pulse'),
+];
+
+/** Compact bottom sheet for secondary nav destinations. */
+function MoreSheet({ open, onClose, onNavigate }) {
+  const { mode, toggleColorMode } = useColorMode();
+  const openAsk = () => { onClose(); window.dispatchEvent(new Event('toolbox:command-palette')); };
+  return (
+    <Drawer
+      anchor="bottom" open={open} onClose={onClose}
+      ModalProps={{ keepMounted: true }}
+      sx={{
+        display: { xs: 'block', md: 'none' },
+        '& .MuiDrawer-paper': {
+          borderRadius: '20px 20px 0 0', px: 2, pt: 2,
+          pb: 'calc(1.5rem + env(safe-area-inset-bottom))',
+          backgroundColor: (t) => t.palette.mode === 'dark' ? 'rgba(18,18,26,0.97)' : 'rgba(255,255,255,0.98)',
+          backdropFilter: 'blur(28px) saturate(1.5)',
+          WebkitBackdropFilter: 'blur(28px) saturate(1.5)',
+        },
+      }}
+    >
+      {/* Handle + close */}
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+        <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+          <Box sx={{ width: 36, height: 4, borderRadius: 2, bgcolor: 'divider' }} />
+        </Box>
+        <IconButton size="small" onClick={onClose} aria-label="Close" sx={{ position: 'absolute', right: 12 }}>
+          <CloseRoundedIcon fontSize="small" />
+        </IconButton>
+      </Box>
+
+      {/* Nav grid */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, mb: 1.5 }}>
+        {MORE_ITEMS.filter(Boolean).map((item) => {
+          const Icon = item.icon;
+          return (
+            <Box
+              key={item.seg}
+              component="button"
+              onClick={() => { onNavigate('/' + item.seg); onClose(); }}
+              aria-label={item.label}
+              sx={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75,
+                border: 'none', cursor: 'pointer', font: 'inherit', borderRadius: '14px',
+                background: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                py: 1.5, px: 1, color: 'text.secondary',
+                transition: 'background 150ms ease, color 150ms ease',
+                '&:active': { background: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.09)' },
+              }}
+            >
+              <Icon sx={{ fontSize: 22, color: item.tone }} />
+              <Typography sx={{ fontSize: '0.68rem', fontWeight: 500, lineHeight: 1, color: 'text.primary' }}>
+                {item.label}
+              </Typography>
+            </Box>
+          );
+        })}
+      </Box>
+
+      {/* Utility row */}
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box
+          component="button"
+          onClick={openAsk}
+          sx={{
+            flex: 1, display: 'flex', alignItems: 'center', gap: 1, py: 1.1, px: 1.5,
+            border: '1px solid', borderColor: 'divider', borderRadius: '12px',
+            background: 'transparent', cursor: 'pointer', font: 'inherit', color: 'text.secondary',
+            '&:active': { background: 'action.hover' },
+          }}
+        >
+          <AutoAwesomeRoundedIcon sx={{ fontSize: 18, color: accents.violet }} />
+          <Typography sx={{ fontSize: '0.82rem', fontWeight: 550 }}>Ask Money OS</Typography>
+        </Box>
+        <Box
+          component="button"
+          onClick={() => { toggleColorMode(); onClose(); }}
+          aria-label="Toggle theme"
+          sx={{
+            display: 'flex', alignItems: 'center', gap: 1, py: 1.1, px: 1.5,
+            border: '1px solid', borderColor: 'divider', borderRadius: '12px',
+            background: 'transparent', cursor: 'pointer', font: 'inherit', color: 'text.secondary',
+            '&:active': { background: 'action.hover' },
+          }}
+        >
+          {mode === 'dark' ? <LightModeIcon sx={{ fontSize: 18 }} /> : <DarkModeIcon sx={{ fontSize: 18 }} />}
+          <Typography sx={{ fontSize: '0.82rem', fontWeight: 550 }}>{mode === 'dark' ? 'Light' : 'Dark'}</Typography>
+        </Box>
+      </Box>
+    </Drawer>
+  );
+}
 
 /** Persistent bottom tab bar rendered on xs/sm only. */
 function BottomBar({ pathname, onNavigate, onOpenDrawer }) {
   const { projection, pulse } = useMoney();
   const weather = deriveWeather({ projection, pulse });
   const weatherColor = weather.color || accents.mint;
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const addExpense = () => window.dispatchEvent(new Event('toolbox:add-expense'));
 
   return (
-    <Box
-      component="nav"
-      aria-label="Mobile navigation"
-      sx={{
-        display: { xs: 'flex', md: 'none' },
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 10,
-        height: 56, alignItems: 'center',
-        backgroundColor: (t) =>
-          t.palette.mode === 'dark' ? 'rgba(16,16,22,0.97)' : 'rgba(255,255,255,0.97)',
-        backdropFilter: 'blur(20px) saturate(1.5)',
-        WebkitBackdropFilter: 'blur(20px) saturate(1.5)',
-        borderTop: '1px solid', borderColor: 'divider',
-      }}
-    >
-      {BOTTOM_ITEMS.map((item, i) => {
-        // ── Centre FAB ──
-        if (i === 2) {
-          return (
-            <Box key="add" sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-              <Box
-                component="button"
-                onClick={addExpense}
-                aria-label="Add expense"
-                sx={{
-                  width: 48, height: 48, borderRadius: '50%',
-                  background: accents.cyan,
-                  boxShadow: `0 4px 20px ${accents.cyan}66`,
-                  border: 'none', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#fff',
-                  transform: 'translateY(-8px)',
-                  transition: 'transform 160ms ease, box-shadow 160ms ease',
-                  '&:hover': {
+    <>
+      <Box
+        component="nav"
+        aria-label="Mobile navigation"
+        sx={{
+          display: { xs: 'flex', md: 'none' },
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 10,
+          height: 'calc(60px + env(safe-area-inset-bottom))',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          alignItems: 'stretch',
+          backgroundColor: (t) =>
+            t.palette.mode === 'dark' ? 'rgba(14,14,20,0.97)' : 'rgba(255,255,255,0.97)',
+          backdropFilter: 'blur(24px) saturate(1.6)',
+          WebkitBackdropFilter: 'blur(24px) saturate(1.6)',
+          borderTop: '1px solid', borderColor: 'divider',
+        }}
+      >
+        {BOTTOM_ITEMS.map((item, i) => {
+          // ── Centre FAB ──
+          if (i === 2) {
+            return (
+              <Box key="add" sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <Box
+                  component="button"
+                  onClick={addExpense}
+                  aria-label="Add expense"
+                  sx={{
+                    width: 46, height: 46, borderRadius: '50%',
+                    background: accents.cyan,
+                    border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff',
                     transform: 'translateY(-10px)',
-                    boxShadow: `0 6px 24px ${accents.cyan}88`,
-                  },
-                  '&:active': { transform: 'translateY(-6px)' },
-                }}
-              >
-                <AddRoundedIcon sx={{ fontSize: 26 }} />
+                    transition: 'transform 160ms ease',
+                    '&:active': { transform: 'translateY(-8px) scale(0.96)' },
+                  }}
+                >
+                  <AddRoundedIcon sx={{ fontSize: 24 }} />
+                </Box>
+                <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled', mt: '-6px', lineHeight: 1 }}>Add</Typography>
               </Box>
+            );
+          }
+
+          if (!item) return null;
+          const active = item.alias
+            ? item.alias.includes(segOf(pathname))
+            : item.seg === segOf(pathname);
+          const Icon = item.icon;
+          const handleClick = item.seg === null
+            ? () => setMoreOpen(true)
+            : () => onNavigate('/' + item.seg);
+
+          return (
+            <Box
+              key={item.label}
+              component="button"
+              onClick={handleClick}
+              aria-label={item.label}
+              aria-current={active ? 'page' : undefined}
+              sx={{
+                flex: 1, height: '100%', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: '3px',
+                border: 'none', background: 'transparent', cursor: 'pointer', font: 'inherit',
+                color: active ? weatherColor : 'text.secondary',
+                transition: 'color 200ms ease',
+                position: 'relative',
+              }}
+            >
+              {/* Active indicator pill at top of button */}
+              <AnimatePresence initial={false}>
+                {active && (
+                  <motion.div
+                    layoutId="bottom-indicator"
+                    initial={{ opacity: 0, scaleX: 0 }}
+                    animate={{ opacity: 1, scaleX: 1 }}
+                    exit={{ opacity: 0, scaleX: 0 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                    style={{
+                      position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+                      width: 24, height: 3, borderRadius: '0 0 3px 3px',
+                      backgroundColor: weatherColor,
+                    }}
+                  />
+                )}
+              </AnimatePresence>
+              <motion.div
+                animate={{ scale: active ? 1.1 : 1.0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                style={{ display: 'flex', alignItems: 'center' }}
+              >
+                <Icon sx={{ fontSize: 23 }} />
+              </motion.div>
+              <Typography sx={{ fontSize: '0.63rem', fontWeight: active ? 650 : 500, lineHeight: 1 }}>
+                {item.label}
+              </Typography>
             </Box>
           );
-        }
+        })}
+      </Box>
 
-        if (!item) return null;
-        const active = item.alias
-          ? item.alias.includes(segOf(pathname))
-          : item.seg === segOf(pathname);
-        const Icon = item.icon;
-        const handleClick = item.seg === null
-          ? onOpenDrawer
-          : () => onNavigate('/' + item.seg);
-
-        return (
-          <Box
-            key={item.label}
-            component="button"
-            onClick={handleClick}
-            aria-label={item.label}
-            aria-current={active ? 'page' : undefined}
-            sx={{
-              flex: 1, height: '100%', display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 0.25,
-              border: 'none', background: 'transparent', cursor: 'pointer', font: 'inherit',
-              color: active ? weatherColor : 'text.secondary',
-              transition: 'color 200ms ease',
-            }}
-          >
-            <motion.div
-              animate={{ scale: active ? 1.08 : 1.0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-              style={{ display: 'flex', alignItems: 'center' }}
-            >
-              <Icon sx={{ fontSize: 22 }} />
-            </motion.div>
-            <Typography sx={{ fontSize: '0.62rem', fontWeight: active ? 650 : 500, lineHeight: 1 }}>
-              {item.label}
-            </Typography>
-          </Box>
-        );
-      })}
-    </Box>
+      <MoreSheet
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        onNavigate={onNavigate}
+      />
+    </>
   );
 }
 
@@ -413,20 +537,19 @@ export default function AppShell() {
             <IconButton onClick={() => setDrawerOpen(true)} sx={{ display: { xs: 'inline-flex', md: 'none' } }} aria-label="Open navigation">
               <MenuRoundedIcon />
             </IconButton>
-            {/* Brand on mobile, page title on desktop */}
+            {/* Brand logo on mobile */}
             <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 1 }}>
               <BrandLogo size={26} />
             </Box>
-            {/* The page title animates in on route change — a quiet "you are here"
-                that reinforces spatial continuity as you move between sections. */}
-            <Box sx={{ display: { xs: 'none', md: 'block' }, position: 'relative', minWidth: 120, height: 24, overflow: 'hidden' }}>
+            {/* Page title — shown on both mobile and desktop */}
+            <Box sx={{ position: 'relative', minWidth: { xs: 80, md: 120 }, height: 24, overflow: 'hidden' }}>
               <Typography
                 key={pageTitle}
                 component={motion.div}
                 initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 14, filter: 'blur(4px)' }}
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 transition={{ duration: reduceMotion ? 0.15 : 0.34, ease: [0.32, 0.72, 0, 1] }}
-                sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: '1.15rem', letterSpacing: '-0.02em', lineHeight: '24px' }}
+                sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: { xs: '1rem', md: '1.15rem' }, letterSpacing: '-0.02em', lineHeight: '24px' }}
               >
                 {pageTitle}
               </Typography>
@@ -456,7 +579,7 @@ export default function AppShell() {
 
           {/* Routed content — the shell above/left persists; only this transitions
               per route (keyed), so navigation feels continuous, not a full reload. */}
-          <Box component="main" sx={{ flex: 1, px: { xs: 1.5, sm: 3 }, py: { xs: 2, sm: 3 }, pb: { xs: '72px', md: 3 } }}>
+          <Box component="main" sx={{ flex: 1, px: { xs: 1.5, sm: 3 }, py: { xs: 2, sm: 3 }, pb: { xs: 'calc(76px + env(safe-area-inset-bottom))', md: 3 } }}>
             <Box ref={sentinelRef} sx={{ height: '1px', mt: '-1px' }} aria-hidden />
             <Box sx={{ maxWidth: 1600, mx: 'auto', width: '100%' }}>
               <PageTransition key={location.pathname}>

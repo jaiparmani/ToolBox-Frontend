@@ -1,23 +1,16 @@
 /**
  * Pulse — a computational portrait of spending behaviour.
  *
- * This page is 100% spending. There is no income, balance, savings, debt,
- * net worth, cash flow or forecast anywhere in it or in what it renders —
- * every pixel traces back to amount, date, merchant, category, frequency,
- * recurrence, distribution, velocity, clusters or outliers.
- *
- * The field fills the viewport. Everything else is bezel: corner-anchored
- * instrument blocks rather than a page header or a row of cards.
- *
- *   top-left      identity + what lens you're looking through + the window
- *   top-right     the window's spending state (or whatever you're inspecting)
- *   right edge    LENS column — six ways of reading the same purchases
- *   bottom-left   SCALE ladder — how far back you stand
- *   bottom-centre control legend, retreats once you engage
+ * The field fills the viewport. Bezel instruments sit at the corners:
+ *   top-left      identity + active lens
+ *   top-right     live state readout (spending in window / focused item)
+ *   right edge    LENS column (desktop) / bottom pill bar (mobile)
+ *   bottom-left   SCALE ladder
+ *   bottom-centre touch prompt → minimal legend after engagement
  *   bottom-right  DATA & INTERPRETATION disclosure
  *
- * Chrome sits at low opacity and lifts on hover, so at rest the field is the
- * only loud thing on screen.
+ * Design principle: field = spectacle, chrome = clarity.
+ * Every bezel element uses frosted glass so it reads against any field state.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -33,14 +26,23 @@ import { moneySmart } from '../ui/money';
 import { accents } from '../../theme/tokens';
 
 const MONO = '"SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace';
-const FETCH_DAYS = 120;   // deep enough to feed the QUARTER scale
+const FETCH_DAYS = 120;
 
 const iso = (d) => d.toISOString().slice(0, 10);
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function prettyDate(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
-  return `${MONTHS[m - 1]} ${d}, ${y}`;
+  return `${MONTHS[m - 1]} ${d}`;
 }
+
+// Frosted glass panel — the shared base for every bezel block.
+const GLASS = {
+  background: 'rgba(4,5,10,0.70)',
+  backdropFilter: 'blur(16px) saturate(140%)',
+  WebkitBackdropFilter: 'blur(16px) saturate(140%)',
+  border: '1px solid rgba(100,210,255,0.10)',
+  borderRadius: '12px',
+};
 
 export default function CashFlowPulsePage() {
   const [expenses, setExpenses] = useState(null);
@@ -63,8 +65,6 @@ export default function CashFlowPulsePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Spending only — income rows are excluded before anything downstream ever
-  // sees them, so the field cannot accidentally absorb non-spending data.
   const transactions = useMemo(() => {
     if (!expenses) return [];
     return expenses
@@ -81,9 +81,6 @@ export default function CashFlowPulsePage() {
 
   const field = useMemo(() => buildSpendingField(transactions), [transactions]);
 
-  // The window the active SCALE is showing — drives the orientation readout.
-  // The dates reported are the window itself, not the extent of the data
-  // inside it, so the label always agrees with the space the field occupies.
   const windowInfo = useMemo(() => {
     if (!field) return null;
     const days = (SCALES.find(s => s.id === scale) || SCALES[1]).days;
@@ -97,7 +94,6 @@ export default function CashFlowPulsePage() {
       events: inWindow.length,
       spent: inWindow.reduce((a, e) => a + e.amount, 0),
       outliers: inWindow.filter(e => e.isOutlier).length,
-      // How much of the window actually contains recorded activity.
       covered: inWindow.length
         ? Math.min(field.maxDay - Math.min(...inWindow.map(e => e.dayNum)) + 1, days)
         : 0,
@@ -106,10 +102,8 @@ export default function CashFlowPulsePage() {
 
   const activeLens = LENSES.find(l => l.id === lens) || LENSES[0];
   const hasData = !!field;
-
   const engage = useCallback(() => setTouched(true), []);
 
-  // Keyboard: 1–6 pick a lens, [ and ] step the scale.
   useEffect(() => {
     if (!hasData) return;
     const onKey = (e) => {
@@ -146,12 +140,16 @@ export default function CashFlowPulsePage() {
             height="100%"
           />
 
-          {/* ── bezel ─────────────────────────────────────────────────── */}
-          <Identity lens={activeLens} windowInfo={windowInfo} scale={scale} />
+          {/* ── bezel ───────────────────────────────────────────────────── */}
+          <Identity lens={activeLens} scale={scale} />
           <StateBlock field={field} windowInfo={windowInfo} pull={pull} focus={focus} />
+
+          {/* Lens switcher: right column on desktop, pill bar on mobile */}
           <LensColumn value={lens} onChange={(v) => { setLens(v); setTouched(true); }} />
+          <LensPillBar value={lens} onChange={(v) => { setLens(v); setTouched(true); }} />
+
           <ScaleLadder value={scale} onChange={(v) => { setScale(v); setTouched(true); }} />
-          <Legend dim={touched} />
+          <BottomBar touched={touched} />
           <AboutTrigger onClick={() => setAboutOpen(true)} />
         </Box>
       ) : (
@@ -171,137 +169,154 @@ export default function CashFlowPulsePage() {
   );
 }
 
-/* ─── Bezel pieces ───────────────────────────────────────────────────────── */
+/* ─── Bezel: Identity (top-left) ────────────────────────────────────────── */
 
-// On phones the right edge belongs to the lens column, so the state block
-// tucks under the identity instead of fighting it for the top-right corner.
-const stateBlockPos = {
-  top: { xs: 152, sm: 20 },
-  right: { xs: 'auto', sm: 78 },
-  left: { xs: 12, sm: 'auto' },
-  textAlign: { xs: 'left', sm: 'right' },
-};
-
-const blockSx = {
-  position: 'absolute', pointerEvents: 'none',
-  opacity: 0.62, transition: 'opacity 420ms cubic-bezier(0.32,0.72,0,1)',
-  '&:hover': { opacity: 1 },
-};
-
-function Rule({ w = 26 }) {
-  return <Box sx={{ width: w, height: '1px', bgcolor: 'rgba(100,210,255,0.35)', my: 0.75 }} />;
-}
-
-function Identity({ lens, windowInfo, scale }) {
+function Identity({ lens, scale }) {
   return (
     <Box sx={{
-      ...blockSx, top: { xs: 12, sm: 20 }, left: { xs: 12, sm: 24 },
-      pointerEvents: 'auto', maxWidth: { xs: 230, sm: 340 },
+      position: 'absolute', top: { xs: 12, sm: 18 }, left: { xs: 12, sm: 20 },
+      pointerEvents: 'none', zIndex: 2,
     }}>
-      <Typography sx={{ fontFamily: MONO, fontSize: { xs: 7.5, sm: 9 }, letterSpacing: '0.42em', color: 'rgba(180,200,235,0.5)' }}>
-        MONEY OS
-      </Typography>
-      <Typography sx={{
-        fontSize: { xs: 20, sm: 30 }, fontWeight: 200, letterSpacing: '0.14em',
-        color: '#e8ecf5', lineHeight: 1.1, mt: 0.25,
-      }}>
-        PULSE
-      </Typography>
-      <Rule />
-      <Typography sx={{ fontFamily: MONO, fontSize: { xs: 9, sm: 11 }, letterSpacing: '0.2em', color: accents.cyan }}>
-        {lens.label.toUpperCase()} LENS · {scale}
-      </Typography>
-      <Typography sx={{
-        fontSize: 12, color: 'rgba(200,214,240,0.68)', mt: 0.4, letterSpacing: '0.01em',
-        display: { xs: 'none', sm: 'block' },
-      }}>
-        {lens.blurb}
-      </Typography>
-      {windowInfo && (
+      <Box sx={{ ...GLASS, px: { xs: 1.75, sm: 2 }, py: { xs: 1.25, sm: 1.5 }, maxWidth: { xs: 200, sm: 300 } }}>
+        {/* Brand line */}
         <Typography sx={{
-          fontFamily: MONO, fontSize: { xs: 8.5, sm: 10 }, color: 'rgba(180,200,235,0.45)',
-          mt: 0.9, letterSpacing: '0.08em',
+          fontFamily: MONO, fontSize: { xs: 7, sm: 8 }, letterSpacing: '0.44em',
+          color: 'rgba(180,200,235,0.45)', textTransform: 'uppercase', lineHeight: 1,
         }}>
-          {windowInfo.from} — {windowInfo.to}
-          <br />
-          {windowInfo.events} PURCHASE{windowInfo.events === 1 ? '' : 'S'}
-          {windowInfo.outliers > 0 && ` · ${windowInfo.outliers} UNUSUAL`}
-          {/* Say so when the window reaches back further than the data does,
-              rather than letting empty space read as missing purchases. */}
-          {windowInfo.events > 0 && windowInfo.covered < windowInfo.days && (
-            <>
-              <br />
-              <Box component="span" sx={{ color: 'rgba(180,200,235,0.32)', display: { xs: 'none', sm: 'inline' } }}>
-                RECORDED ACTIVITY SPANS {windowInfo.covered} OF {windowInfo.days} DAYS
-              </Box>
-            </>
-          )}
+          MONEY OS
         </Typography>
-      )}
+
+        {/* PULSE wordmark */}
+        <Typography sx={{
+          fontSize: { xs: 22, sm: 32 }, fontWeight: 200, letterSpacing: '0.16em',
+          color: '#e8ecf5', lineHeight: 1, mt: 0.4, mb: 1,
+        }}>
+          PULSE
+        </Typography>
+
+        {/* Active lens pill */}
+        <Box sx={{
+          display: 'inline-flex', alignItems: 'center', gap: 0.75,
+          bgcolor: `${accents.cyan}18`, border: `1px solid ${accents.cyan}40`,
+          borderRadius: '6px', px: 1, py: 0.4,
+        }}>
+          <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: accents.cyan, boxShadow: `0 0 6px ${accents.cyan}` }} />
+          <Typography sx={{
+            fontFamily: MONO, fontSize: { xs: 8, sm: 9 }, letterSpacing: '0.22em',
+            color: accents.cyan, textTransform: 'uppercase', lineHeight: 1,
+          }}>
+            {lens.label}
+          </Typography>
+          <Typography sx={{
+            fontFamily: MONO, fontSize: { xs: 7.5, sm: 8.5 }, letterSpacing: '0.18em',
+            color: 'rgba(100,210,255,0.5)', lineHeight: 1,
+          }}>
+            · {scale}
+          </Typography>
+        </Box>
+
+        {/* Lens blurb — human-readable in sans-serif */}
+        <Typography sx={{
+          fontSize: { xs: 11, sm: 12 }, color: 'rgba(200,218,245,0.65)',
+          mt: 0.9, lineHeight: 1.45, letterSpacing: '0.01em',
+          display: { xs: 'none', sm: 'block' },
+        }}>
+          {lens.blurb}
+        </Typography>
+      </Box>
     </Box>
   );
 }
 
+/* ─── Bezel: State readout (top-right on desktop, below identity on mobile) ── */
+
+// On narrow phones the state block tucks below the identity.
+const STATE_POS = {
+  top: { xs: 130, sm: 18 },
+  right: { xs: 'auto', sm: 20 },
+  left: { xs: 12, sm: 'auto' },
+};
+
 function StateBlock({ field, windowInfo, pull, focus }) {
-  // The block yields to whatever the user is currently interrogating.
+  let label, amount, sub, subColor;
+
   if (pull) {
-    return (
-      <Box sx={{ ...blockSx, ...stateBlockPos, opacity: 1 }}>
-        <Typography sx={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.3em', color: accents.cyan }}>
-          SPENT HERE SO FAR
-        </Typography>
-        <Typography sx={{ fontSize: { xs: 21, sm: 30 }, fontWeight: 250, color: '#eef2fa', fontVariantNumeric: 'tabular-nums', lineHeight: 1.15 }}>
-          {moneySmart(pull.spent)}
-        </Typography>
-        <Typography sx={{ fontFamily: MONO, fontSize: 10, color: 'rgba(180,200,235,0.65)', letterSpacing: '0.08em' }}>
-          {pull.label.toUpperCase()} · {pull.shown}/{pull.visits} VISITS · SINCE {pull.since}
-        </Typography>
-      </Box>
-    );
+    label = 'SPENT HERE SO FAR';
+    amount = moneySmart(pull.spent);
+    sub = `${pull.label.toUpperCase()} · ${pull.shown}/${pull.visits} VISITS · SINCE ${pull.since}`;
+  } else if (focus) {
+    label = focus.category.toUpperCase();
+    amount = moneySmart(focus.amount);
+    sub = focus.isOutlier
+      ? `${focus.ratioToTypical.toFixed(1)}× USUAL · ${focus.date}`
+      : focus.isHabit ? `HABIT · ${focus.visits}× · ${focus.date}` : focus.date;
+    subColor = focus.isOutlier ? accents.amber : undefined;
+  } else if (windowInfo) {
+    label = 'SPENT IN WINDOW';
+    amount = moneySmart(windowInfo.spent);
+    sub = `${windowInfo.events} PURCHASE${windowInfo.events === 1 ? '' : 'S'} · ${windowInfo.from} – ${windowInfo.to}`;
+  } else {
+    return null;
   }
-  if (focus) {
-    return (
-      <Box sx={{ ...blockSx, ...stateBlockPos, opacity: 1 }}>
-        <Typography sx={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.3em', color: 'rgba(180,200,235,0.55)' }}>
-          {focus.category.toUpperCase()}
-        </Typography>
-        <Typography sx={{ fontSize: { xs: 21, sm: 30 }, fontWeight: 250, color: '#eef2fa', fontVariantNumeric: 'tabular-nums', lineHeight: 1.15 }}>
-          {moneySmart(focus.amount)}
-        </Typography>
-        <Typography sx={{ fontFamily: MONO, fontSize: 10, color: focus.isOutlier ? accents.amber : 'rgba(180,200,235,0.6)', letterSpacing: '0.08em' }}>
-          {focus.isOutlier
-            ? `${focus.ratioToTypical.toFixed(1)}× USUAL · ${focus.date}`
-            : focus.isHabit ? `HABIT · ${focus.visits}× · ${focus.date}` : focus.date}
-        </Typography>
-      </Box>
-    );
-  }
-  if (!windowInfo) return null;
+
   return (
-    <Box sx={{ ...blockSx, ...stateBlockPos }}>
-      <Typography sx={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.3em', color: 'rgba(180,200,235,0.5)' }}>
-        SPENT IN WINDOW
-      </Typography>
-      <Typography sx={{
-        fontSize: { xs: 21, sm: 30 }, fontWeight: 250, lineHeight: 1.15, fontVariantNumeric: 'tabular-nums',
-        color: '#eef2fa',
+    <Box sx={{
+      position: 'absolute', ...STATE_POS, zIndex: 2,
+      transition: 'opacity 400ms ease',
+    }}>
+      <Box sx={{
+        ...GLASS, px: { xs: 1.75, sm: 2 }, py: { xs: 1.25, sm: 1.5 },
+        textAlign: { xs: 'left', sm: 'right' },
+        minWidth: { xs: 160, sm: 180 },
+        border: pull || focus
+          ? `1px solid ${accents.cyan}30`
+          : '1px solid rgba(100,210,255,0.10)',
       }}>
-        {moneySmart(windowInfo.spent)}
-      </Typography>
-      <Typography sx={{ fontFamily: MONO, fontSize: 10, color: 'rgba(180,200,235,0.5)', letterSpacing: '0.08em' }}>
-        {windowInfo.events} PURCHASE{windowInfo.events === 1 ? '' : 'S'}
-      </Typography>
-      {field?.signature && (
         <Typography sx={{
-          fontFamily: MONO, fontSize: { xs: 8, sm: 9 }, color: 'rgba(120,200,240,0.55)',
-          letterSpacing: '0.12em', mt: 0.6, display: { xs: 'none', sm: 'block' },
+          fontFamily: MONO, fontSize: { xs: 7.5, sm: 8.5 }, letterSpacing: '0.32em',
+          color: 'rgba(180,200,235,0.5)', textTransform: 'uppercase', lineHeight: 1, mb: 0.6,
         }}>
-          {field.signature.join(' · ')}
+          {label}
         </Typography>
-      )}
+
+        {/* The hero number — big, glowing, readable */}
+        <Typography sx={{
+          fontSize: { xs: 26, sm: 38 }, fontWeight: 250, lineHeight: 1,
+          fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em',
+          color: '#eef2fa',
+          textShadow: `0 0 32px ${accents.cyan}55`,
+        }}>
+          {amount}
+        </Typography>
+
+        <Typography sx={{
+          fontFamily: MONO, fontSize: { xs: 8, sm: 9 }, letterSpacing: '0.12em',
+          color: subColor || 'rgba(180,200,235,0.5)', mt: 0.7, lineHeight: 1.4,
+          textTransform: 'uppercase',
+        }}>
+          {sub}
+        </Typography>
+
+        {/* Signature tags — desktop only */}
+        {!pull && !focus && field?.signature && (
+          <Box sx={{ mt: 0.8, display: { xs: 'none', sm: 'flex' }, flexWrap: 'wrap', gap: 0.5, justifyContent: 'flex-end' }}>
+            {field.signature.slice(0, 3).map((tag) => (
+              <Box key={tag} sx={{
+                fontFamily: MONO, fontSize: 7.5, letterSpacing: '0.18em', color: `${accents.cyan}99`,
+                border: `1px solid ${accents.cyan}22`, borderRadius: '4px', px: 0.75, py: 0.25,
+                textTransform: 'uppercase',
+              }}>
+                {tag}
+              </Box>
+            ))}
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 }
+
+/* ─── Bezel: Lens column (desktop only, right edge) ─────────────────────── */
 
 function LensColumn({ value, onChange }) {
   return (
@@ -309,9 +324,9 @@ function LensColumn({ value, onChange }) {
       role="radiogroup"
       aria-label="Field lens"
       sx={{
-        position: 'absolute', right: { xs: 8, sm: 18 }, top: '50%', transform: 'translateY(-50%)',
-        display: 'flex', flexDirection: 'column', gap: { xs: 1.1, sm: 1.5 }, alignItems: 'flex-end',
-        opacity: 0.75, transition: 'opacity 420ms', '&:hover': { opacity: 1 },
+        position: 'absolute', right: { xs: 8, sm: 16 }, top: '50%', transform: 'translateY(-50%)',
+        display: { xs: 'none', sm: 'flex' }, flexDirection: 'column', gap: 1.25,
+        alignItems: 'flex-end', zIndex: 2,
       }}
     >
       {LENSES.map((l, i) => {
@@ -327,39 +342,30 @@ function LensColumn({ value, onChange }) {
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange(l.id); } }}
             sx={{
               display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer',
-              minHeight: { xs: 30, sm: 0 }, px: { xs: 0.75, sm: 0 },
-              outline: 'none', '&:focus-visible': { boxShadow: `0 0 0 1px ${accents.cyan}`, borderRadius: 0.5 },
-              '&:hover .lensLabel': { opacity: 1 },
-              '&:hover .lensTick': { width: 26, opacity: 1 },
+              outline: 'none', px: 1, py: 0.5, borderRadius: '6px',
+              transition: 'background 200ms ease',
+              '&:focus-visible': { outline: `1px solid ${accents.cyan}`, outlineOffset: 2 },
+              '&:hover': { background: 'rgba(100,210,255,0.07)' },
             }}
           >
-            <Typography
-              className="lensLabel"
-              sx={{
-                fontFamily: MONO, fontSize: { xs: 8, sm: 9.5 }, letterSpacing: '0.26em',
-                color: on ? accents.cyan : 'rgba(180,200,235,0.6)',
-                opacity: on ? 1 : 0.55, transition: 'opacity 240ms, color 240ms',
-                textTransform: 'uppercase', userSelect: 'none',
-                // Narrow screens keep only the active label; the rest are ticks.
-                display: { xs: on ? 'block' : 'none', sm: 'block' },
-              }}
-            >
+            <Typography sx={{
+              fontFamily: MONO, fontSize: 9, letterSpacing: '0.24em',
+              color: on ? accents.cyan : 'rgba(180,200,235,0.45)',
+              transition: 'color 200ms', textTransform: 'uppercase', userSelect: 'none',
+              opacity: on ? 1 : 0.7,
+            }}>
               {l.label}
             </Typography>
-            <Box
-              className="lensTick"
-              sx={{
-                width: on ? 30 : 12, height: on ? 2 : 1,
-                bgcolor: on ? accents.cyan : 'rgba(180,200,235,0.45)',
-                boxShadow: on ? `0 0 10px ${accents.cyan}` : 'none',
-                opacity: on ? 1 : 0.6,
-                transition: 'width 320ms cubic-bezier(0.32,0.72,0,1), background-color 240ms, opacity 240ms',
-              }}
-            />
+            <Box sx={{
+              width: on ? 28 : 10, height: on ? 2 : 1,
+              bgcolor: on ? accents.cyan : 'rgba(180,200,235,0.3)',
+              boxShadow: on ? `0 0 8px ${accents.cyan}` : 'none',
+              transition: 'width 280ms cubic-bezier(0.32,0.72,0,1), background-color 200ms',
+              flexShrink: 0,
+            }} />
             <Typography sx={{
-              fontFamily: MONO, fontSize: 8, color: 'rgba(180,200,235,0.3)',
+              fontFamily: MONO, fontSize: 7.5, color: 'rgba(180,200,235,0.25)',
               width: 8, textAlign: 'right', userSelect: 'none',
-              display: { xs: 'none', sm: 'block' },
             }}>
               {i + 1}
             </Typography>
@@ -370,20 +376,80 @@ function LensColumn({ value, onChange }) {
   );
 }
 
+/* ─── Bezel: Lens pill bar (mobile only, bottom) ────────────────────────── */
+
+function LensPillBar({ value, onChange }) {
+  return (
+    <Box
+      role="radiogroup"
+      aria-label="Field lens"
+      sx={{
+        position: 'absolute',
+        bottom: { xs: 60, sm: 'auto' },
+        left: 0, right: 0,
+        display: { xs: 'flex', sm: 'none' },
+        justifyContent: 'center',
+        gap: 0.75, px: 1.5, zIndex: 2,
+        overflowX: 'auto',
+        '&::-webkit-scrollbar': { display: 'none' },
+      }}
+    >
+      {LENSES.map((l) => {
+        const on = l.id === value;
+        return (
+          <Box
+            key={l.id}
+            role="radio"
+            aria-checked={on}
+            aria-label={`${l.label} lens`}
+            tabIndex={0}
+            onClick={() => onChange(l.id)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange(l.id); } }}
+            sx={{
+              flexShrink: 0,
+              px: 1.25, py: 0.75,
+              borderRadius: '20px',
+              border: `1px solid ${on ? accents.cyan : 'rgba(100,210,255,0.18)'}`,
+              background: on ? `${accents.cyan}20` : 'rgba(4,5,10,0.65)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              cursor: 'pointer',
+              transition: 'background 200ms ease, border-color 200ms ease',
+              outline: 'none',
+              '&:focus-visible': { outline: `1px solid ${accents.cyan}`, outlineOffset: 2 },
+              minHeight: 34, display: 'flex', alignItems: 'center',
+            }}
+          >
+            <Typography sx={{
+              fontFamily: MONO, fontSize: 8.5, letterSpacing: '0.2em',
+              color: on ? accents.cyan : 'rgba(180,200,235,0.55)',
+              textTransform: 'uppercase', userSelect: 'none',
+              transition: 'color 200ms',
+            }}>
+              {l.label}
+            </Typography>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+/* ─── Bezel: Scale ladder (bottom-left) ─────────────────────────────────── */
+
 function ScaleLadder({ value, onChange }) {
   return (
     <Box
       role="radiogroup"
       aria-label="Time scale"
       sx={{
-        position: 'absolute', left: { xs: 10, sm: 24 }, bottom: { xs: 14, sm: 22 },
-        display: 'flex', alignItems: 'flex-end', gap: { xs: 0.9, sm: 1.25 },
-        opacity: 0.75, transition: 'opacity 420ms', '&:hover': { opacity: 1 },
+        position: 'absolute', left: { xs: 10, sm: 20 }, bottom: { xs: 14, sm: 20 },
+        display: 'flex', alignItems: 'flex-end', gap: { xs: 0.75, sm: 1 }, zIndex: 2,
       }}
     >
       <Typography sx={{
-        fontFamily: MONO, fontSize: 9, letterSpacing: '0.3em',
-        color: 'rgba(180,200,235,0.4)', mr: 0.5, pb: 0.25,
+        fontFamily: MONO, fontSize: 8, letterSpacing: '0.3em',
+        color: 'rgba(180,200,235,0.35)', mr: 0.5, pb: 0.5,
         display: { xs: 'none', sm: 'block' },
       }}>
         SCALE
@@ -402,25 +468,24 @@ function ScaleLadder({ value, onChange }) {
             sx={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5,
               cursor: 'pointer', outline: 'none',
-              minWidth: { xs: 40, sm: 0 }, py: { xs: 0.75, sm: 0 },
-              '&:focus-visible': { boxShadow: `0 0 0 1px ${accents.cyan}`, borderRadius: 0.5 },
-              '&:hover .scaleLabel': { opacity: 1 },
+              minWidth: { xs: 38, sm: 32 }, minHeight: { xs: 44, sm: 0 },
+              justifyContent: 'flex-end',
+              '&:focus-visible': { outline: `1px solid ${accents.cyan}`, borderRadius: '4px' },
             }}
           >
-            <Typography className="scaleLabel" sx={{
-              fontFamily: MONO, fontSize: { xs: 8, sm: 9 }, letterSpacing: '0.2em',
-              color: on ? accents.cyan : 'rgba(180,200,235,0.6)',
-              opacity: on ? 1 : 0.5, transition: 'opacity 240ms, color 240ms',
-              textTransform: 'uppercase', userSelect: 'none',
+            <Typography sx={{
+              fontFamily: MONO, fontSize: { xs: 8.5, sm: 9 }, letterSpacing: '0.18em',
+              color: on ? accents.cyan : 'rgba(180,200,235,0.5)',
+              transition: 'color 200ms', textTransform: 'uppercase', userSelect: 'none',
             }}>
               {s.label}
             </Typography>
-            {/* Notch height encodes how far back this step stands */}
+            {/* Notch height encodes how far back this scale stands */}
             <Box sx={{
               width: on ? 2 : 1, height: 8 + i * 5,
-              bgcolor: on ? accents.cyan : 'rgba(180,200,235,0.35)',
+              bgcolor: on ? accents.cyan : 'rgba(180,200,235,0.3)',
               boxShadow: on ? `0 0 8px ${accents.cyan}` : 'none',
-              transition: 'background-color 240ms, width 240ms',
+              transition: 'background-color 200ms, width 200ms',
             }} />
           </Box>
         );
@@ -429,69 +494,93 @@ function ScaleLadder({ value, onChange }) {
   );
 }
 
-function Legend({ dim }) {
-  const common = {
-    fontFamily: MONO, letterSpacing: '0.3em',
-    color: 'rgba(180,200,235,0.9)', textTransform: 'uppercase', textAlign: 'center',
-  };
+/* ─── Bezel: Bottom bar (touch prompt → legend after engagement) ─────────── */
+
+function BottomBar({ touched }) {
   return (
     <Box sx={{
-      position: 'absolute', bottom: { xs: 76, sm: 24 }, left: 0, right: 0,
-      display: 'flex', justifyContent: 'center', pointerEvents: 'none', px: 2,
-      opacity: dim ? 0.18 : 0.5,
-      transition: 'opacity 900ms cubic-bezier(0.32,0.72,0,1)',
+      position: 'absolute', bottom: { xs: 104, sm: 22 }, left: 0, right: 0,
+      display: 'flex', justifyContent: 'center', pointerEvents: 'none', px: 2, zIndex: 2,
     }}>
-      {/* The full legend only fits a wide viewport; phones get the essentials. */}
-      <Typography sx={{ ...common, fontSize: 9, display: { xs: 'none', md: 'block' } }}>
-        drag · orbit &nbsp;|&nbsp; scroll · dolly &nbsp;|&nbsp; move · attract &nbsp;|&nbsp; drag a habit · unfurl history &nbsp;|&nbsp; 1–6 lens &nbsp;|&nbsp; [ ] scale
-      </Typography>
-      <Typography sx={{ ...common, fontSize: 8.5, display: { xs: 'none', sm: 'block', md: 'none' } }}>
-        drag · orbit &nbsp;|&nbsp; scroll · dolly &nbsp;|&nbsp; drag a habit · unfurl
-      </Typography>
-      <Typography sx={{ ...common, fontSize: 7.5, letterSpacing: '0.22em', display: { xs: 'block', sm: 'none' } }}>
-        drag · orbit &nbsp;|&nbsp; pinch · dolly
+      {/* Touch prompt — visible before engagement, fades out */}
+      <Box sx={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        display: 'flex', justifyContent: 'center',
+        opacity: touched ? 0 : 1,
+        transition: 'opacity 800ms cubic-bezier(0.32,0.72,0,1)',
+        pointerEvents: 'none',
+      }}>
+        <Box sx={{
+          ...GLASS, px: 2, py: 1.25,
+          display: 'flex', alignItems: 'center', gap: 1.25,
+        }}>
+          {/* Pulsing dot */}
+          <Box sx={{
+            width: 6, height: 6, borderRadius: '50%', bgcolor: accents.cyan, flexShrink: 0,
+            boxShadow: `0 0 10px ${accents.cyan}`,
+            '@keyframes pulse': {
+              '0%,100%': { opacity: 1, transform: 'scale(1)' },
+              '50%': { opacity: 0.4, transform: 'scale(0.7)' },
+            },
+            animation: 'pulse 2s ease-in-out infinite',
+          }} />
+          <Typography sx={{
+            fontFamily: MONO, fontSize: { xs: 8.5, sm: 10 }, letterSpacing: '0.28em',
+            color: 'rgba(200,218,245,0.75)', textTransform: 'uppercase',
+          }}>
+            Drag to orbit · Scroll to zoom · Tap a habit to explore
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Minimal legend — appears after engagement */}
+      <Typography sx={{
+        fontFamily: MONO, fontSize: 9, letterSpacing: '0.26em',
+        color: 'rgba(180,200,235,0.9)', textTransform: 'uppercase', textAlign: 'center',
+        opacity: touched ? 0.2 : 0,
+        transition: 'opacity 900ms cubic-bezier(0.32,0.72,0,1)',
+        display: { xs: 'none', md: 'block' },
+        pointerEvents: 'none',
+      }}>
+        drag · orbit &nbsp;|&nbsp; scroll · zoom &nbsp;|&nbsp; tap a habit · unfurl &nbsp;|&nbsp; 1–6 lens &nbsp;|&nbsp; [ ] scale
       </Typography>
     </Box>
   );
 }
+
+/* ─── Bezel: About trigger (bottom-right) ────────────────────────────────── */
 
 function AboutTrigger({ onClick }) {
   return (
     <Box
       component="button"
       onClick={onClick}
-      aria-label="About this visualization — data and interpretation"
+      aria-label="About Pulse — data and interpretation"
       sx={{
-        position: 'absolute', right: { xs: 10, sm: 22 }, bottom: { xs: 14, sm: 22 },
-        display: 'flex', alignItems: 'center', gap: 0.9,
-        minHeight: { xs: 34, sm: 0 },
-        background: 'none', border: 'none', p: 0.5, cursor: 'pointer',
-        opacity: 0.55, transition: 'opacity 300ms',
+        position: 'absolute', right: { xs: 10, sm: 20 }, bottom: { xs: 14, sm: 20 },
+        display: 'flex', alignItems: 'center', gap: 0.75,
+        minHeight: { xs: 36, sm: 0 }, minWidth: { xs: 36, sm: 0 },
+        background: 'none', border: 'none', p: 0.75, cursor: 'pointer',
+        opacity: 0.5, transition: 'opacity 250ms',
+        zIndex: 2,
         '&:hover': { opacity: 1 },
-        '&:focus-visible': { opacity: 1, outline: `1px solid ${accents.cyan}`, outlineOffset: 3 },
+        '&:focus-visible': { opacity: 1, outline: `1px solid ${accents.cyan}`, outlineOffset: 3, borderRadius: '4px' },
       }}
     >
       <Box sx={{
-        width: 15, height: 15, borderRadius: '50%',
-        border: '1px solid rgba(180,200,235,0.7)',
+        width: 16, height: 16, borderRadius: '50%',
+        border: '1px solid rgba(180,200,235,0.6)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: MONO, fontSize: 9.5, color: 'rgba(200,215,240,0.9)', lineHeight: 1,
+        fontFamily: MONO, fontSize: 9.5, color: 'rgba(200,215,240,0.85)', lineHeight: 1, flexShrink: 0,
       }}>
         i
       </Box>
       <Typography sx={{
-        fontFamily: MONO, fontSize: 9, letterSpacing: '0.28em',
-        color: 'rgba(180,200,235,0.9)', textTransform: 'uppercase',
+        fontFamily: MONO, fontSize: 8.5, letterSpacing: '0.28em',
+        color: 'rgba(180,200,235,0.85)', textTransform: 'uppercase',
         display: { xs: 'none', sm: 'block' },
       }}>
         Data &amp; Interpretation
-      </Typography>
-      <Typography sx={{
-        fontFamily: MONO, fontSize: 8, letterSpacing: '0.24em',
-        color: 'rgba(180,200,235,0.9)', textTransform: 'uppercase',
-        display: { xs: 'block', sm: 'none' },
-      }}>
-        Data
       </Typography>
     </Box>
   );
@@ -537,8 +626,9 @@ function AboutOverlay({ onClose }) {
       sx={{
         position: 'absolute', inset: 0, zIndex: 20,
         display: 'flex', alignItems: 'center', justifyContent: 'center', p: { xs: 2, sm: 4 },
-        bgcolor: 'rgba(3,4,9,0.78)', backdropFilter: 'blur(18px) saturate(140%)',
-        animation: 'fadeIn 260ms cubic-bezier(0.32,0.72,0,1)',
+        bgcolor: 'rgba(3,4,9,0.82)', backdropFilter: 'blur(20px) saturate(140%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(140%)',
+        animation: 'fadeIn 240ms cubic-bezier(0.32,0.72,0,1)',
         '@keyframes fadeIn': { from: { opacity: 0 }, to: { opacity: 1 } },
       }}
     >
@@ -551,35 +641,31 @@ function AboutOverlay({ onClose }) {
           position: 'relative', width: '100%', maxWidth: 660,
           maxHeight: '82vh', overflowY: 'auto',
           px: { xs: 3, sm: 5 }, py: { xs: 3.5, sm: 4.5 },
-          bgcolor: 'rgba(7,9,17,0.92)',
-          border: '1px solid rgba(100,210,255,0.16)',
+          bgcolor: 'rgba(6,8,16,0.94)',
+          border: `1px solid rgba(100,210,255,0.14)`,
+          borderRadius: '16px',
           boxShadow: '0 40px 120px rgba(0,0,0,0.7)',
         }}
       >
-        {/* corner brackets — the overlay wears the same bezel language */}
+        {/* Corner brackets */}
         {[
-          { top: 10, left: 10, bt: 1, bl: 1 },
-          { top: 10, right: 10, bt: 1, br: 1 },
-          { bottom: 10, left: 10, bb: 1, bl: 1 },
-          { bottom: 10, right: 10, bb: 1, br: 1 },
+          { top: 12, left: 12, borderTop: `1px solid ${accents.cyan}`, borderLeft: `1px solid ${accents.cyan}` },
+          { top: 12, right: 12, borderTop: `1px solid ${accents.cyan}`, borderRight: `1px solid ${accents.cyan}` },
+          { bottom: 12, left: 12, borderBottom: `1px solid ${accents.cyan}`, borderLeft: `1px solid ${accents.cyan}` },
+          { bottom: 12, right: 12, borderBottom: `1px solid ${accents.cyan}`, borderRight: `1px solid ${accents.cyan}` },
         ].map((p, i) => (
           <Box key={i} sx={{
             position: 'absolute', width: 14, height: 14, pointerEvents: 'none',
-            top: p.top, left: p.left, right: p.right, bottom: p.bottom,
-            borderTop: p.bt ? `1px solid ${accents.cyan}` : 'none',
-            borderBottom: p.bb ? `1px solid ${accents.cyan}` : 'none',
-            borderLeft: p.bl ? `1px solid ${accents.cyan}` : 'none',
-            borderRight: p.br ? `1px solid ${accents.cyan}` : 'none',
-            opacity: 0.5,
+            opacity: 0.45, ...p,
           }} />
         ))}
 
-        <Typography sx={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.42em', color: accents.cyan, opacity: 0.85 }}>
+        <Typography sx={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: '0.44em', color: `${accents.cyan}cc` }}>
           MONEY OS · PULSE
         </Typography>
         <Typography
           id="pulse-about-title"
-          sx={{ fontSize: 23, fontWeight: 250, letterSpacing: '0.02em', color: '#eef2fa', mt: 0.75, mb: 2.5 }}
+          sx={{ fontSize: 24, fontWeight: 250, letterSpacing: '0.02em', color: '#eef2fa', mt: 0.75, mb: 3 }}
         >
           Data &amp; Interpretation
         </Typography>
@@ -587,23 +673,23 @@ function AboutOverlay({ onClose }) {
         {DISCLOSURE.map(({ k, v }) => (
           <Box key={k} sx={{ mb: 2.75 }}>
             <Typography sx={{
-              fontFamily: MONO, fontSize: 9.5, letterSpacing: '0.26em',
-              color: 'rgba(140,200,240,0.85)', mb: 0.9,
+              fontFamily: MONO, fontSize: 9, letterSpacing: '0.26em',
+              color: `${accents.cyan}cc`, mb: 0.9, textTransform: 'uppercase',
             }}>
               {k}
             </Typography>
             <Typography sx={{
-              fontSize: 13.5, lineHeight: 1.72, color: 'rgba(214,224,244,0.86)', letterSpacing: '0.005em',
+              fontSize: 13.5, lineHeight: 1.72, color: 'rgba(214,224,244,0.82)', letterSpacing: '0.005em',
             }}>
               {v}
             </Typography>
           </Box>
         ))}
 
-        <Box sx={{ height: '1px', bgcolor: 'rgba(100,210,255,0.14)', my: 2.5 }} />
+        <Box sx={{ height: '1px', bgcolor: `${accents.cyan}20`, my: 2.5 }} />
 
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
-          <Typography sx={{ fontFamily: MONO, fontSize: 9.5, color: 'rgba(180,200,235,0.42)', letterSpacing: '0.14em' }}>
+          <Typography sx={{ fontFamily: MONO, fontSize: 9, color: 'rgba(180,200,235,0.38)', letterSpacing: '0.14em' }}>
             DESCRIPTIVE ANALYTICS · NOT ADVICE
           </Typography>
           <Box
@@ -611,11 +697,12 @@ function AboutOverlay({ onClose }) {
             ref={closeRef}
             onClick={onClose}
             sx={{
-              fontFamily: MONO, fontSize: 10, letterSpacing: '0.26em', textTransform: 'uppercase',
+              fontFamily: MONO, fontSize: 9.5, letterSpacing: '0.26em', textTransform: 'uppercase',
               color: accents.cyan, bgcolor: 'transparent',
-              border: '1px solid rgba(100,210,255,0.35)', px: 2.5, py: 1, cursor: 'pointer',
-              transition: 'background-color 240ms, border-color 240ms',
-              '&:hover': { bgcolor: 'rgba(100,210,255,0.10)', borderColor: accents.cyan },
+              border: `1px solid ${accents.cyan}44`, px: 2.5, py: 1, cursor: 'pointer',
+              borderRadius: '6px',
+              transition: 'background-color 200ms, border-color 200ms',
+              '&:hover': { bgcolor: `${accents.cyan}14`, borderColor: accents.cyan },
               '&:focus-visible': { outline: `1px solid ${accents.cyan}`, outlineOffset: 3 },
             }}
           >
@@ -627,12 +714,11 @@ function AboutOverlay({ onClose }) {
   );
 }
 
-/* ─── Boot ───────────────────────────────────────────────────────────────── */
+/* ─── Boot (loading state) ───────────────────────────────────────────────── */
 
 function Boot() {
   const shouldReduceMotion = useReducedMotion();
 
-  // ── Typewriter ──────────────────────────────────────────────────────────
   const FULL_TEXT = 'READING PURCHASE HISTORY';
   const [displayed, setDisplayed] = useState('');
   const [cursorVisible, setCursorVisible] = useState(true);
@@ -643,29 +729,23 @@ function Boot() {
     const id = setInterval(() => {
       i += 1;
       setDisplayed(FULL_TEXT.slice(0, i));
-      if (i >= FULL_TEXT.length) {
-        clearInterval(id);
-        setTypingDone(true);
-      }
+      if (i >= FULL_TEXT.length) { clearInterval(id); setTypingDone(true); }
     }, 35);
     return () => clearInterval(id);
   }, []);
 
-  // Blinking cursor — stops once typing is done.
   useEffect(() => {
     if (typingDone) { setCursorVisible(false); return; }
     const id = setInterval(() => setCursorVisible(v => !v), 530);
     return () => clearInterval(id);
   }, [typingDone]);
 
-  // ── Particle field ──────────────────────────────────────────────────────
-  // Positions are seeded once on mount and never recalculated.
   const particles = useMemo(() =>
     Array.from({ length: 35 }, (_, idx) => ({
       id: idx,
       x: Math.random() * 100,
       y: Math.random() * 100,
-      opacity: 0.15 + Math.random() * 0.2,
+      opacity: 0.12 + Math.random() * 0.18,
       dx: (Math.random() - 0.5) * 40,
       dy: (Math.random() - 0.5) * 40,
       duration: 15 + Math.random() * 10,
@@ -683,48 +763,33 @@ function Boot() {
         background: '#04050a',
       }}
     >
-      {/* ── Constellation ─────────────────────────────────────────────── */}
+      {/* Constellation */}
       <Box sx={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
         {particles.map(p => (
           <motion.div
             key={p.id}
             style={{
-              position: 'absolute',
-              left: `${p.x}%`,
-              top: `${p.y}%`,
-              width: 2,
-              height: 2,
-              borderRadius: '50%',
-              background: '#ffffff',
+              position: 'absolute', left: `${p.x}%`, top: `${p.y}%`,
+              width: 2, height: 2, borderRadius: '50%', background: '#ffffff',
               opacity: shouldReduceMotion ? p.opacity * 0.6 : p.opacity,
             }}
-            animate={shouldReduceMotion ? {} : {
-              x: [0, p.dx, 0],
-              y: [0, p.dy, 0],
-            }}
+            animate={shouldReduceMotion ? {} : { x: [0, p.dx, 0], y: [0, p.dy, 0] }}
             transition={shouldReduceMotion ? {} : {
-              duration: p.duration,
-              repeat: Infinity,
-              repeatType: 'mirror',
-              ease: 'easeInOut',
+              duration: p.duration, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut',
             }}
           />
         ))}
       </Box>
 
-      {/* ── Radial glow ───────────────────────────────────────────────── */}
+      {/* Radial glow */}
       <Box sx={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'radial-gradient(circle at 50% 50%, rgba(100,210,255,0.05), transparent 60%)',
+        background: `radial-gradient(circle at 50% 50%, ${accents.cyan}0d, transparent 60%)`,
       }} />
 
-      {/* ── Spinner + typewriter text ──────────────────────────────────── */}
+      {/* Spinner + typewriter */}
       <Box sx={{ position: 'relative', textAlign: 'center' }}>
-        {/* Custom SVG arc spinner */}
-        <Box sx={{
-          width: 56, height: 56, mx: 'auto', mb: 3,
-          filter: `drop-shadow(0 0 8px ${accents.cyan})`,
-        }}>
+        <Box sx={{ width: 56, height: 56, mx: 'auto', mb: 3, filter: `drop-shadow(0 0 10px ${accents.cyan})` }}>
           <motion.svg
             width="56" height="56" viewBox="0 0 56 56"
             animate={shouldReduceMotion ? {} : { rotate: 360 }}
@@ -732,16 +797,11 @@ function Boot() {
           >
             <circle
               cx="28" cy="28" r="24"
-              fill="none"
-              stroke={accents.cyan}
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeDasharray="60 96"
+              fill="none" stroke={accents.cyan} strokeWidth="1.5"
+              strokeLinecap="round" strokeDasharray="60 96"
             />
           </motion.svg>
         </Box>
-
-        {/* Typewriter text */}
         <Typography sx={{
           fontFamily: MONO, fontSize: 10, letterSpacing: '0.4em',
           color: accents.cyan, opacity: 0.65, textTransform: 'uppercase',
@@ -749,10 +809,7 @@ function Boot() {
         }}>
           {displayed}
           {!typingDone && (
-            <Box
-              component="span"
-              sx={{ opacity: cursorVisible ? 1 : 0, transition: 'opacity 80ms', ml: '1px' }}
-            >
+            <Box component="span" sx={{ opacity: cursorVisible ? 1 : 0, transition: 'opacity 80ms', ml: '1px' }}>
               |
             </Box>
           )}

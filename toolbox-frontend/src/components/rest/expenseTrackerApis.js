@@ -1272,6 +1272,37 @@ export const getMonthlyReport = async (year, month) => {
     }
 };
 
+export const getMonthlyNarrative = async (year, month) => {
+    try {
+        const params = new URLSearchParams({ year, month });
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/monthly_narrative/?${params}`);
+        return await response.json();
+    } catch (error) {
+        if (error.status === 404) return null;
+        throw handleApiError(error, 'fetch monthly narrative');
+    }
+};
+
+export const getMonthForecast = async () => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/month_forecast/`);
+        return await response.json();
+    } catch (error) {
+        if (error.status === 404) return null;
+        throw handleApiError(error, 'fetch month forecast');
+    }
+};
+
+export const getCategoryMergeSuggestions = async () => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/category_merge_suggestions/`);
+        return await response.json();
+    } catch (error) {
+        if (error.status === 404) return { suggestions: [] };
+        throw handleApiError(error, 'fetch category merge suggestions');
+    }
+};
+
 // Utility function for array sum (keeping existing functionality)
 export const getArraySumApi = (values, onSuccess, onError) => {
     const queryString = values.join(',');

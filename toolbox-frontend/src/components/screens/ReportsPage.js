@@ -13,6 +13,7 @@ import CursorGlow from '../motion/CursorGlow';
 import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { PageHeader, ChartContainer, EmptyState } from '../ui';
 
+import MonthlyNarrativeCard from '../ui/MonthlyNarrativeCard';
 import InsightsMonthTrend from '../insights/InsightsMonthTrend';
 import InsightsCategoryDelta from '../insights/InsightsCategoryDelta';
 import InsightsDailyRhythm from '../insights/InsightsDailyRhythm';
@@ -167,6 +168,11 @@ export default function ReportsPage() {
             {/* 1. Hero — spend trend across months */}
             <Reveal index={1}>
               <InsightsMonthTrend months={monthSeries} count={count} />
+            </Reveal>
+
+            {/* 1b. Monthly narrative — model-written prose summary of the month */}
+            <Reveal index={1}>
+              <MonthlyNarrativeCard year={year} month={month} />
             </Reveal>
 
             {/* 2. Where it went — categories with per-category MoM delta */}

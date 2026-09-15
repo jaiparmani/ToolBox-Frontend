@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   Box, Container, Typography, Paper,
   Button, TextField, Alert, Snackbar, Chip, IconButton, Tooltip,
-  Fab,
+  Fab, Dialog, DialogTitle, DialogContent, DialogActions,
   Table, TableBody, TableCell, TableContainer,
   TableRow, TablePagination, InputAdornment,
 } from '@mui/material';
@@ -19,7 +19,8 @@ import {
   Refresh as RefreshIcon,
   Close as CloseIcon,
   Insights as InsightsIcon,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  CallSplit as MergeIcon,
 } from '@mui/icons-material';
 
 // Import API functions and reusable components
@@ -29,7 +30,7 @@ import {
   getTags, createTag, updateTag, deleteTag,
   getExpenseSummary, quickAddExpense, bulkAddExpenses,
   generateExpenseInsight, getLatestExpenseInsight, askExpenses,
-  getSplits,
+  getSplits, getCategoryMergeSuggestions,
 } from '../rest/expenseTrackerApis';
 
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
@@ -55,6 +56,7 @@ import ActivityInsightsPanel from '../ui/ActivityInsightsPanel';
 import ActivityLabelsPanel from '../ui/ActivityLabelsPanel';
 import ActivityLabelDialog from '../ui/ActivityLabelDialog';
 import { TransactionStoryDrawer, buildStoryFromExpense, PageHeader } from '../ui';
+import DashMonthForecast from '../ui/DashMonthForecast';
 import CursorGlow from '../motion/CursorGlow';
 import AssistantOrb from '../ui/AssistantOrb';
 import { accents, color, radius } from '../../theme/tokens';
@@ -255,6 +257,19 @@ export default function ExpenseTrackerPage() {
 
  // Plain-language question over the expense list
  const [ask, setAsk] = useState({ question: '', loading: false, answer: null });
+
+ // Swipe-to-delete undo state
+ const [deletedExpense, setDeletedExpense] = useState(null);
+ const [undoOpen, setUndoOpen] = useState(false);
+ const undoTimerRef = React.useRef(null);
+ const pendingDeleteIdRef = React.useRef(null);
+
+ // Category merge suggestions
+ const [mergeSuggestions, setMergeSuggestions] = useState([]);
+ const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+ const [mergeDismissed, setMergeDismissed] = useState(
+   () => sessionStorage.getItem('merge_suggestion_dismissed') === '1'
+ );
 
  /**
   * The three sections, and the one real figure each can put on the peek card
@@ -602,27 +617,87 @@ export default function ExpenseTrackerPage() {
    }
  };
 
- const deleteExpenseDirect = async (expenseId) => {
-   setLoading(true);
-   try {
-     await deleteExpense(expenseId);
-     setSuccess('Expense deleted successfully!');
-     loadExpenses();
-     loadSummary();
-   } catch (error) {
-     setError('Failed to delete expense');
-   } finally {
-     setLoading(false);
+ // Swipe-to-delete: optimistically remove from UI, offer a 5-second undo window,
+ // then commit the real API delete. If another swipe arrives before the timer
+ // fires, the pending deletion is committed immediately.
+ const deleteExpenseDirect = (expenseId) => {
+   // Commit any previous pending deletion before starting this one
+   if (undoTimerRef.current) {
+     clearTimeout(undoTimerRef.current);
+     undoTimerRef.current = null;
+     const prevId = pendingDeleteIdRef.current;
+     pendingDeleteIdRef.current = null;
+     if (prevId) deleteExpense(prevId).then(() => loadSummary()).catch(() => {});
+     setUndoOpen(false);
+     setDeletedExpense(null);
    }
+
+   const toDelete = expenses.find(e => e.id === expenseId);
+   if (!toDelete) return;
+
+   pendingDeleteIdRef.current = expenseId;
+   setExpenses(prev => prev.filter(e => e.id !== expenseId));
+   setDeletedExpense(toDelete);
+   setUndoOpen(true);
+
+   undoTimerRef.current = setTimeout(async () => {
+     undoTimerRef.current = null;
+     pendingDeleteIdRef.current = null;
+     setUndoOpen(false);
+     setDeletedExpense(null);
+     try {
+       await deleteExpense(expenseId);
+       loadSummary();
+     } catch {
+       setError('Failed to delete expense');
+       loadExpenses();
+     }
+   }, 5000);
  };
 
- // The menu delete keeps a confirm; the swipe gesture is its own confirmation.
+ const handleUndoDelete = () => {
+   if (undoTimerRef.current) { clearTimeout(undoTimerRef.current); undoTimerRef.current = null; }
+   pendingDeleteIdRef.current = null;
+   setUndoOpen(false);
+   const exp = deletedExpense;
+   setDeletedExpense(null);
+   if (!exp) return;
+   addExpenseApi({
+     amount: String(exp.amount),
+     transactionType: exp.type || 'expense',
+     categoryId: exp.category?.id || '',
+     description: exp.description,
+     date: exp.date,
+     tagIds: (exp.tags || []).map(t => t.id),
+     location: exp.location || '',
+     paymentMethod: exp.paymentMethod || '',
+     isRecurring: exp.isRecurring || false,
+   }).then(() => {
+     loadExpenses();
+     loadSummary();
+     setSuccess('Expense restored');
+   }).catch(() => setError('Could not restore the expense'));
+ };
+
+ // The menu delete already has a confirm dialog — delete immediately there.
  const deleteExpenseHandler = (expenseId) => setConfirm({
    title: 'Delete this expense?',
    message: 'It disappears from the timeline and from every total on this page.',
    confirmLabel: 'Delete',
    destructive: true,
-   onConfirm: () => deleteExpenseDirect(expenseId),
+   onConfirm: async () => {
+     setLoading(true);
+     try {
+       await deleteExpense(expenseId);
+       setSuccess('Expense deleted successfully!');
+       loadExpenses();
+       loadSummary();
+     } catch {
+       setError('Failed to delete expense');
+     } finally {
+       setLoading(false);
+     }
+   },
  });
 
  // Category handlers
@@ -775,6 +850,15 @@ export default function ExpenseTrackerPage() {
      loadLatestInsight();
    }
  }, [activeTab, insight.loaded, isAuthenticated]);
+
+ // Fetch category merge suggestions once on load; respect session-level dismissal.
+ useEffect(() => {
+   if (!isAuthenticated || mergeDismissed) return;
+   getCategoryMergeSuggestions()
+     .then(data => setMergeSuggestions(data?.suggestions || []))
+     .catch(() => {});
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [isAuthenticated]);
 
  // Filter handlers
  const handleFilterChange = (key, value) => {
@@ -971,6 +1055,19 @@ export default function ExpenseTrackerPage() {
        </Alert>
      </Snackbar>
 
+     {/* Swipe-to-delete undo toast */}
+     <Snackbar
+       open={undoOpen}
+       anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+       sx={{ bottom: { xs: 80, md: 24 } }}
+       message="Expense deleted"
+       action={
+         <Button color="inherit" size="small" onClick={handleUndoDelete}>
+           Undo
+         </Button>
+       }
+     />
+
      {/* Headline figures */}
      <Box sx={{ mb: { xs: 2, sm: 3 } }}>
        {!summary && loading ? (
@@ -986,6 +1083,42 @@ export default function ExpenseTrackerPage() {
          />
        ) : null}
      </Box>
+
+     {/* Category merge suggestion banner — shown once per session, dismissed to sessionStorage */}
+     {!mergeDismissed && mergeSuggestions.length > 0 && (
+       <Box
+         sx={{
+           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+           gap: 1, px: 1.5, py: 1, mb: 2,
+           borderRadius: `${radius.lg}px`,
+           border: '1px solid', borderColor: `${accents.amber}44`,
+           bgcolor: (t) => t.palette.mode === 'dark' ? `${accents.amber}10` : `${accents.amber}08`,
+         }}
+       >
+         <Box
+           role="button"
+           onClick={() => setMergeDialogOpen(true)}
+           sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, cursor: 'pointer', minWidth: 0 }}
+         >
+           <MergeIcon sx={{ fontSize: 16, color: accents.amber, flexShrink: 0 }} />
+           <Typography sx={{ fontSize: 13, fontWeight: 550, color: 'text.secondary' }} noWrap>
+             Tip: You have overlapping categories — review
+           </Typography>
+           <ChevronRightIcon sx={{ fontSize: 16, color: 'text.disabled', flexShrink: 0 }} />
+         </Box>
+         <IconButton
+           size="small"
+           aria-label="Dismiss"
+           onClick={() => {
+             sessionStorage.setItem('merge_suggestion_dismissed', '1');
+             setMergeDismissed(true);
+           }}
+           sx={{ flexShrink: 0, color: 'text.disabled' }}
+         >
+           <CloseIcon sx={{ fontSize: 15 }} />
+         </IconButton>
+       </Box>
+     )}
 
      {/* Main Content Tabs */}
      <Paper
@@ -1264,6 +1397,9 @@ export default function ExpenseTrackerPage() {
                biggest single expense, all derived from the loaded rows. */}
            <ActivityGlance expenses={expenses} />
 
+           {/* Month-end forecast — projected total, pace, top categories */}
+           <DashMonthForecast />
+
            {/* One-tap category narrowing, wired into the existing category filter. */}
            {/* Where the period's money actually went — the server's own
                per-category totals for this exact scope, as one bar you can put
@@ -1415,6 +1551,58 @@ export default function ExpenseTrackerPage() {
        onChange={(patch) => setTagForm(prev => ({ ...prev, data: { ...prev.data, ...patch } }))}
        onSave={saveTag}
      />
+
+     {/* Category merge suggestions dialog */}
+     <Dialog open={mergeDialogOpen} onClose={() => setMergeDialogOpen(false)} maxWidth="xs" fullWidth>
+       <DialogTitle sx={{ fontWeight: 700, fontSize: 17 }}>Overlapping categories</DialogTitle>
+       <DialogContent sx={{ pb: 1 }}>
+         {mergeSuggestions.map((s, i) => (
+           <Box
+             key={i}
+             sx={{
+               p: 1.5, mb: 1.5, borderRadius: `${radius.md}px`,
+               border: '1px solid', borderColor: 'divider',
+               bgcolor: 'background.paper',
+             }}
+           >
+             <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 0.5 }}>
+               Merge into: <Box component="span" sx={{ color: accents.mint }}>{s.into}</Box>
+             </Typography>
+             <Typography sx={{ fontSize: 12.5, color: 'text.secondary', mb: 0.75 }}>
+               {Array.isArray(s.merge) ? s.merge.join(', ') : s.merge}
+             </Typography>
+             {s.reason && (
+               <Typography sx={{ fontSize: 12, color: 'text.disabled' }}>{s.reason}</Typography>
+             )}
+             <Button
+               size="small" variant="outlined"
+               sx={{ mt: 1, borderRadius: radius.pill, textTransform: 'none', fontWeight: 600, borderColor: 'divider', color: 'text.secondary' }}
+               onClick={() => {
+                 setMergeDialogOpen(false);
+                 setSuccess('Feature coming — contact support to merge categories');
+               }}
+             >
+               Merge
+             </Button>
+           </Box>
+         ))}
+       </DialogContent>
+       <DialogActions sx={{ px: 2.5, pb: 2 }}>
+         <Button
+           onClick={() => {
+             setMergeDialogOpen(false);
+             sessionStorage.setItem('merge_suggestion_dismissed', '1');
+             setMergeDismissed(true);
+           }}
+           sx={{ textTransform: 'none', color: 'text.secondary' }}
+         >
+           Dismiss
+         </Button>
+         <Button onClick={() => setMergeDialogOpen(false)} sx={{ textTransform: 'none', fontWeight: 700 }}>
+           Close
+         </Button>
+       </DialogActions>
+     </Dialog>
 
      {/* Every destructive or irreversible step goes through the one house
          confirmation instead of a browser-chrome window.confirm. */}

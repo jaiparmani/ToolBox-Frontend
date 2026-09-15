@@ -18,6 +18,7 @@ import SplitsPage from './screens/SplitsPage'
 import MoneyUniversePage from './screens/MoneyUniversePage'
 import CashFlowPulsePage from './screens/CashFlowPulsePage'
 import GuidePage from './screens/GuidePage'
+import ShareTargetPage from './screens/ShareTargetPage'
 import { Box, CircularProgress, Typography } from '@mui/material'
 
 // Loading Component
@@ -95,6 +96,8 @@ export default function Router() {
         <Route path="/how-to" element={<GuidePage />} />
         {/* API Keys is admin-only tooling — reachable by URL, kept out of the nav */}
         <Route path="/api-keys" element={<ApiKeysPage />} />
+        {/* Web Share Target — Android PWA share sheet from PhonePe/GPay */}
+        <Route path="/share" element={<ShareTargetPage />} />
         {/* Retired sections (health, hobby, array-sum, qr) redirect home */}
         <Route path="/health-tracker" element={<Navigate to="/" replace />} />
         <Route path="/hobby-tracker" element={<Navigate to="/" replace />} />

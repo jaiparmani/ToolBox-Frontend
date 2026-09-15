@@ -502,17 +502,25 @@ export default function GuidePage() {
 
           <More summary="Adding from your phone">
             <P sx={{ mb: 1.25, fontSize: '0.89rem' }}>
-              Both live in <strong>Settings</strong>, reachable from your name at the bottom of
-              the sidebar.
+              Settings lives under your name at the bottom of the sidebar.
             </P>
             <Item title="Telegram" headingLevel="h4">
-              Message the bot once and it replies with your Telegram ID; paste that ID into
-              Settings and connect. After that you can log expenses and get alerts in the chat.
+              Connect your Telegram ID in Settings. After that, send <em>any</em> plain message
+              to the bot &mdash; <em>&ldquo;coffee 120&rdquo;</em>, <em>&ldquo;petrol 2000&rdquo;</em>
+              &mdash; and it is logged instantly. You also get a Telegram ping every time Money OS
+              records an expense.
             </Item>
-            <Item title="Apple Shortcuts" headingLevel="h4">
+            <Item title="Android: share sheet" headingLevel="h4">
+              Add Money OS to your home screen first (Android Chrome &rarr; &ldquo;Add to Home Screen&rdquo;).
+              After that, any PhonePe / GPay &ldquo;Share&rdquo; button will include <strong>Money OS</strong>
+              in the list. Tap it and the payment text is logged automatically &mdash; zero taps.
+            </Item>
+            <Item title="iPhone: Shortcuts &amp; SMS" headingLevel="h4">
               Settings generates an API key and offers ready-made shortcuts you can install on
-              your iPhone with the key already filled in. The key is shown once &mdash; copy it
-              then, or make a new one.
+              your iPhone with the key already filled in. One shortcut watches incoming bank SMS
+              (HDFC-Bank, ICICIBANKLTD, etc.) and logs the debit automatically; another lets you
+              share any text directly to Money OS from the iOS share sheet. The key is shown
+              once &mdash; copy it then, or make a new one.
             </Item>
           </More>
         </Section>

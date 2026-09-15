@@ -298,6 +298,42 @@ export default function ApiKeysPage() {
         )}
       </Panel>
 
+      {/* ── Voice Shortcut setup ─────────────────────────────────────────── */}
+      <Typography variant="h6" sx={{ fontWeight: 700, mt: 1, mb: 1.5 }}>
+        Voice Logging (Siri)
+      </Typography>
+      <Panel sx={{ p: 2.5, mb: 2.5, backgroundColor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)' }}>
+        <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600, mb: 1.5 }}>
+          Log expenses by speaking — "chai 40 rupees" → saved instantly
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, lineHeight: 1.7 }}>
+          Create an iOS Shortcut with these three actions:
+        </Typography>
+        {[
+          { n: '1', title: 'Dictate Text', detail: 'Action type: "Dictate Text". Prompt: "What did you spend?"' },
+          { n: '2', title: 'Get Contents of URL', detail: `URL: https://toolbox.pythonanywhere.com/api/expenses/expenses/quick_add/\nMethod: POST · Body type: JSON\nKey: text  Value: Dictated Text (magic variable from step 1)` },
+          { n: '3', title: 'Speak (optional)', detail: 'Speak the "amount" field from the JSON result so Siri reads it back: "Logged ₹40."' },
+        ].map(({ n, title, detail }) => (
+          <Box key={n} sx={{ display: 'flex', gap: 1.5, mb: 1.5 }}>
+            <Box sx={{ flexShrink: 0, width: 24, height: 24, borderRadius: '50%', bgcolor: 'action.hover',
+              display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Typography variant="caption" sx={{ fontWeight: 700 }}>{n}</Typography>
+            </Box>
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>{title}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'pre-line', display: 'block' }}>{detail}</Typography>
+            </Box>
+          </Box>
+        ))}
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+          Add the header{' '}
+          <Typography component="code" variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'action.hover', px: 0.5, borderRadius: 0.5 }}>
+            Authorization: Api-Key tbk_…
+          </Typography>{' '}
+          to the URL request. Generate a key above, then paste it here.
+        </Typography>
+      </Panel>
+
       {/* ── OpenRouter Keys ──────────────────────────────────────────────── */}
       <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
         OpenRouter Keys

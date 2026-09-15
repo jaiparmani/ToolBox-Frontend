@@ -10,6 +10,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import ArrowUpwardRoundedIcon from '@mui/icons-material/ArrowUpwardRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import MyLocationRoundedIcon from '@mui/icons-material/MyLocationRounded';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { accents, motion as motionTokens, type, radius, color } from '../../theme/tokens';
 import { money } from './money';
@@ -235,6 +236,7 @@ export default function ExpenseComposer({
   const [makingTag, setMakingTag] = React.useState(false);
   const [catError, setCatError] = React.useState(null);
   const [tagError, setTagError] = React.useState(null);
+  const [locating, setLocating] = React.useState(false);
 
   // Entry-time suggestions — matching past descriptions plus the category/
   // tags most often paired with them. Auto-fill only ever touches a *blank*
@@ -289,6 +291,44 @@ export default function ExpenseComposer({
   }, [suggestions.descriptions, data.description]);
 
   const set = (patch) => onChange(patch);
+
+  const detectLocation = React.useCallback(async () => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    try {
+      const pos = await new Promise((res, rej) =>
+        navigator.geolocation.getCurrentPosition(res, rej, { timeout: 8000 })
+      );
+      const { latitude: lat, longitude: lon } = pos.coords;
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+      const geo = await r.json();
+      const a = geo.address || {};
+      const placeName = a.amenity || a.shop || a.cafe || a.fast_food || a.name
+        || a.road || a.suburb || geo.display_name?.split(',')[0] || '';
+      if (placeName) set({ location: placeName });
+
+      // Map OSM amenity/shop type → category name hint (display only, not forced)
+      const typeMap = {
+        cafe: 'Food', restaurant: 'Food', fast_food: 'Food', food_court: 'Food',
+        bakery: 'Food', bar: 'Food', pub: 'Food',
+        fuel: 'Transport', petrol_station: 'Transport', charging_station: 'Transport',
+        pharmacy: 'Health', hospital: 'Health', clinic: 'Health', doctors: 'Health',
+        supermarket: 'Groceries', grocery: 'Groceries', convenience: 'Groceries',
+        cinema: 'Entertainment', theatre: 'Entertainment', nightclub: 'Entertainment',
+        gym: 'Health', sports_centre: 'Health',
+      };
+      const osmType = a.amenity || a.shop || '';
+      const catHint = typeMap[osmType.toLowerCase()] || null;
+      if (catHint && !data.categoryId && allCats.length) {
+        const match = allCats.find(c => c.name.toLowerCase().includes(catHint.toLowerCase()));
+        if (match) set({ categoryId: match.id });
+      }
+    } catch { /* location declined or timed out — silent */ }
+    setLocating(false);
+  }, [allCats, data.categoryId, set]); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     if (open) {
@@ -1075,12 +1115,29 @@ export default function ExpenseComposer({
                   )}
 
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                    <TextField
-                      fullWidth size="small" label="Location"
-                      value={data.location || ''}
-                      onChange={(e) => set({ location: e.target.value })}
-                      sx={{ ...fieldSx(heroColor), minWidth: 0 }}
-                    />
+                    <Box sx={{ position: 'relative', flex: 1, minWidth: 0 }}>
+                      <TextField
+                        fullWidth size="small" label="Location"
+                        value={data.location || ''}
+                        onChange={(e) => set({ location: e.target.value })}
+                        sx={{ ...fieldSx(heroColor) }}
+                        InputProps={{
+                          endAdornment: (
+                            <IconButton
+                              size="small"
+                              onClick={detectLocation}
+                              disabled={locating}
+                              aria-label="Detect location"
+                              sx={{ color: locating ? accents.violet : 'text.secondary', p: 0.25 }}
+                            >
+                              {locating
+                                ? <CircularProgress size={14} sx={{ color: accents.violet }} />
+                                : <MyLocationRoundedIcon sx={{ fontSize: 16 }} />}
+                            </IconButton>
+                          ),
+                        }}
+                      />
+                    </Box>
                     <TextField
                       fullWidth size="small" label="Payment"
                       value={data.paymentMethod || ''}

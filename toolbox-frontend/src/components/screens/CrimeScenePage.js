@@ -9,7 +9,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import { motion } from 'framer-motion';
-import { getExpenses } from '../rest/expenseTrackerApis';
+import { getExpenses, yourShareOf } from '../rest/expenseTrackerApis';
 import { moneySmart } from '../ui/money';
 
 /* ── Design tokens ──────────────────────────────────────────────────────── */
@@ -147,9 +147,11 @@ export default function CrimeScenePage() {
     if (!expenses) return null;
 
     const txns = expenses
-      .filter(e => (e.type || 'expense') !== 'income')
+      .filter(e => (e.type || e.transaction_type || 'expense') !== 'income')
       .map(e => ({
-        amount: Math.abs(Number(e.amount) || 0),
+        // Use your_share so a split expense counts only what you actually owe,
+        // not the full bill you fronted on behalf of the group.
+        amount: yourShareOf(e),
         date: (typeof e.date === 'string' ? e.date : new Date(e.date).toISOString()).slice(0, 10),
         description: e.description || e.note || e.title || '',
         category: e.category?.name || 'Uncategorised',

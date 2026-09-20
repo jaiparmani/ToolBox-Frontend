@@ -35,6 +35,7 @@ import { MoneyProvider, useMoney } from '../contexts/MoneyContext';
 import { deriveWeather } from './ui/FinancialWeather';
 import BrandLogo from './motion/BrandLogo';
 import PageTransition from './motion/PageTransition';
+import RouteProgress from './motion/RouteProgress';
 import { NotificationBell, FinancialWeatherBar } from './ui';
 import Assistant from './ui/Assistant';
 import usePressSpring from './ui/usePressSpring';
@@ -588,12 +589,15 @@ export default function AppShell() {
           <Box component="main" sx={{ flex: 1, px: { xs: 1.5, sm: 3 }, py: { xs: 2, sm: 3 }, pb: { xs: 'calc(76px + env(safe-area-inset-bottom))', md: 3 } }}>
             <Box ref={sentinelRef} sx={{ height: '1px', mt: '-1px' }} aria-hidden />
             <Box sx={{ maxWidth: 1600, mx: 'auto', width: '100%' }}>
-              <PageTransition key={location.pathname}>
+              <PageTransition locationKey={location.pathname}>
                 <Outlet />
               </PageTransition>
             </Box>
           </Box>
         </Box>
+
+        {/* Route progress bar — top edge, fires on every navigation */}
+        <RouteProgress />
 
         {/* Mobile bottom tab bar — replaces the hamburger nav on xs/sm */}
         <BottomBar pathname={location.pathname} onNavigate={go} onOpenDrawer={() => setDrawerOpen(true)} />

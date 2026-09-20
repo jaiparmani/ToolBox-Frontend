@@ -32,16 +32,28 @@ import { dashCardSx } from './DashSurface';
  * never fed a field of meaningless placeholder nodes.
  */
 
-// Derived from the motion scale rather than invented: a slow, calm breath.
-const BREATH_MS = motionTokens.slower * 3;
-
-const pulse = (i = 0) => ({
-  animation: `dashSkelBreath ${BREATH_MS}ms ${motionTokens.standard} ${(i % 6) * 110}ms infinite`,
-  '@keyframes dashSkelBreath': {
-    '0%, 100%': { opacity: 0.55 },
-    '50%': { opacity: 1 },
+// Moving shimmer: a 50%-wide shine sweeps left→right via transform (GPU-composited).
+// Stagger offset staggers the phase across sibling blocks so the wave ripples.
+const shimmer = (i = 0) => ({
+  position: 'relative',
+  overflow: 'hidden',
+  opacity: 0.78,
+  '@keyframes dashSkelShimmer': {
+    '0%':   { transform: 'translateX(-100%)' },
+    '100%': { transform: 'translateX(300%)' },
   },
-  '@media (prefers-reduced-motion: reduce)': { animation: 'none', opacity: 0.75 },
+  '&::after': {
+    content: '""',
+    position: 'absolute',
+    top: 0, left: 0, bottom: 0,
+    width: '50%',
+    background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.09) 50%, transparent 100%)',
+    animation: `dashSkelShimmer 2.4s linear ${(i % 8) * 65}ms infinite`,
+  },
+  '@media (prefers-reduced-motion: reduce)': {
+    opacity: 0.75,
+    '&::after': { display: 'none' },
+  },
 });
 
 /** One placeholder block. Tone comes from the theme, so light and dark both work. */
@@ -51,7 +63,7 @@ export function SkelBlock({ w = '100%', h = 12, r = radius.sm, i = 0, sx }) {
       aria-hidden
       sx={{
         width: w, height: h, flexShrink: 0, borderRadius: `${r}px`,
-        bgcolor: 'action.hover', willChange: 'opacity', ...pulse(i), ...sx,
+        bgcolor: 'action.hover', willChange: 'transform', ...shimmer(i), ...sx,
       }}
     />
   );
@@ -122,7 +134,7 @@ const ChartGhost = () => (
     aria-hidden
     sx={{
       width: '100%', height: 200, borderRadius: `${radius.md}px`, overflow: 'hidden',
-      ...pulse(2),
+      ...shimmer(2),
     }}
   >
     <svg viewBox="0 0 760 200" width="100%" height="200" preserveAspectRatio="none" style={{ display: 'block' }}>
@@ -391,7 +403,8 @@ export function DashLoadingStatus({ loading, slow, secondary }) {
         <Box aria-hidden sx={{
           width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
           bgcolor: slow ? accents.amber : accents.mint,
-          ...pulse(0),
+          '@keyframes statusDotPulse': { '0%,100%': { opacity: 0.5 }, '50%': { opacity: 1 } },
+          animation: `statusDotPulse 1.4s ease-in-out infinite`,
         }} />
       )}
       <Typography sx={{

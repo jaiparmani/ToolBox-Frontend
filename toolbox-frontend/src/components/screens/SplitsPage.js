@@ -918,7 +918,11 @@ export default function SplitsPage() {
     }
   };
 
-  if (isLoading) return null;
+  if (isLoading) return (
+    <Box sx={{ maxWidth: 680, mx: 'auto', px: { xs: 2, sm: 3 }, pt: 3, pb: 6 }}>
+      <BalanceSkeleton rows={3} />
+    </Box>
+  );
 
   if (!isAuthenticated) {
     return (

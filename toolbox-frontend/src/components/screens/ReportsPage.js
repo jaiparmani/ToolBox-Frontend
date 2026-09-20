@@ -116,7 +116,13 @@ export default function ReportsPage() {
 
   const hasData = total > 0 || count > 0 || categoryTotals.length > 0;
 
-  if (isLoading) return null;
+  if (isLoading) return (
+    <Box sx={{ maxWidth: 860, mx: 'auto', px: { xs: 2, sm: 3 }, pt: 3, pb: 6 }}>
+      <SummarySkeleton count={4} />
+      <Box sx={{ mt: 2 }}><ExpenseListSkeleton rows={4} /></Box>
+      <Box sx={{ mt: 2 }}><ExpenseListSkeleton rows={5} /></Box>
+    </Box>
+  );
   if (!isAuthenticated) {
     return (
       <Container maxWidth="sm" sx={{ mt: 8 }}>

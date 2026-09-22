@@ -1,0 +1,1070 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Money OS — Brag</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 1920px;
+        height: 1080px;
+        background: #000;
+        overflow: hidden;
+        font-family: "Archivo Black", sans-serif;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000;
+      }
+      .scene {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      #scene1 { z-index: 1; background: #000000; }
+      #scene2 { z-index: 2; background: #0b0b10; opacity: 0; }
+      #scene3 { z-index: 3; background: #0b0b10; opacity: 0; }
+      #scene4 { z-index: 4; background: #0b0b10; opacity: 0; }
+      #scene5 { z-index: 5; background: #06060b; opacity: 0; }
+      #scene6 { z-index: 6; background: #04050a; opacity: 0; }
+      #scene7 { z-index: 7; background: #05050a; opacity: 0; }
+      #scene8 { z-index: 8; background: #0a0900; opacity: 0; }
+      #scene9 { z-index: 9; background: #0b0b10; opacity: 0; }
+      #scene10 { z-index: 10; background: #0b0b10; opacity: 0; }
+      #scene11 { z-index: 11; background: #0b0b10; opacity: 0; }
+
+      #flash-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 50;
+        background: #ffffff;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .title-safe { padding: 130px 170px; box-sizing: border-box; }
+      .caption-top {
+        position: absolute; top: 120px; left: 0; right: 0;
+        text-align: center; color: #f5f6fa;
+        font-size: 74px; letter-spacing: -0.01em; text-transform: uppercase;
+      }
+      .panel-card {
+        background: rgba(20,20,26,0.9);
+        border: 1px solid rgba(255,255,255,0.09);
+        border-radius: 24px;
+        padding: 40px 52px;
+      }
+      .dim-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 22px; letter-spacing: 0.14em; color: #ced0d6; text-transform: uppercase;
+      }
+      .pill {
+        display: inline-block;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 24px; letter-spacing: 0.06em; text-transform: uppercase;
+        padding: 10px 24px; border-radius: 999px;
+      }
+      .ambient-glow {
+        position: absolute; width: 900px; height: 900px; border-radius: 50%;
+        filter: blur(120px); opacity: 0; pointer-events: none;
+      }
+
+      /* ---------- Scene 1 — Hook ---------- */
+      #s1-tape {
+        position: absolute; top: 0; left: -200px; right: -200px; height: 64px;
+        background: repeating-linear-gradient(-45deg, #F5C518 0px, #F5C518 26px, #0a0900 26px, #0a0900 52px);
+        transform: translateY(-64px);
+      }
+      #s1-tape-bottom {
+        position: absolute; bottom: 0; left: -200px; right: -200px; height: 64px;
+        background: repeating-linear-gradient(-45deg, #F5C518 0px, #F5C518 26px, #0a0900 26px, #0a0900 52px);
+        transform: translateY(64px);
+      }
+      #s1-stage { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+      .s1-line { color: #f5f6fa; font-size: 128px; line-height: 1.05; letter-spacing: -0.02em; text-align: center; text-transform: uppercase; }
+      .s1-line .hl { color: #F5C518; }
+      .s1-particle { position: absolute; border-radius: 50%; background: rgba(245,197,24,0.55); }
+
+      /* ---------- Scene 2 — Reveal ---------- */
+      #s2-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; }
+      #s2-glow { top: -260px; left: 620px; background: radial-gradient(circle, rgba(10,132,255,0.4), rgba(10,132,255,0) 70%); }
+      #s2-card {
+        background: rgba(20,20,26,0.86); border: 1px solid rgba(255,255,255,0.09); border-radius: 28px;
+        padding: 56px 72px; box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+      }
+      #s2-label {
+        font-family: "JetBrains Mono", monospace; font-size: 26px; letter-spacing: 0.16em;
+        color: #a4a6b3; text-transform: uppercase; margin-bottom: 18px;
+      }
+      #s2-balance {
+        font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums;
+        font-weight: 700; font-size: 128px; color: #f5f6fa; letter-spacing: -0.02em;
+      }
+      #s2-word { position: absolute; top: 96px; right: 130px; font-size: 64px; color: #f5f6fa; letter-spacing: -0.01em; }
+      #s2-word .hl { color: #0A84FF; }
+      #s2-stats { position: absolute; left: 170px; top: 840px; display: flex; gap: 22px; }
+      .s2-stat {
+        background: rgba(28,28,36,0.78); border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 16px; padding: 20px 30px; font-family: "JetBrains Mono", monospace;
+      }
+      .s2-stat .k { font-size: 18px; letter-spacing: 0.12em; color: #a4a6b3; text-transform: uppercase; display: block; margin-bottom: 8px; }
+      .s2-stat .v { font-size: 36px; color: #f5f6fa; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .s2-stat.pos .v { color: #30D6A5; }
+      .s2-stat.neg .v { color: #FF453A; }
+
+      /* ---------- Scene 3 — Story ---------- */
+      #s3-bars { position: absolute; top: 70px; left: 170px; right: 170px; display: flex; gap: 10px; }
+      .s3-bar { flex: 1; height: 7px; border-radius: 4px; background: rgba(255,255,255,0.16); overflow: hidden; }
+      .s3-bar-fill { width: 0%; height: 100%; background: #f5f6fa; border-radius: 4px; }
+      #s3-label {
+        position: absolute; top: 250px; left: 0; right: 0; text-align: center;
+        font-family: "JetBrains Mono", monospace; font-size: 28px; letter-spacing: 0.24em;
+        color: #a4a6b3; text-transform: uppercase;
+      }
+      #s3-counter {
+        position: absolute; top: 330px; left: 0; right: 0; text-align: center;
+        font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums;
+        font-weight: 700; font-size: 176px; color: #f5f6fa; letter-spacing: -0.02em;
+      }
+      #s3-chapter {
+        position: absolute; bottom: 190px; left: 0; right: 0; text-align: center;
+        font-size: 72px; color: #7C5CFF; text-transform: uppercase; letter-spacing: -0.01em;
+      }
+
+      /* ---------- Scene 4 — AI auto-add ---------- */
+      #s4-glow { top: 640px; left: -160px; background: radial-gradient(circle, rgba(124,92,255,0.35), rgba(124,92,255,0) 70%); }
+      #s4-suggestions { position: absolute; left: 170px; top: 220px; display: flex; gap: 16px; z-index: 1; }
+      .s4-sugg {
+        background: rgba(28,28,36,0.7); border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 999px; padding: 14px 24px; font-family: "JetBrains Mono", monospace; font-size: 20px; color: #ced0d6;
+      }
+      #s4-panel { position: absolute; left: 170px; top: 300px; width: 980px; }
+      #s4-header { margin-bottom: 22px; }
+      #s4-input-row {
+        background: rgba(28,28,36,0.82); border: 1px solid rgba(255,255,255,0.09); border-radius: 16px;
+        padding: 26px 34px; font-family: "JetBrains Mono", monospace; font-size: 52px; color: #f5f6fa; min-height: 68px;
+      }
+      #s4-cursor { color: #7C5CFF; }
+      #s4-thinking { position: absolute; left: 170px; top: 470px; display: flex; gap: 12px; }
+      .s4-think-dot { width: 16px; height: 16px; border-radius: 50%; background: #7C5CFF; }
+      #s4-result { margin-top: 32px; display: flex; align-items: center; gap: 26px; }
+      #s4-chip { background: #7C5CFF; color: #0b0b10; }
+      #s4-desc { font-family: "JetBrains Mono", monospace; font-size: 34px; color: #f5f6fa; }
+      #s4-amount {
+        font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums;
+        font-weight: 700; font-size: 48px; color: #f5f6fa; margin-left: auto;
+      }
+      #s4-badge { background: #30D6A5; color: #05050a; }
+
+      /* ---------- Scene 5 — Insights ---------- */
+      #s5-chart { position: absolute; left: 170px; right: 170px; bottom: 300px; height: 420px; }
+      #s5-baseline { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: rgba(255,255,255,0.16); }
+      .s5-bar-col { position: absolute; bottom: 0; width: 140px; display: flex; flex-direction: column; align-items: center; }
+      .s5-bar { width: 100%; border-radius: 10px 10px 0 0; transform: scaleY(0); transform-origin: bottom; }
+      .s5-bar-value {
+        font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; font-weight: 700;
+        font-size: 26px; color: #f5f6fa; margin-bottom: 10px; opacity: 0;
+      }
+      .s5-bar-cat {
+        position: absolute; bottom: -46px; font-family: "JetBrains Mono", monospace; font-size: 20px;
+        letter-spacing: 0.05em; color: #a4a6b3; text-transform: uppercase; opacity: 0;
+      }
+      #s5-score { position: absolute; top: 240px; right: 170px; text-align: right; opacity: 0; }
+      #s5-score-label {
+        font-family: "JetBrains Mono", monospace; font-size: 20px; letter-spacing: 0.16em;
+        color: #a4a6b3; text-transform: uppercase;
+      }
+      #s5-score-value {
+        font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums;
+        font-weight: 700; font-size: 88px; color: #30D6A5; margin-top: 6px;
+      }
+      #s5-ai-row { position: absolute; left: 170px; right: 170px; bottom: 130px; display: flex; align-items: baseline; gap: 22px; }
+      #s5-ai-tag { background: #7C5CFF; color: #0b0b10; flex-shrink: 0; }
+      #s5-ai-text { font-family: "JetBrains Mono", monospace; font-size: 34px; color: rgba(245,246,250,0.92); }
+
+      /* ---------- Scene 6 — Pulse (HUD) ---------- */
+      .s6-corner { position: absolute; width: 56px; height: 56px; border: 3px solid rgba(48,214,165,0.6); }
+      #s6-tl { top: 60px; left: 60px; border-right: none; border-bottom: none; }
+      #s6-tr { top: 60px; right: 60px; border-left: none; border-bottom: none; }
+      #s6-bl { bottom: 60px; left: 60px; border-right: none; border-top: none; }
+      #s6-br { bottom: 60px; right: 60px; border-left: none; border-top: none; }
+      #s6-sweep {
+        position: absolute; left: 60px; right: 60px; height: 4px; top: 60px;
+        background: linear-gradient(90deg, rgba(48,214,165,0), rgba(48,214,165,0.85), rgba(48,214,165,0));
+      }
+      #s6-radar {
+        position: absolute; left: 50%; top: 50%; width: 640px; height: 640px; margin-left: -320px; margin-top: -320px;
+        border-radius: 50%; border: 1px solid rgba(48,214,165,0.22);
+      }
+      #s6-radar-inner { position: absolute; inset: 95px; border-radius: 50%; border: 1px solid rgba(48,214,165,0.16); }
+      #s6-title { position: absolute; top: 110px; left: 0; right: 0; text-align: center; }
+      #s6-title .tag {
+        font-family: "JetBrains Mono", monospace; font-size: 26px; letter-spacing: 0.3em;
+        color: #a4a6b3; text-transform: uppercase; display: block; margin-bottom: 10px;
+      }
+      #s6-title .big { font-size: 108px; color: #f5f6fa; letter-spacing: 0.02em; text-transform: uppercase; }
+      #s6-boot {
+        position: absolute; top: 470px; left: 0; right: 0; text-align: center;
+        font-family: "JetBrains Mono", monospace; font-size: 34px; letter-spacing: 0.1em; color: #30D6A5; text-transform: uppercase;
+      }
+      #s6-clusters { position: absolute; inset: 0; }
+      .s6-dot { position: absolute; border-radius: 50%; }
+      #s6-prompt {
+        position: absolute; bottom: 110px; left: 0; right: 0; text-align: center;
+        font-family: "JetBrains Mono", monospace; font-size: 26px; letter-spacing: 0.08em; color: #6c6e7d; text-transform: uppercase;
+      }
+
+      /* ---------- Scene 7 — Money Universe ---------- */
+      #s7-nebula { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(124,92,255,0.18), rgba(5,5,10,0) 60%); }
+      #s7-caption {
+        position: absolute; top: 130px; left: 0; right: 0; text-align: center;
+        color: #f5f6fa; font-size: 92px; letter-spacing: -0.01em; text-transform: uppercase;
+      }
+      #s7-orbit-root { position: absolute; inset: 0; display: grid; place-items: center; }
+      #s7-orbit-stage { position: relative; width: 10px; height: 10px; }
+      .s7-body {
+        position: absolute; top: 50%; left: 50%; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-family: "JetBrains Mono", monospace; font-size: 20px; color: #05050a; font-weight: 700;
+      }
+      #s7-sun {
+        position: relative; width: 150px; height: 150px; border-radius: 50%;
+        background: radial-gradient(circle at 35% 35%, #ffffff, #0A84FF 70%);
+        box-shadow: 0 0 80px rgba(10,132,255,0.7); z-index: 9999;
+      }
+      .s7-dust { position: absolute; border-radius: 50%; background: rgba(255,255,255,0.55); }
+
+      /* ---------- Scene 8 — Crime Scene ---------- */
+      #s8-tape-top {
+        position: absolute; top: 0; left: -400px; right: -400px; height: 56px;
+        background: repeating-linear-gradient(-45deg, #F5C518 0px, #F5C518 22px, #0a0900 22px, #0a0900 44px);
+      }
+      #s8-stamp {
+        position: absolute; top: 170px; left: 170px; font-family: "JetBrains Mono", monospace;
+        font-size: 34px; letter-spacing: 0.3em; text-transform: uppercase; color: #F5C518;
+      }
+      #s8-suspect {
+        position: absolute; top: 250px; left: 170px; right: 170px;
+        font-size: 150px; color: #FF3B30; letter-spacing: -0.01em; text-transform: uppercase;
+      }
+      #s8-evidence { position: absolute; left: 170px; top: 700px; display: flex; flex-direction: column; gap: 16px; }
+      .s8-ev-row { font-family: "JetBrains Mono", monospace; font-size: 26px; letter-spacing: 0.03em; color: rgba(240,232,210,0.75); }
+      .s8-ev-row .n { color: #F5C518; margin-right: 16px; }
+      #s8-verdict-wrap { position: absolute; bottom: 190px; left: 170px; right: 170px; }
+      #s8-verdict { font-family: "JetBrains Mono", monospace; font-size: 56px; color: rgba(240,232,210,0.92); letter-spacing: -0.005em; }
+      #s8-cursor { color: #F5C518; }
+
+      /* ---------- Scene 9 — Apple Shortcuts / Siri ---------- */
+      #s9-icon-row { position: absolute; left: 170px; top: 300px; display: flex; align-items: center; gap: 34px; }
+      #s9-icon { width: 120px; height: 120px; border-radius: 30px; background: linear-gradient(135deg, #7C5CFF, #0A84FF); position: relative; }
+      #s9-bolt {
+        position: absolute; inset: 0; margin: auto; width: 56px; height: 56px; background: #f5f6fa;
+        clip-path: polygon(60% 0%, 20% 55%, 45% 55%, 40% 100%, 80% 45%, 55% 45%);
+      }
+      #s9-bubble {
+        background: rgba(28,28,36,0.9); border: 1px solid rgba(255,255,255,0.09); border-radius: 999px;
+        padding: 22px 40px; font-family: "JetBrains Mono", monospace; font-size: 34px; color: #f5f6fa;
+      }
+      #s9-wave { position: absolute; left: 330px; top: 336px; display: flex; align-items: flex-end; gap: 7px; height: 48px; }
+      .s9-bar { width: 8px; border-radius: 4px; background: #7C5CFF; }
+      #s9-prompt-card { position: absolute; left: 170px; top: 470px; width: 940px; }
+      #s9-prompt-answer {
+        font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums;
+        font-weight: 700; font-size: 68px; color: #f5f6fa; margin-top: 18px; min-height: 78px;
+      }
+      #s9-reply-card { position: absolute; left: 170px; top: 700px; width: 940px; display: flex; align-items: center; gap: 26px; }
+      #s9-reply-badge { background: #30D6A5; color: #05050a; }
+      #s9-reply-text { font-family: "JetBrains Mono", monospace; font-size: 38px; font-weight: 700; color: #f5f6fa; }
+
+      /* ---------- Scene 10 — Splits (AI ask/reply) ---------- */
+      .s10-avatar {
+        position: absolute; top: 220px; width: 96px; height: 96px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 30px; color: #05050a;
+      }
+      #s10-avatar-you { left: 660px; background: #7C5CFF; }
+      #s10-avatar-raj { right: 660px; background: #0A84FF; }
+      #s10-link {
+        position: absolute; top: 268px; left: 756px; right: 756px; height: 2px;
+        background: repeating-linear-gradient(90deg, rgba(255,255,255,0.45) 0 10px, transparent 10px 20px);
+      }
+      #s10-ask-panel { position: absolute; left: 170px; top: 430px; width: 820px; opacity: 0; }
+      #s10-query-row {
+        background: rgba(28,28,36,0.82); border: 1px solid rgba(255,255,255,0.09); border-radius: 16px;
+        padding: 24px 32px; font-family: "JetBrains Mono", monospace; font-size: 42px; color: #f5f6fa;
+        min-height: 56px; margin-top: 16px;
+      }
+      #s10-query-cursor { color: #7C5CFF; }
+      #s10-reply-row {
+        position: absolute; left: 170px; top: 600px; width: 1400px;
+        display: flex; align-items: center; gap: 26px; opacity: 0;
+      }
+      #s10-reply-tag { background: #7C5CFF; color: #0b0b10; flex-shrink: 0; }
+      #s10-reply-text { font-family: "JetBrains Mono", monospace; font-size: 36px; color: rgba(245,246,250,0.92); }
+      #s10-reply-figure {
+        font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums;
+        font-weight: 700; font-size: 62px; color: #d94f3d; margin-left: auto;
+      }
+
+      /* ---------- Scene 11 — Outro ---------- */
+      #s11-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+      #s11-glow { top: 340px; left: 660px; background: radial-gradient(circle, rgba(124,92,255,0.4), rgba(124,92,255,0) 70%); }
+      #s11-orbit { position: absolute; left: 50%; top: 46%; width: 10px; height: 10px; }
+      .s11-orbit-dot { position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; border-radius: 50%; }
+      #s11-word { font-size: 190px; color: #f5f6fa; letter-spacing: -0.02em; text-align: center; }
+      #s11-word .hl { color: #7C5CFF; }
+      #s11-tagline {
+        margin-top: 40px; font-family: "JetBrains Mono", monospace; font-size: 38px; color: #a4a6b3;
+        text-align: center; max-width: 1500px; letter-spacing: 0.01em; display: flex; flex-wrap: wrap; justify-content: center; gap: 0.35em;
+      }
+      #s11-fade { position: absolute; inset: 0; background: #000; opacity: 0; z-index: 60; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="moneyos-brag" data-start="0" data-width="1920" data-height="1080" data-duration="32.1">
+
+      <!-- SCENE 1 — HOOK -->
+      <div id="scene1" class="scene">
+        <div id="s1-tape"></div>
+        <div id="s1-tape-bottom"></div>
+        <div id="s1-particles">
+          <div class="s1-particle" id="s1-p1" style="left:260px; top:220px; width:8px; height:8px;"></div>
+          <div class="s1-particle" id="s1-p2" style="left:1640px; top:300px; width:6px; height:6px;"></div>
+          <div class="s1-particle" id="s1-p3" style="left:1500px; top:840px; width:10px; height:10px;"></div>
+          <div class="s1-particle" id="s1-p4" style="left:340px; top:880px; width:6px; height:6px;"></div>
+          <div class="s1-particle" id="s1-p5" style="left:960px; top:180px; width:7px; height:7px;"></div>
+        </div>
+        <div id="s1-stage" class="title-safe">
+          <div class="s1-line" id="s1-l1"><span class="hl">Personal Finance</span></div>
+          <div class="s1-line" id="s1-l2">Was Too Calm.</div>
+        </div>
+      </div>
+
+      <!-- SCENE 2 — REVEAL: THE APP -->
+      <div id="scene2" class="scene">
+        <div class="ambient-glow" id="s2-glow"></div>
+        <div id="s2-wrap" class="title-safe">
+          <div id="s2-card">
+            <div id="s2-label">Net Balance</div>
+            <div id="s2-balance">$0.00</div>
+          </div>
+        </div>
+        <div id="s2-word">Money <span class="hl">OS</span></div>
+        <div id="s2-stats">
+          <div class="s2-stat pos" id="s2-stat1"><span class="k">Income</span><span class="v">$3,120</span></div>
+          <div class="s2-stat neg" id="s2-stat2"><span class="k">Expenses</span><span class="v">$638</span></div>
+          <div class="s2-stat pos" id="s2-stat3"><span class="k">Saved</span><span class="v">62%</span></div>
+        </div>
+      </div>
+
+      <!-- SCENE 3 — STORY -->
+      <div id="scene3" class="scene">
+        <div id="s3-bars">
+          <div class="s3-bar"><div class="s3-bar-fill" id="s3-fill1"></div></div>
+          <div class="s3-bar"><div class="s3-bar-fill" id="s3-fill2"></div></div>
+          <div class="s3-bar"><div class="s3-bar-fill" id="s3-fill3"></div></div>
+          <div class="s3-bar"><div class="s3-bar-fill" id="s3-fill4"></div></div>
+          <div class="s3-bar"><div class="s3-bar-fill" id="s3-fill5"></div></div>
+        </div>
+        <div id="s3-label">Spent This Month</div>
+        <div id="s3-counter">$0.00</div>
+        <div id="s3-chapter">This Month&rsquo;s Shape.</div>
+      </div>
+
+      <!-- SCENE 4 — AI AUTO-ADD -->
+      <div id="scene4" class="scene">
+        <div class="ambient-glow" id="s4-glow"></div>
+        <div class="caption-top" id="s4-caption">Type It. AI Adds It.</div>
+        <div id="s4-suggestions">
+          <div class="s4-sugg" id="s4-sg1">20 aamras</div>
+          <div class="s4-sugg" id="s4-sg2">split 1200 w/ Raj</div>
+          <div class="s4-sugg" id="s4-sg3">food this month?</div>
+          <div class="s4-sugg" id="s4-sg4">overspend on food?</div>
+        </div>
+        <div id="s4-panel">
+          <div id="s4-header" class="dim-label">Money OS Assistant</div>
+          <div id="s4-input-row"><span id="s4-typed"></span><span id="s4-cursor">|</span></div>
+          <div id="s4-thinking" style="opacity:0;">
+            <span class="s4-think-dot" id="s4-td1"></span>
+            <span class="s4-think-dot" id="s4-td2"></span>
+            <span class="s4-think-dot" id="s4-td3"></span>
+          </div>
+          <div id="s4-result">
+            <span class="pill" id="s4-chip" style="opacity:0;">Food</span>
+            <span id="s4-desc" style="opacity:0;">Aamras</span>
+            <span id="s4-amount" style="opacity:0;">$20.00</span>
+            <span class="pill" id="s4-badge" style="opacity:0;">Saved</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 5 — INSIGHTS -->
+      <div id="scene5" class="scene">
+        <div class="caption-top" id="s5-caption">AI Reads The Pattern.</div>
+        <div id="s5-score">
+          <div id="s5-score-label">Money Score</div>
+          <div id="s5-score-value">0</div>
+        </div>
+        <div id="s5-chart">
+          <div id="s5-baseline"></div>
+          <div class="s5-bar-col" id="s5-col1" style="left:0px;">
+            <span class="s5-bar-value" id="s5-val1">$210</span>
+            <div class="s5-bar" id="s5-bar1" style="height:420px; background:#7C5CFF;"></div>
+            <span class="s5-bar-cat" id="s5-cat1">Delivery</span>
+          </div>
+          <div class="s5-bar-col" id="s5-col2" style="left:290px;">
+            <span class="s5-bar-value" id="s5-val2">$160</span>
+            <div class="s5-bar" id="s5-bar2" style="height:320px; background:#0A84FF;"></div>
+            <span class="s5-bar-cat" id="s5-cat2">Grocery</span>
+          </div>
+          <div class="s5-bar-col" id="s5-col3" style="left:580px;">
+            <span class="s5-bar-value" id="s5-val3">$138</span>
+            <div class="s5-bar" id="s5-bar3" style="height:276px; background:#FF453A;"></div>
+            <span class="s5-bar-cat" id="s5-cat3">Shopping</span>
+          </div>
+          <div class="s5-bar-col" id="s5-col4" style="left:870px;">
+            <span class="s5-bar-value" id="s5-val4">$84</span>
+            <div class="s5-bar" id="s5-bar4" style="height:168px; background:#FF9F0A;"></div>
+            <span class="s5-bar-cat" id="s5-cat4">Subs</span>
+          </div>
+          <div class="s5-bar-col" id="s5-col5" style="left:1160px;">
+            <span class="s5-bar-value" id="s5-val5">$46</span>
+            <div class="s5-bar" id="s5-bar5" style="height:92px; background:#30D6A5;"></div>
+            <span class="s5-bar-cat" id="s5-cat5">Transit</span>
+          </div>
+        </div>
+        <div id="s5-ai-row">
+          <span class="pill" id="s5-ai-tag">AI Insight</span>
+          <span id="s5-ai-text"><span id="s5-ai-typed"></span></span>
+        </div>
+      </div>
+
+      <!-- SCENE 6 — PULSE (SCI-FI HUD) -->
+      <div id="scene6" class="scene">
+        <div id="s6-radar"><div id="s6-radar-inner"></div></div>
+        <div id="s6-sweep"></div>
+        <div class="s6-corner" id="s6-tl"></div>
+        <div class="s6-corner" id="s6-tr"></div>
+        <div class="s6-corner" id="s6-bl"></div>
+        <div class="s6-corner" id="s6-br"></div>
+        <div id="s6-title">
+          <span class="tag">Money OS</span>
+          <span class="big">Pulse</span>
+        </div>
+        <div id="s6-boot"><span id="s6-boot-text"></span><span id="s6-boot-cursor">_</span></div>
+        <div id="s6-clusters">
+          <div class="s6-dot" id="s6-d1" style="left:520px; top:640px; width:70px; height:70px; background:#0A84FF; box-shadow:0 0 30px rgba(10,132,255,0.6);"></div>
+          <div class="s6-dot" id="s6-d2" style="left:820px; top:760px; width:44px; height:44px; background:#7C5CFF; box-shadow:0 0 24px rgba(124,92,255,0.6);"></div>
+          <div class="s6-dot" id="s6-d3" style="left:1180px; top:660px; width:56px; height:56px; background:#30D6A5; box-shadow:0 0 26px rgba(48,214,165,0.6);"></div>
+          <div class="s6-dot" id="s6-d4" style="left:1400px; top:780px; width:34px; height:34px; background:#FF9F0A; box-shadow:0 0 20px rgba(255,159,10,0.5);"></div>
+          <div class="s6-dot" id="s6-d5" style="left:960px; top:700px; width:26px; height:26px; background:#f5f6fa; box-shadow:0 0 16px rgba(255,255,255,0.5);"></div>
+        </div>
+        <div id="s6-prompt">Drag to orbit &middot; Scroll to zoom</div>
+      </div>
+
+      <!-- SCENE 7 — MONEY UNIVERSE -->
+      <div id="scene7" class="scene">
+        <div id="s7-nebula"></div>
+        <div id="s7-dust-field">
+          <div class="s7-dust" id="s7-d1" style="left:300px; top:260px; width:5px; height:5px;"></div>
+          <div class="s7-dust" id="s7-d2" style="left:1600px; top:320px; width:4px; height:4px;"></div>
+          <div class="s7-dust" id="s7-d3" style="left:1500px; top:850px; width:6px; height:6px;"></div>
+          <div class="s7-dust" id="s7-d4" style="left:280px; top:820px; width:4px; height:4px;"></div>
+        </div>
+        <div id="s7-caption">Every Dollar Gets A Planet.</div>
+        <div id="s7-orbit-root">
+          <div id="s7-orbit-stage">
+            <div id="s7-sun"></div>
+            <div class="s7-body" id="s7-b1" data-angle="0"   style="width:132px;height:132px;background:#7C5CFF;box-shadow:0 0 40px rgba(124,92,255,0.7);">Delivery</div>
+            <div class="s7-body" id="s7-b2" data-angle="90"  style="width:104px;height:104px;background:#0A84FF;box-shadow:0 0 32px rgba(10,132,255,0.6);">Grocery</div>
+            <div class="s7-body" id="s7-b3" data-angle="180" style="width:86px;height:86px;background:#FF9F0A;box-shadow:0 0 28px rgba(255,159,10,0.6);">Subs</div>
+            <div class="s7-body" id="s7-b4" data-angle="270" style="width:70px;height:70px;background:#30D6A5;box-shadow:0 0 24px rgba(48,214,165,0.6);">Transit</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCENE 8 — CRIME SCENE (VERDICT) -->
+      <div id="scene8" class="scene">
+        <div id="s8-tape-top"></div>
+        <div id="s8-evidence">
+          <div class="s8-ev-row" id="s8-ev1"><span class="n">01</span>Grocery &mdash; $210</div>
+          <div class="s8-ev-row" id="s8-ev2"><span class="n">02</span>Subscriptions &mdash; $84</div>
+          <div class="s8-ev-row" id="s8-ev3"><span class="n">03</span>Transit &mdash; $46</div>
+        </div>
+        <div id="s8-stamp">Primary Suspect</div>
+        <div id="s8-suspect">Delivery</div>
+        <div id="s8-verdict-wrap">
+          <div id="s8-verdict"><span id="s8-verdict-text"></span><span id="s8-cursor">_</span></div>
+        </div>
+      </div>
+
+      <!-- SCENE 9 — APPLE SHORTCUTS / SIRI -->
+      <div id="scene9" class="scene">
+        <div class="caption-top" id="s9-caption">Say It. Siri Logs It.</div>
+        <div id="s9-icon-row">
+          <div id="s9-icon"><div id="s9-bolt"></div></div>
+          <div id="s9-bubble">&ldquo;Hey Siri, Log Expense&rdquo;</div>
+        </div>
+        <div id="s9-wave">
+          <div class="s9-bar" id="s9-w1" style="height:14px;"></div>
+          <div class="s9-bar" id="s9-w2" style="height:30px;"></div>
+          <div class="s9-bar" id="s9-w3" style="height:44px;"></div>
+          <div class="s9-bar" id="s9-w4" style="height:24px;"></div>
+          <div class="s9-bar" id="s9-w5" style="height:36px;"></div>
+        </div>
+        <div id="s9-prompt-card" class="panel-card" style="opacity:0;">
+          <div class="dim-label">What did you spend?</div>
+          <div id="s9-prompt-answer"><span id="s9-prompt-text"></span></div>
+        </div>
+        <div id="s9-reply-card" class="panel-card" style="opacity:0;">
+          <span class="pill" id="s9-reply-badge">Logged</span>
+          <span id="s9-reply-text">$50.00 &middot; Chai</span>
+        </div>
+      </div>
+
+      <!-- SCENE 10 — SPLITS: ASK MONEY OS -->
+      <div id="scene10" class="scene">
+        <div class="caption-top" id="s10-caption">Ask It. AI Tracks Who Owes Who.</div>
+        <div class="s10-avatar" id="s10-avatar-you">You</div>
+        <div class="s10-avatar" id="s10-avatar-raj">Raj</div>
+        <div id="s10-link"></div>
+        <div id="s10-ask-panel">
+          <div class="dim-label">Ask Money OS</div>
+          <div id="s10-query-row"><span id="s10-query-typed"></span><span id="s10-query-cursor">|</span></div>
+        </div>
+        <div id="s10-reply-row">
+          <span class="pill" id="s10-reply-tag">AI</span>
+          <span id="s10-reply-text">You owe Raj for dinner.</span>
+          <span id="s10-reply-figure">$126.00</span>
+        </div>
+      </div>
+
+      <!-- SCENE 11 — OUTRO -->
+      <div id="scene11" class="scene">
+        <div class="ambient-glow" id="s11-glow"></div>
+        <div id="s11-wrap">
+          <div id="s11-orbit">
+            <div class="s11-orbit-dot" id="s11-od1" style="background:#7C5CFF;"></div>
+            <div class="s11-orbit-dot" id="s11-od2" style="background:#0A84FF;"></div>
+            <div class="s11-orbit-dot" id="s11-od3" style="background:#30D6A5;"></div>
+            <div class="s11-orbit-dot" id="s11-od4" style="background:#FF9F0A;"></div>
+          </div>
+          <div id="s11-word">Money <span class="hl">OS</span></div>
+          <div id="s11-tagline">
+            <span id="s11-tw1">Your</span><span id="s11-tw2">Money</span><span id="s11-tw3">Operating</span><span id="s11-tw4">System.</span><span id="s11-tw5">It</span><span id="s11-tw6">Does</span><span id="s11-tw7">A</span><span id="s11-tw8">Lot.</span>
+          </div>
+        </div>
+        <div id="s11-fade"></div>
+      </div>
+
+      <div id="flash-overlay"></div>
+
+      <!-- ================= AUDIO ================= -->
+      <audio id="bg-music" data-start="0" data-duration="32.1" data-track-index="10"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[
+          {"t":0,"v":0.36},{"t":20.8,"v":0.36},{"t":21.0,"v":0.07},{"t":22.2,"v":0.07},
+          {"t":22.4,"v":0.36},{"t":31.6,"v":0.36},{"t":32.1,"v":0.0}
+        ]}]}'
+        src="assets/music/happy-beats-business-moves-vol-1-by-ende-dot-app.mp3"></audio>
+
+      <!-- SCENE 1 -->
+      <audio id="sfx-hook" data-start="0.1" data-duration="0.65" data-track-index="11" data-volume="0.85" src="assets/sfx/impact/impactPunch_heavy_000.ogg"></audio>
+      <audio id="sfx-t1"   data-start="2.0" data-duration="0.54" data-track-index="12" data-volume="0.8"  src="assets/sfx/impact/impactPunch_heavy_001.ogg"></audio>
+
+      <!-- SCENE 2 -->
+      <audio id="sfx-s2in"   data-start="2.1" data-duration="0.11" data-track-index="13" data-volume="0.6"  src="assets/sfx/interface/drop_001.ogg"></audio>
+      <audio id="sfx-s2stat" data-start="3.0" data-duration="0.19" data-track-index="14" data-volume="0.55" src="assets/sfx/interface/drop_002.ogg"></audio>
+      <audio id="sfx-t2"     data-start="4.0" data-duration="0.65" data-track-index="15" data-volume="0.8"  src="assets/sfx/impact/impactPunch_heavy_000.ogg"></audio>
+
+      <!-- SCENE 3: Story -->
+      <audio id="sfx-s3bars" data-start="4.5" data-duration="0.19" data-track-index="16" data-volume="0.5" src="assets/sfx/interface/drop_002.ogg"></audio>
+      <audio id="sfx-s3fill" data-start="4.6" data-duration="0.03" data-track-index="17" data-volume="0.4" src="assets/sfx/interface/glitch_002.ogg"></audio>
+      <audio id="sfx-t3"     data-start="6.6" data-duration="0.54" data-track-index="18" data-volume="0.8" src="assets/sfx/impact/impactPunch_heavy_001.ogg"></audio>
+
+      <!-- SCENE 4: suggestion chips + typing "20 aamras" + thinking + saved -->
+      <audio id="sfx-sg1" data-start="7.10" data-duration="0.1" data-track-index="19" data-volume="0.4" src="assets/sfx/ui/rollover1.ogg"></audio>
+      <audio id="sfx-sg2" data-start="7.18" data-duration="0.1" data-track-index="20" data-volume="0.4" src="assets/sfx/ui/rollover1.ogg"></audio>
+      <audio id="sfx-sg3" data-start="7.26" data-duration="0.1" data-track-index="21" data-volume="0.4" src="assets/sfx/ui/rollover1.ogg"></audio>
+      <audio id="sfx-sg4" data-start="7.34" data-duration="0.1" data-track-index="22" data-volume="0.4" src="assets/sfx/ui/rollover1.ogg"></audio>
+      <audio id="sfx-ai-kp1" data-start="7.80" data-duration="0.12" data-track-index="23" data-volume="0.6" src="assets/sfx/keyboard/keypress-001.wav"></audio>
+      <audio id="sfx-ai-kp2" data-start="7.90" data-duration="0.12" data-track-index="24" data-volume="0.6" src="assets/sfx/keyboard/keypress-002.wav"></audio>
+      <audio id="sfx-ai-kp3" data-start="8.00" data-duration="0.12" data-track-index="25" data-volume="0.6" src="assets/sfx/keyboard/keypress-003.wav"></audio>
+      <audio id="sfx-ai-kp4" data-start="8.10" data-duration="0.12" data-track-index="26" data-volume="0.6" src="assets/sfx/keyboard/keypress-004.wav"></audio>
+      <audio id="sfx-ai-kp5" data-start="8.20" data-duration="0.12" data-track-index="27" data-volume="0.6" src="assets/sfx/keyboard/keypress-005.wav"></audio>
+      <audio id="sfx-ai-kp6" data-start="8.30" data-duration="0.12" data-track-index="28" data-volume="0.6" src="assets/sfx/keyboard/keypress-006.wav"></audio>
+      <audio id="sfx-ai-kp7" data-start="8.40" data-duration="0.12" data-track-index="29" data-volume="0.6" src="assets/sfx/keyboard/keypress-007.wav"></audio>
+      <audio id="sfx-ai-kp8" data-start="8.50" data-duration="0.12" data-track-index="30" data-volume="0.6" src="assets/sfx/keyboard/keypress-008.wav"></audio>
+      <audio id="sfx-think"  data-start="8.80" data-duration="0.06" data-track-index="31" data-volume="0.4" src="assets/sfx/ui/rollover2.ogg"></audio>
+      <audio id="sfx-ai-saved" data-start="9.3" data-duration="0.19" data-track-index="32" data-volume="0.7" src="assets/sfx/interface/drop_002.ogg"></audio>
+
+      <!-- SCENE 5: Insights — bars grow, money score, two AI insights -->
+      <audio id="sfx-bar1" data-start="10.40" data-duration="0.1" data-track-index="33" data-volume="0.5" src="assets/sfx/casino/card-slide-1.ogg"></audio>
+      <audio id="sfx-bar2" data-start="10.50" data-duration="0.1" data-track-index="34" data-volume="0.5" src="assets/sfx/casino/card-slide-2.ogg"></audio>
+      <audio id="sfx-bar3" data-start="10.60" data-duration="0.1" data-track-index="35" data-volume="0.5" src="assets/sfx/casino/card-slide-3.ogg"></audio>
+      <audio id="sfx-bar4" data-start="10.70" data-duration="0.1" data-track-index="36" data-volume="0.5" src="assets/sfx/casino/card-slide-4.ogg"></audio>
+      <audio id="sfx-bar5" data-start="10.80" data-duration="0.1" data-track-index="37" data-volume="0.5" src="assets/sfx/casino/card-slide-1.ogg"></audio>
+      <audio id="sfx-score" data-start="11.1" data-duration="0.11" data-track-index="38" data-volume="0.55" src="assets/sfx/interface/drop_001.ogg"></audio>
+      <audio id="sfx-aitag" data-start="11.6" data-duration="0.11" data-track-index="39" data-volume="0.6" src="assets/sfx/interface/drop_001.ogg"></audio>
+      <audio id="sfx-ai-kv1" data-start="11.80" data-duration="0.12" data-track-index="40" data-volume="0.4" src="assets/sfx/keyboard/keypress-009.wav"></audio>
+      <audio id="sfx-ai-kv2" data-start="12.00" data-duration="0.12" data-track-index="41" data-volume="0.4" src="assets/sfx/keyboard/keypress-010.wav"></audio>
+      <audio id="sfx-ai-kv3" data-start="12.20" data-duration="0.12" data-track-index="42" data-volume="0.4" src="assets/sfx/keyboard/keypress-011.wav"></audio>
+      <audio id="sfx-ai-kv4" data-start="12.40" data-duration="0.12" data-track-index="43" data-volume="0.4" src="assets/sfx/keyboard/keypress-012.wav"></audio>
+      <audio id="sfx-blink"  data-start="13.25" data-duration="0.1" data-track-index="44" data-volume="0.5" src="assets/sfx/ui/click1.ogg"></audio>
+      <audio id="sfx-ai-kv5" data-start="13.35" data-duration="0.12" data-track-index="45" data-volume="0.4" src="assets/sfx/keyboard/keypress-001.wav"></audio>
+      <audio id="sfx-ai-kv6" data-start="13.55" data-duration="0.12" data-track-index="46" data-volume="0.4" src="assets/sfx/keyboard/keypress-002.wav"></audio>
+      <audio id="sfx-ai-kv7" data-start="13.75" data-duration="0.12" data-track-index="47" data-volume="0.4" src="assets/sfx/keyboard/keypress-003.wav"></audio>
+      <audio id="sfx-ai-kv8" data-start="13.95" data-duration="0.12" data-track-index="48" data-volume="0.4" src="assets/sfx/keyboard/keypress-004.wav"></audio>
+      <audio id="sfx-t5" data-start="14.3" data-duration="0.65" data-track-index="49" data-volume="0.8" src="assets/sfx/impact/impactPunch_heavy_000.ogg"></audio>
+
+      <!-- SCENE 6: pulse boot text ticks -->
+      <audio id="sfx-boot1" data-start="14.65" data-duration="0.12" data-track-index="50" data-volume="0.45" src="assets/sfx/keyboard/keypress-001.wav"></audio>
+      <audio id="sfx-boot2" data-start="14.80" data-duration="0.12" data-track-index="51" data-volume="0.45" src="assets/sfx/keyboard/keypress-002.wav"></audio>
+      <audio id="sfx-boot3" data-start="14.95" data-duration="0.12" data-track-index="52" data-volume="0.45" src="assets/sfx/keyboard/keypress-003.wav"></audio>
+      <audio id="sfx-boot4" data-start="15.10" data-duration="0.12" data-track-index="53" data-volume="0.45" src="assets/sfx/keyboard/keypress-004.wav"></audio>
+      <audio id="sfx-boot5" data-start="15.25" data-duration="0.12" data-track-index="54" data-volume="0.45" src="assets/sfx/keyboard/keypress-005.wav"></audio>
+      <audio id="sfx-boot6" data-start="15.40" data-duration="0.12" data-track-index="55" data-volume="0.45" src="assets/sfx/keyboard/keypress-006.wav"></audio>
+      <audio id="sfx-t6" data-start="17.1" data-duration="0.54" data-track-index="56" data-volume="0.85" src="assets/sfx/impact/impactPunch_heavy_001.ogg"></audio>
+
+      <!-- SCENE 7: orbit arrivals, beat-grid -->
+      <audio id="sfx-orb1" data-start="17.5195" data-duration="0.11" data-track-index="57" data-volume="0.55" src="assets/sfx/interface/drop_001.ogg"></audio>
+      <audio id="sfx-orb2" data-start="18.0187" data-duration="0.11" data-track-index="58" data-volume="0.55" src="assets/sfx/interface/drop_001.ogg"></audio>
+      <audio id="sfx-orb3" data-start="18.5179" data-duration="0.11" data-track-index="59" data-volume="0.55" src="assets/sfx/interface/drop_001.ogg"></audio>
+      <audio id="sfx-orb4" data-start="19.0171" data-duration="0.11" data-track-index="60" data-volume="0.55" src="assets/sfx/interface/drop_001.ogg"></audio>
+      <audio id="sfx-t7"   data-start="19.3" data-duration="0.54" data-track-index="61" data-volume="0.8" src="assets/sfx/impact/impactPunch_heavy_000.ogg"></audio>
+
+      <!-- SCENE 8: evidence rows + stamp + verdict typing ticks -->
+      <audio id="sfx-ev1" data-start="19.80" data-duration="0.11" data-track-index="62" data-volume="0.5" src="assets/sfx/casino/card-slide-1.ogg"></audio>
+      <audio id="sfx-ev2" data-start="19.86" data-duration="0.11" data-track-index="63" data-volume="0.5" src="assets/sfx/casino/card-slide-2.ogg"></audio>
+      <audio id="sfx-ev3" data-start="19.92" data-duration="0.11" data-track-index="64" data-volume="0.5" src="assets/sfx/casino/card-slide-3.ogg"></audio>
+      <audio id="sfx-stamp" data-start="20.35" data-duration="1.0" data-track-index="65" data-volume="0.8" src="assets/sfx/impact/impactBell_heavy_000.ogg"></audio>
+      <audio id="sfx-kv1" data-start="21.00" data-duration="0.12" data-track-index="66" data-volume="0.32" src="assets/sfx/keyboard/keypress-007.wav"></audio>
+      <audio id="sfx-kv2" data-start="21.15" data-duration="0.12" data-track-index="67" data-volume="0.32" src="assets/sfx/keyboard/keypress-008.wav"></audio>
+      <audio id="sfx-kv3" data-start="21.30" data-duration="0.12" data-track-index="68" data-volume="0.32" src="assets/sfx/keyboard/keypress-009.wav"></audio>
+      <audio id="sfx-kv4" data-start="21.45" data-duration="0.12" data-track-index="69" data-volume="0.32" src="assets/sfx/keyboard/keypress-010.wav"></audio>
+      <audio id="sfx-kv5" data-start="21.60" data-duration="0.12" data-track-index="70" data-volume="0.32" src="assets/sfx/keyboard/keypress-011.wav"></audio>
+      <audio id="sfx-kv6" data-start="21.75" data-duration="0.12" data-track-index="71" data-volume="0.32" src="assets/sfx/keyboard/keypress-012.wav"></audio>
+      <audio id="sfx-kv7" data-start="21.90" data-duration="0.12" data-track-index="72" data-volume="0.32" src="assets/sfx/keyboard/keypress-001.wav"></audio>
+      <audio id="sfx-t8" data-start="22.4" data-duration="0.65" data-track-index="73" data-volume="0.8" src="assets/sfx/impact/impactPunch_heavy_000.ogg"></audio>
+
+      <!-- SCENE 9: waveform + typing "50 chai" + reply chime -->
+      <audio id="sfx-wave" data-start="22.9" data-duration="0.03" data-track-index="74" data-volume="0.4" src="assets/sfx/interface/glitch_002.ogg"></audio>
+      <audio id="sfx-sc-kp1" data-start="23.80" data-duration="0.12" data-track-index="75" data-volume="0.6" src="assets/sfx/keyboard/keypress-011.wav"></audio>
+      <audio id="sfx-sc-kp2" data-start="23.92" data-duration="0.12" data-track-index="76" data-volume="0.6" src="assets/sfx/keyboard/keypress-012.wav"></audio>
+      <audio id="sfx-sc-kp3" data-start="24.04" data-duration="0.12" data-track-index="77" data-volume="0.6" src="assets/sfx/keyboard/keypress-001.wav"></audio>
+      <audio id="sfx-sc-kp4" data-start="24.16" data-duration="0.12" data-track-index="78" data-volume="0.6" src="assets/sfx/keyboard/keypress-002.wav"></audio>
+      <audio id="sfx-sc-reply" data-start="24.4" data-duration="0.5" data-track-index="79" data-volume="0.7" src="assets/sfx/casino/card-place-1.ogg"></audio>
+      <audio id="sfx-t9" data-start="25.3" data-duration="0.54" data-track-index="80" data-volume="0.8" src="assets/sfx/impact/impactPunch_heavy_001.ogg"></audio>
+
+      <!-- SCENE 10: avatars + ask AI + reply + settle -->
+      <audio id="sfx-avatars" data-start="25.8" data-duration="0.11" data-track-index="81" data-volume="0.5" src="assets/sfx/casino/card-slide-4.ogg"></audio>
+      <audio id="sfx-ask-in"  data-start="26.4" data-duration="0.11" data-track-index="82" data-volume="0.55" src="assets/sfx/interface/drop_001.ogg"></audio>
+      <audio id="sfx-ask-kp1" data-start="26.65" data-duration="0.12" data-track-index="83" data-volume="0.6" src="assets/sfx/keyboard/keypress-005.wav"></audio>
+      <audio id="sfx-ask-kp2" data-start="26.80" data-duration="0.12" data-track-index="84" data-volume="0.6" src="assets/sfx/keyboard/keypress-006.wav"></audio>
+      <audio id="sfx-ask-kp3" data-start="26.95" data-duration="0.12" data-track-index="85" data-volume="0.6" src="assets/sfx/keyboard/keypress-007.wav"></audio>
+      <audio id="sfx-ask-kp4" data-start="27.10" data-duration="0.12" data-track-index="86" data-volume="0.6" src="assets/sfx/keyboard/keypress-008.wav"></audio>
+      <audio id="sfx-reply"   data-start="27.4"  data-duration="0.5" data-track-index="87" data-volume="0.7" src="assets/sfx/casino/card-place-1.ogg"></audio>
+      <audio id="sfx-settle"  data-start="28.015" data-duration="0.65" data-track-index="88" data-volume="0.85" src="assets/sfx/impact/impactPunch_heavy_000.ogg"></audio>
+      <audio id="sfx-t10" data-start="28.9" data-duration="0.54" data-track-index="89" data-volume="0.8" src="assets/sfx/impact/impactPunch_heavy_001.ogg"></audio>
+
+      <!-- SCENE 11: outro -->
+      <audio id="sfx-outro" data-start="29.013" data-duration="1.2" data-track-index="90" data-volume="0.9" src="assets/sfx/impact/impactBell_heavy_000.ogg"></audio>
+    </div>
+
+    <script>
+      // ---------- Deterministic helpers ----------
+      function fmtMoney(v) {
+        return "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+
+      // Smooth character-slice typewriter (no edits, no typos — see hyperframes-animation/rules/discrete-text-sequence.md)
+      function typeInto(tl, el, fullText, start, dur) {
+        var proxy = { v: 0 };
+        tl.to(proxy, {
+          v: fullText.length,
+          duration: dur,
+          ease: "power1.inOut",
+          onUpdate: function () { el.textContent = fullText.substring(0, Math.floor(proxy.v)); },
+        }, start);
+      }
+
+      // Finite idle "breathing" loop — cycle seconds per full yoyo pass, reps computed to fit inside [start, end].
+      function idleLoop(tl, target, vars, start, end, cycle) {
+        var holdDur = end - start;
+        var reps = Math.max(0, Math.floor(holdDur / cycle) - 1);
+        if (reps <= 0) return;
+        var v = Object.assign({ duration: cycle / 2, ease: "sine.inOut", yoyo: true, repeat: reps }, vars);
+        tl.to(target, v, start);
+      }
+
+      // ---------- Transitions (see hyperframes-animation/transitions catalog.md + css-scale.md + css-light.md) ----------
+      function flashCut(tl, oldSel, newSel, T) {
+        tl.to(oldSel, { filter: "brightness(1.5)", scale: 1.03, duration: 0.16, ease: "power1.in" }, T);
+        tl.to(oldSel, { filter: "brightness(3)", scale: 1.06, duration: 0.16, ease: "power2.in" }, T + 0.16);
+        tl.to("#flash-overlay", { opacity: 0.6, duration: 0.18, ease: "power1.in" }, T + 0.12);
+        tl.to("#flash-overlay", { opacity: 1, duration: 0.12, ease: "power2.in" }, T + 0.32);
+        tl.set(oldSel, { opacity: 0, filter: "brightness(1)", scale: 1 }, T + 0.44);
+        tl.set(newSel, { opacity: 1 }, T + 0.44);
+        tl.to("#flash-overlay", { opacity: 0, duration: 0.28, ease: "power2.out" }, T + 0.44);
+      }
+
+      function zoomThrough(tl, oldSel, newSel, T) {
+        tl.to(oldSel, { scale: 2.2, opacity: 0, filter: "blur(8px)", duration: 0.4, ease: "power3.in" }, T);
+        tl.fromTo(newSel,
+          { scale: 0.5, opacity: 0, filter: "blur(8px)" },
+          { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.4, ease: "power3.out" }, T + 0.15);
+      }
+
+      document.fonts.ready.then(function () {
+        var tl = gsap.timeline({ paused: true, defaults: { ease: "power3.out" } });
+
+        // ================= SCENE 1 — HOOK (0.0 – 2.0s) =================
+        tl.fromTo("#s1-tape", { y: -64 }, { y: 0, duration: 0.35, ease: "power2.out" }, 0.0);
+        tl.fromTo("#s1-tape-bottom", { y: 64 }, { y: 0, duration: 0.35, ease: "power2.out" }, 0.0);
+        tl.fromTo(".s1-particle", { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.3, stagger: 0.04 }, 0.05);
+        tl.fromTo("#s1-l1",
+          { scale: 1.5, filter: "blur(16px)", opacity: 0 },
+          { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.4, ease: "power4.out" }, 0.15);
+        tl.fromTo("#s1-l2",
+          { scale: 1.3, filter: "blur(12px)", opacity: 0 },
+          { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.4, ease: "power4.out" }, 0.42);
+        idleLoop(tl, "#s1-stage", { scale: 1.02 }, 0.9, 2.0, 0.55);
+
+        flashCut(tl, "#scene1", "#scene2", 2.0);
+
+        // ================= SCENE 2 — REVEAL: THE APP (2.0 – 4.0s) =================
+        tl.fromTo("#s2-glow", { opacity: 0, x: 0, y: 0 }, { opacity: 0.55, duration: 0.4 }, 2.0);
+        idleLoop(tl, "#s2-glow", { x: -60, y: 40 }, 2.4, 4.0, 0.9);
+        tl.fromTo("#s2-card",
+          { scale: 0.85, opacity: 0 },
+          { scale: 1, opacity: 1, duration: 0.3, ease: "back.out(1.6)" }, 2.1);
+        tl.fromTo("#s2-word",
+          { x: 40, opacity: 0 },
+          { x: 0, opacity: 1, duration: 0.3, ease: "power3.out" }, 2.2);
+        var balProxy = { v: 0 };
+        var balEl = document.getElementById("s2-balance");
+        tl.to(balProxy, {
+          v: 2481.36, duration: 0.7, ease: "power2.out",
+          onUpdate: function () { balEl.textContent = fmtMoney(balProxy.v); },
+        }, 2.3);
+        tl.fromTo(["#s2-stat1", "#s2-stat2", "#s2-stat3"],
+          { y: 20, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.3, stagger: 0.08, ease: "back.out(1.6)" }, 3.0);
+        idleLoop(tl, "#s2-card", { y: -8 }, 3.3, 4.0, 0.7);
+
+        flashCut(tl, "#scene2", "#scene3", 4.0);
+
+        // ================= SCENE 3 — STORY (4.0 – 6.6s) =================
+        tl.fromTo(".s3-bar", { opacity: 0 }, { opacity: 1, duration: 0.2 }, 4.5);
+        var s3fill = { v: 0 };
+        tl.to(s3fill, {
+          v: 100, duration: 1.9, ease: "none",
+          onUpdate: function () { document.getElementById("s3-fill1").style.width = s3fill.v + "%"; },
+        }, 4.6);
+        tl.fromTo("#s3-label", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.3 }, 4.7);
+        var s3counter = { v: 0 };
+        var s3CounterEl = document.getElementById("s3-counter");
+        tl.to(s3counter, {
+          v: 2481.36, duration: 0.8, ease: "power2.out",
+          onUpdate: function () { s3CounterEl.textContent = fmtMoney(s3counter.v); },
+        }, 4.9);
+        tl.fromTo("#s3-chapter",
+          { opacity: 0, y: 24, scale: 0.95 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.35, ease: "power3.out" }, 5.85);
+
+        flashCut(tl, "#scene3", "#scene4", 6.6);
+
+        // ================= SCENE 4 — AI AUTO-ADD (6.6 – 10.0s) =================
+        tl.fromTo("#s4-glow", { opacity: 0 }, { opacity: 0.5, duration: 0.4 }, 6.6);
+        idleLoop(tl, "#s4-glow", { x: 50, y: -30 }, 7.0, 10.0, 1.0);
+        tl.fromTo("#s4-caption", { scale: 1.15, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, ease: "power4.out" }, 6.7);
+        tl.fromTo("#s4-panel", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: "power3.out" }, 6.7);
+
+        tl.fromTo(["#s4-sg1", "#s4-sg2", "#s4-sg3", "#s4-sg4"],
+          { y: -16, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.22, stagger: 0.08, ease: "back.out(1.6)" }, 7.1);
+        tl.to(["#s4-sg1", "#s4-sg2", "#s4-sg3", "#s4-sg4"],
+          { y: -14, opacity: 0, duration: 0.18, stagger: 0.04, ease: "power2.in" }, 7.55);
+        tl.set("#s4-suggestions", { display: "none" }, 7.78);
+
+        typeInto(tl, document.getElementById("s4-typed"), "20 aamras", 7.8, 0.8);
+        tl.to("#s4-input-row", { scale: 1.03, duration: 0.1, yoyo: true, repeat: 1 }, 8.6);
+        tl.to("#s4-input-row", { opacity: 0.35, duration: 0.2 }, 8.7);
+
+        tl.to("#s4-thinking", { opacity: 1, duration: 0.15 }, 8.8);
+        tl.to([".s4-think-dot"], { y: -10, duration: 0.18, stagger: 0.08, yoyo: true, repeat: 1 }, 8.8);
+        tl.to("#s4-thinking", { opacity: 0, duration: 0.15 }, 9.15);
+        tl.set("#s4-thinking", { display: "none" }, 9.3);
+
+        tl.fromTo(["#s4-chip", "#s4-desc", "#s4-amount", "#s4-badge"],
+          { y: 18, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.26, stagger: 0.07, ease: "back.out(1.7)" }, 9.3);
+
+        zoomThrough(tl, "#scene4", "#scene5", 10.0);
+
+        // ================= SCENE 5 — INSIGHTS (10.0 – 14.3s) =================
+        tl.fromTo("#s5-caption", { scale: 1.15, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, ease: "power4.out" }, 10.2);
+        tl.fromTo("#s5-baseline", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 10.35);
+
+        var s5bars = [
+          { bar: "#s5-bar1", val: "#s5-val1", cat: "#s5-cat1", start: 10.40 },
+          { bar: "#s5-bar2", val: "#s5-val2", cat: "#s5-cat2", start: 10.50 },
+          { bar: "#s5-bar3", val: "#s5-val3", cat: "#s5-cat3", start: 10.60 },
+          { bar: "#s5-bar4", val: "#s5-val4", cat: "#s5-cat4", start: 10.70 },
+          { bar: "#s5-bar5", val: "#s5-val5", cat: "#s5-cat5", start: 10.80 },
+        ];
+        s5bars.forEach(function (b) {
+          tl.fromTo(b.bar, { scaleY: 0 }, { scaleY: 1, duration: 0.45, ease: "power3.out" }, b.start);
+          tl.fromTo(b.cat, { opacity: 0 }, { opacity: 1, duration: 0.25 }, b.start);
+          tl.fromTo(b.val, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.25 }, b.start + 0.38);
+        });
+
+        // AI-computed "Money Score" badge — a second, distinct AI-derived metric alongside the chart.
+        tl.fromTo("#s5-score", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.3 }, 11.0);
+        var s5ScoreProxy = { v: 0 };
+        var s5ScoreEl = document.getElementById("s5-score-value");
+        tl.to(s5ScoreProxy, {
+          v: 82, duration: 0.6, ease: "power2.out",
+          onUpdate: function () { s5ScoreEl.textContent = String(Math.round(s5ScoreProxy.v)); },
+        }, 11.1);
+
+        tl.fromTo("#s5-ai-tag", { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.25, ease: "back.out(1.8)" }, 11.6);
+        var s5aiTypedEl = document.getElementById("s5-ai-typed");
+        typeInto(tl, s5aiTypedEl, "Delivery is down 18% from last month. Nice.", 11.8, 1.0);
+        // A second AI insight retypes into the same line — a quick dim/brighten pulse signals
+        // "new answer," then typeInto naturally clears (proxy restarts at v=0) and retypes.
+        tl.to("#s5-ai-text", { opacity: 0.25, duration: 0.08, yoyo: true, repeat: 1 }, 13.25);
+        typeInto(tl, s5aiTypedEl, "12-day no-impulse streak. Keep going.", 13.3, 0.8);
+
+        flashCut(tl, "#scene5", "#scene6", 14.3);
+
+        // ================= SCENE 6 — PULSE / SCI-FI HUD (14.3 – 17.1s) =================
+        tl.fromTo("#s6-radar", { opacity: 0, scale: 0.85 }, { opacity: 1, scale: 1, duration: 0.4, ease: "power3.out" }, 14.35);
+        tl.to("#s6-radar", { rotation: 220, duration: 2.6, ease: "none" }, 14.4);
+        tl.fromTo(["#s6-tl", "#s6-tr", "#s6-bl", "#s6-br"],
+          { opacity: 0 }, { opacity: 1, duration: 0.3, stagger: 0.04 }, 14.4);
+        idleLoop(tl, [".s6-corner"], { opacity: 0.55 }, 14.7, 17.1, 0.7);
+        tl.fromTo("#s6-title", { opacity: 0, y: -14 }, { opacity: 1, y: 0, duration: 0.35, ease: "power3.out" }, 14.45);
+
+        var sweep = { p: 0 };
+        tl.to(sweep, {
+          p: 1, duration: 0.85, ease: "sine.inOut", repeat: 2,
+          onUpdate: function () {
+            var y = 60 + sweep.p * 900;
+            var el = document.getElementById("s6-sweep");
+            el.style.transform = "translateY(" + y + "px)";
+            el.style.opacity = String(0.15 + 0.7 * Math.sin(sweep.p * Math.PI));
+          },
+        }, 14.6);
+
+        typeInto(tl, document.getElementById("s6-boot-text"), "Reading Purchase History", 14.65, 0.75);
+        var bootBlink = { p: 0 };
+        tl.to(bootBlink, {
+          p: Math.PI * 2 * 3, duration: 2.8, ease: "none",
+          onUpdate: function () { document.getElementById("s6-boot-cursor").style.opacity = Math.sin(bootBlink.p) > 0 ? "1" : "0"; },
+        }, 14.3);
+
+        var s6dots = ["#s6-d1", "#s6-d2", "#s6-d3", "#s6-d4", "#s6-d5"];
+        tl.fromTo(s6dots, { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.4, stagger: 0.08, ease: "back.out(1.5)" }, 15.5);
+        s6dots.forEach(function (sel, i) {
+          idleLoop(tl, sel, { x: (i % 2 === 0 ? 14 : -12), y: (i % 2 === 0 ? -10 : 12) }, 16.0, 17.1, 0.5 + i * 0.06);
+        });
+        tl.fromTo("#s6-prompt", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 16.3);
+
+        zoomThrough(tl, "#scene6", "#scene7", 17.1);
+
+        // ================= SCENE 7 — MONEY UNIVERSE (17.1 – 19.3s) =================
+        idleLoop(tl, "#s7-nebula", { opacity: 0.65 }, 17.1, 19.3, 0.9);
+        tl.fromTo(".s7-dust", { opacity: 0 }, { opacity: 0.8, duration: 0.4, stagger: 0.05 }, 17.15);
+        tl.fromTo("#s7-caption",
+          { scale: 1.2, opacity: 0 },
+          { scale: 1, opacity: 1, duration: 0.35, ease: "power4.out" }, 17.2);
+        tl.fromTo("#s7-sun", { scale: 0.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, ease: "back.out(1.6)" }, 17.15);
+        idleLoop(tl, "#s7-sun", { scale: 1.06 }, 17.55, 19.3, 0.6);
+
+        var RADIUS_X = 430, RADIUS_Y = 430 * 0.55;
+        var bodies7 = [
+          { id: "s7-b1", angle: 0,   start: 17.5195, dur: 0.4 },
+          { id: "s7-b2", angle: 90,  start: 18.0187, dur: 0.4 },
+          { id: "s7-b3", angle: 180, start: 18.5179, dur: 0.4 },
+          { id: "s7-b4", angle: 270, start: 19.0171, dur: 0.28 },
+        ];
+        bodies7.forEach(function (b) { // beat-grid: orbit bodies land on consecutive beats
+          var el = document.getElementById(b.id);
+          var a0 = (b.angle / 360) * Math.PI * 2;
+          var sx = Math.cos(a0) * RADIUS_X, sy = Math.sin(a0) * RADIUS_Y;
+          gsap.set(el, { xPercent: -50, yPercent: -50, x: sx, y: sy, opacity: 0, scale: 0.3 });
+          tl.to(el, { opacity: 1, scale: 1, duration: b.dur, ease: "back.out(1.7)" }, b.start);
+          var orbit = { p: 0 };
+          var orbitDur = 19.3 - (b.start + b.dur);
+          if (orbitDur > 0.1) {
+            tl.to(orbit, {
+              p: 1, duration: orbitDur, ease: "none",
+              onUpdate: function () {
+                var a = a0 + orbit.p * (Math.PI * 2 * 0.35);
+                var x = Math.cos(a) * RADIUS_X, y = Math.sin(a) * RADIUS_Y;
+                el.style.transform = "translate(-50%,-50%) translate(" + x + "px," + y + "px)";
+                el.style.zIndex = String(1 + Math.round(((y + RADIUS_Y) / (2 * RADIUS_Y)) * 49));
+              },
+            }, b.start + b.dur);
+          }
+        });
+
+        flashCut(tl, "#scene7", "#scene8", 19.3);
+        // Explicitly hide orbit leaves — their own opacity/transform is set imperatively in
+        // onUpdate above and must not be left visible after the scene container fades out.
+        tl.set(["#s7-b1", "#s7-b2", "#s7-b3", "#s7-b4", "#s7-sun"], { opacity: 0, display: "none" }, 19.74);
+
+        // ================= SCENE 8 — CRIME SCENE / VERDICT (19.3 – 22.4s) =================
+        // Note: scene8 is not opaque until 19.74 (flashCut's T+0.44) — the evidence beat below
+        // starts just after that so it is actually seen, not wasted behind an invisible scene.
+        tl.fromTo(["#s8-ev1", "#s8-ev2", "#s8-ev3"],
+          { x: -30, opacity: 0 },
+          { x: 0, opacity: 1, duration: 0.2, stagger: 0.06, ease: "power3.out" }, 19.8);
+        tl.to(["#s8-ev1", "#s8-ev2", "#s8-ev3"],
+          { x: 20, opacity: 0, duration: 0.15, stagger: 0.03, ease: "power2.in" }, 20.15);
+        tl.set("#s8-evidence", { display: "none" }, 20.35);
+
+        tl.fromTo("#s8-stamp",
+          { scale: 1.4, opacity: 0 },
+          { scale: 1, opacity: 1, duration: 0.25, ease: "power4.out" }, 20.35);
+        tl.fromTo("#s8-suspect",
+          { scale: 1.3, opacity: 0, filter: "blur(10px)" },
+          { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.3, ease: "power4.out" }, 20.6);
+        // No competing music swell here (see audio automation dip 21.0–22.2) — the punchline needs the room.
+        typeInto(tl, document.getElementById("s8-verdict-text"), "Table for one. Bill for five.", 21.0, 1.2);
+        var blink = { p: 0 };
+        tl.to(blink, {
+          p: Math.PI * 2 * 3, duration: 3.1, ease: "none",
+          onUpdate: function () { document.getElementById("s8-cursor").style.opacity = Math.sin(blink.p) > 0 ? "1" : "0"; },
+        }, 19.3);
+
+        flashCut(tl, "#scene8", "#scene9", 22.4);
+
+        // ================= SCENE 9 — APPLE SHORTCUTS / SIRI (22.4 – 25.3s) =================
+        tl.fromTo("#s9-caption", { scale: 1.15, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, ease: "power4.out" }, 22.5);
+        tl.fromTo("#s9-icon", { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, ease: "back.out(2)" }, 22.5);
+        idleLoop(tl, "#s9-icon", { scale: 1.05 }, 22.8, 25.3, 0.7);
+        tl.fromTo("#s9-bubble", { x: -20, opacity: 0 }, { x: 0, opacity: 1, duration: 0.3, ease: "power3.out" }, 22.7);
+
+        var s9bars = ["#s9-w1", "#s9-w2", "#s9-w3", "#s9-w4", "#s9-w5"];
+        tl.fromTo(s9bars, { opacity: 0, scaleY: 0.3 }, { opacity: 1, scaleY: 1, duration: 0.2, stagger: 0.04, ease: "power2.out" }, 22.9);
+        s9bars.forEach(function (sel, i) {
+          tl.to(sel, { scaleY: (i % 2 === 0 ? 1.5 : 0.6), duration: 0.16, yoyo: true, repeat: 3, ease: "sine.inOut" }, 23.15 + i * 0.02);
+        });
+        tl.to(s9bars, { opacity: 0, duration: 0.15 }, 23.5);
+        tl.set("#s9-wave", { display: "none" }, 23.65);
+
+        tl.fromTo("#s9-prompt-card", { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: "power3.out" }, 23.6);
+        typeInto(tl, document.getElementById("s9-prompt-text"), "50 chai", 23.8, 0.4);
+        tl.fromTo("#s9-reply-card",
+          { y: 24, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.3, ease: "back.out(1.6)" }, 24.4);
+
+        flashCut(tl, "#scene9", "#scene10", 25.3);
+
+        // ================= SCENE 10 — SPLITS: ASK MONEY OS (25.3 – 28.9s) =================
+        // Note: scene10 is not opaque until 25.74 (flashCut's T+0.44) — the avatar beat below
+        // starts just after that. Scheduling it earlier would run the whole thing invisibly.
+        tl.fromTo("#s10-caption", { scale: 1.15, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, ease: "power4.out" }, 25.75);
+        tl.fromTo(["#s10-avatar-you", "#s10-avatar-raj"],
+          { opacity: 0, x: 0 },
+          {
+            opacity: 1, duration: 0.2, ease: "back.out(1.8)",
+            x: function (i) { return i === 0 ? -30 : 30; },
+          }, 25.8);
+        tl.fromTo("#s10-link", { scaleX: 0, opacity: 0 }, { scaleX: 1, opacity: 1, duration: 0.15, ease: "power2.out" }, 25.95);
+        tl.to(["#s10-avatar-you", "#s10-avatar-raj", "#s10-link"],
+          { opacity: 0, duration: 0.15 }, 26.15);
+        tl.set(["#s10-avatar-you", "#s10-avatar-raj", "#s10-link"], { display: "none" }, 26.3);
+
+        // Real "ask_lending"-style AI query: type a question, AI answers with who owes whom.
+        tl.fromTo("#s10-ask-panel", { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: "power3.out" }, 26.4);
+        typeInto(tl, document.getElementById("s10-query-typed"), "who do i owe?", 26.6, 0.6);
+        tl.to("#s10-query-row", { scale: 1.03, duration: 0.1, yoyo: true, repeat: 1 }, 27.2);
+
+        tl.fromTo("#s10-reply-row",
+          { y: 24, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.3, ease: "back.out(1.6)" }, 27.4);
+
+        var s10ReplyTextEl = document.getElementById("s10-reply-text");
+        var s10ReplyFigEl = document.getElementById("s10-reply-figure");
+        // Discrete state swap via a reverse-searched onUpdate proxy (see
+        // hyperframes-animation/rules/discrete-text-sequence.md) — a plain tl.call()
+        // can be skipped when the renderer seeks directly to an arbitrary later frame
+        // instead of scrubbing through it, so this must not rely on tl.call().
+        var S10_STATES = [
+          { t: 0,      text: "You owe Raj for dinner.",   fig: "$126.00", color: "#d94f3d" },
+          { t: 28.015, text: "Settled up with Raj.",       fig: "$0.00",   color: "#30D6A5" },
+        ];
+        function s10At(time) {
+          for (var i = S10_STATES.length - 1; i >= 0; i--) if (time >= S10_STATES[i].t) return S10_STATES[i];
+          return S10_STATES[0];
+        }
+        var s10Driver = { t: 25.3 };
+        tl.to(s10Driver, {
+          t: 32.1, duration: 6.8, ease: "none",
+          onUpdate: function () {
+            var st = s10At(s10Driver.t);
+            s10ReplyTextEl.textContent = st.text; s10ReplyFigEl.textContent = st.fig; s10ReplyFigEl.style.color = st.color;
+          },
+        }, 25.3);
+        tl.to("#s10-reply-figure", { scale: 1.15, duration: 0.12, yoyo: true, repeat: 1 }, 28.015); // beat-locked: settle snap on strong cue 28.015s
+
+        flashCut(tl, "#scene10", "#scene11", 28.9);
+
+        // ================= SCENE 11 — OUTRO (28.9 – 32.1s) =================
+        tl.fromTo("#s11-glow", { opacity: 0 }, { opacity: 0.5, duration: 0.5 }, 28.95);
+        idleLoop(tl, "#s11-glow", { scale: 1.15 }, 29.5, 31.7, 0.9);
+
+        // beat-locked: wordmark slam on strong cue 29.013s
+        tl.fromTo("#s11-word",
+          { scale: 1.6, opacity: 0, filter: "blur(14px)" },
+          { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.4, ease: "power4.out" }, 29.013);
+
+        var s11dots = [
+          { id: "s11-od1", angle: 0 },
+          { id: "s11-od2", angle: 90 },
+          { id: "s11-od3", angle: 180 },
+          { id: "s11-od4", angle: 270 },
+        ];
+        var ORBIT11_RX = 560, ORBIT11_RY = 110;
+        s11dots.forEach(function (d, i) {
+          var el = document.getElementById(d.id);
+          var a0 = (d.angle / 360) * Math.PI * 2;
+          var sx = Math.cos(a0) * ORBIT11_RX, sy = Math.sin(a0) * ORBIT11_RY;
+          gsap.set(el, { x: sx, y: sy, opacity: 0, scale: 0.3 });
+          var startAt = 29.4 + i * 0.06;
+          tl.to(el, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(1.8)" }, startAt);
+          var orbit11 = { p: 0 };
+          tl.to(orbit11, {
+            p: 1, duration: 31.7 - (startAt + 0.3), ease: "none",
+            onUpdate: function () {
+              var a = a0 + orbit11.p * (Math.PI * 2 * 0.4);
+              var x = Math.cos(a) * ORBIT11_RX, y = Math.sin(a) * ORBIT11_RY;
+              el.style.transform = "translate(" + x + "px," + y + "px)";
+            },
+          }, startAt + 0.3);
+        });
+
+        var s11words = ["#s11-tw1", "#s11-tw2", "#s11-tw3", "#s11-tw4", "#s11-tw5", "#s11-tw6", "#s11-tw7", "#s11-tw8"];
+        tl.fromTo(s11words,
+          { y: 16, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.22, stagger: 0.05, ease: "power3.out" }, 29.6);
+
+        // Final-scene exception: fade to black at the very end.
+        tl.to("#s11-fade", { opacity: 1, duration: 0.5, ease: "power2.in" }, 31.6);
+
+        window.__timelines["moneyos-brag"] = tl;
+      });
+    </script>
+  </body>
+</html>

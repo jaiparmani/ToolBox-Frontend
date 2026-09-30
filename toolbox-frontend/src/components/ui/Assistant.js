@@ -14,7 +14,7 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import { accents, motion as motionTokens, radius, type } from '../../theme/tokens';
-import { askAssistant, commitAssistant, deleteExpense } from '../rest/expenseTrackerApis';
+import { askAssistant, commitAssistant, confirmExpense, deleteExpense } from '../rest/expenseTrackerApis';
 import { useMoney } from '../../contexts/MoneyContext';
 import AssistantOrb from './AssistantOrb';
 import AssistantLauncher from './AssistantLauncher';
@@ -56,7 +56,7 @@ const NAV = {
   home: '/dashboard', dashboard: '/dashboard', activity: '/expense-tracker',
   expenses: '/expense-tracker', inbox: '/inbox', insights: '/reports', reports: '/reports',
   shared: '/splits', splits: '/splits', recurring: '/recurring',
-  settings: '/profile',
+  settings: '/profile', messages: '/messages',
 };
 
 /** A screen-reader summary of a result card, so nothing lives only in the layout. */
@@ -69,6 +69,10 @@ function describeCard(card = {}) {
     }
     case 'batch_added':
       return `Saved ${(card.expenses || []).length} transactions.`;
+    case 'expense_pending': {
+      const e = card.expense || {};
+      return `Logged ${e.description} for ${money(parseFloat(e.amount))}, suggested as ${e.category?.name || 'uncategorised'}. Awaiting your confirmation.`;
+    }
     case 'split_added': {
       const e = card.expense || {};
       return `Split ${e.description} of ${money(parseFloat(e.amount || 0))} across ${(card.splits || []).length} people.`;
@@ -285,6 +289,25 @@ export default function Assistant() {
     }
   };
 
+  // A bank-message row landed with a suggested category already applied —
+  // this just clears the pending flag on it, in place, without a second round
+  // trip through the router.
+  const confirmPending = async (turnId, expenseId) => {
+    setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, committing: true } : x)));
+    try {
+      const expense = await confirmExpense(expenseId);
+      feedback('success');
+      setTurns((t) => t.map((x) => (x.id === turnId
+        ? { ...x, committing: false, card: { ...x.card, expense: { ...x.card.expense, pending_confirmation: false } }, confirmedExpense: expense }
+        : x)));
+      setAnnouncement('Confirmed.');
+      refreshMoney();
+    } catch (e) {
+      setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, committing: false, card: { ...x.card, error: e.message } } : x)));
+      setAnnouncement(`Could not confirm: ${e.message}`);
+    }
+  };
+
   const prefill = (example) => {
     setInput(example);
     // Fills the box rather than firing — a mis-click used to create a real
@@ -417,7 +440,7 @@ export default function Assistant() {
               <Turn
                 key={turn.id} turn={turn} reduce={reduce} navigate={navigate}
                 revealAll={revealAll}
-                onConfirm={confirm} onDelete={handleDelete} onClose={closePanel} onRetry={send}
+                onConfirm={confirm} onConfirmPending={confirmPending} onDelete={handleDelete} onClose={closePanel} onRetry={send}
                 onSpeakStart={onSpeakStart} onSpeakEnd={onSpeakEnd}
               />
             ))}
@@ -573,7 +596,7 @@ export default function Assistant() {
   );
 }
 
-function Turn({ turn, reduce, navigate, revealAll, onConfirm, onDelete, onClose, onRetry, onSpeakStart, onSpeakEnd }) {
+function Turn({ turn, reduce, navigate, revealAll, onConfirm, onConfirmPending, onDelete, onClose, onRetry, onSpeakStart, onSpeakEnd }) {
   const c = turn.card || {};
   const hasReply = turn.role === 'assistant' && !!c.reply && !turn.committed && !turn.deleted;
   const [streamed, setStreamed] = React.useState(reduce || !hasReply);
@@ -620,7 +643,7 @@ function Turn({ turn, reduce, navigate, revealAll, onConfirm, onDelete, onClose,
       ) : streamed ? (
         <Box sx={emitSx}>
           <CardBody
-            card={c} turn={turn} onConfirm={onConfirm} onDelete={onDelete}
+            card={c} turn={turn} onConfirm={onConfirm} onConfirmPending={onConfirmPending} onDelete={onDelete}
             onClose={onClose} onRetry={onRetry} navigate={navigate}
           />
         </Box>
@@ -629,7 +652,7 @@ function Turn({ turn, reduce, navigate, revealAll, onConfirm, onDelete, onClose,
   );
 }
 
-function CardBody({ card, turn, onConfirm, onDelete, onClose, onRetry, navigate }) {
+function CardBody({ card, turn, onConfirm, onConfirmPending, onDelete, onClose, onRetry, navigate }) {
   const busy = turn.committing || turn.deleting;
 
   if (card.error) {
@@ -680,6 +703,43 @@ function CardBody({ card, turn, onConfirm, onDelete, onClose, onRetry, navigate 
             deleteLabel={`Delete ${e.description}`}
             onDelete={() => onDelete(turn.id, [e.id])}
             onView={() => { onClose(); navigate('/expense-tracker'); }} />
+        </Panel>
+      );
+    }
+    case 'expense_pending': {
+      const e = card.expense;
+      const confirmed = e.pending_confirmation === false;
+      return (
+        <Panel tone={accents.amber}>
+          <Row icon={ReceiptLongRoundedIcon} tone={accents.amber}
+            title={e.description} amount={parseFloat(e.amount)} type={e.transaction_type}
+            category={e.category_name || e.category?.name} tags={e.tags?.map((t) => t.name || t)} />
+          {confirmed ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1.5 }}>
+              <CheckCircleRoundedIcon aria-hidden sx={{ color: accents.mint, fontSize: 16 }} />
+              <Typography variant="caption" sx={{ fontWeight: 600, color: accents.mint }}>Confirmed</Typography>
+            </Box>
+          ) : (
+            <>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                Already added to your activity, suggested as <b>{e.category_name || e.category?.name}</b> from past messages like this — pending your confirmation.
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, mt: 1.25 }}>
+                <AssistantButton
+                  onClick={() => onConfirmPending(turn.id, e.id)}
+                  disabled={busy} tone={accents.amber} variant="solid" sx={{ flex: 1, minHeight: 38 }}
+                >
+                  {busy ? 'Confirming…' : 'Looks right'}
+                </AssistantButton>
+                <AssistantButton
+                  onClick={() => { onClose(); navigate('/messages'); }}
+                  disabled={busy} tone={accents.blue} variant="quiet"
+                >
+                  Change category
+                </AssistantButton>
+              </Box>
+            </>
+          )}
         </Panel>
       );
     }

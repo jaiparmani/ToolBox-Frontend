@@ -26,6 +26,7 @@ import MoreHorizRoundedIcon from '@mui/icons-material/MoreHorizRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import ArticleRoundedIcon from '@mui/icons-material/ArticleRounded';
 import GavelRoundedIcon from '@mui/icons-material/GavelRounded';
+import MarkChatUnreadRoundedIcon from '@mui/icons-material/MarkChatUnreadRounded';
 
 import { authUtils } from './rest/authUtils';
 import { clearAllData } from './rest/userApis';
@@ -54,6 +55,7 @@ const NAV = [
   { seg: 'dashboard', alias: ['', 'dashboard'], label: 'Home', icon: DashboardIcon, tone: accents.blue },
   { seg: 'story', label: 'Today', icon: AutoStoriesRoundedIcon, tone: accents.mint },
   { seg: 'expense-tracker', label: 'Activity', icon: TimelineIcon, tone: accents.blue },
+  { seg: 'messages', label: 'Messages', icon: MarkChatUnreadRoundedIcon, tone: accents.amber },
   { seg: 'recurring', label: 'Recurring', icon: AutorenewIcon, tone: accents.violet },
   { seg: 'reports', label: 'Insights', icon: AutoGraphIcon, tone: accents.purple },
   { seg: 'pulse', label: 'Pulse', icon: FavoriteBorderRoundedIcon, tone: accents.red },
@@ -244,6 +246,7 @@ const BOTTOM_ITEMS = [
 // Items surfaced in the "More" bottom sheet
 const MORE_ITEMS = [
   NAV.find((n) => n.seg === 'story'),
+  NAV.find((n) => n.seg === 'messages'),
   NAV.find((n) => n.seg === 'recurring'),
   NAV.find((n) => n.seg === 'splits'),
   NAV.find((n) => n.seg === 'pulse'),

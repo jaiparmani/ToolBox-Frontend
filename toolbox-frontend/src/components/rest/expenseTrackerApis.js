@@ -149,6 +149,11 @@ export const transformExpenseForUI = (apiExpense) => {
         location: apiExpense.location,
         paymentMethod: apiExpense.payment_method,
         isRecurring: apiExpense.is_recurring,
+        // Landed straight off a forwarded bank/UPI/card alert with a
+        // model-suggested category — real, already counted in totals, but
+        // not yet looked at by the user. See expenses.assistant's
+        // bank_message intent.
+        pendingConfirmation: !!apiExpense.pending_confirmation,
         createdAt: apiExpense.created_at,
         updatedAt: apiExpense.updated_at,
         // Present only on a just-created expense the backend thinks echoes one
@@ -840,6 +845,42 @@ export const commitAssistant = async (payload) => {
         method: 'POST', body: JSON.stringify(payload),
     });
     return await r.json();
+};
+
+// ── Messages — bank/UPI/card alerts extracted to a suggested-but-unconfirmed
+// expense (expenses.assistant's bank_message intent) ───────────────────────
+
+/** Every expense still awaiting a look at its suggested category. */
+export const getPendingExpenses = async () => {
+    try {
+        const response = await authenticatedFetch(
+            `${API_BASE_URL}/expenses/?pending_confirmation=true&ordering=-created_at&page_size=100`);
+        const data = await response.json();
+        return (data.results || data || []).map(transformExpenseForUI);
+    } catch (error) {
+        throw handleApiError(error, 'fetch pending messages');
+    }
+};
+
+/**
+ * Accept (or correct) a pending expense's suggestion. Pass `categoryId`/
+ * `tagIds` only when the user changed them — omitted, the suggested category
+ * the message landed with stands.
+ */
+export const confirmExpense = async (expenseId, { categoryId, tagIds } = {}) => {
+    try {
+        const body = { pending_confirmation: false };
+        if (categoryId != null) body.category_id = categoryId;
+        if (tagIds != null) body.tag_ids = tagIds;
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/${expenseId}/`, {
+            method: 'PATCH',
+            body: JSON.stringify(body),
+        });
+        const data = await response.json();
+        return transformExpenseForUI(data);
+    } catch (error) {
+        throw handleApiError(error, 'confirm message');
+    }
 };
 
 // ── "Can I afford it?" — natural-language, computed from the projection ───────

@@ -15,6 +15,7 @@ const UserRegistrationPage = lazy(() => import('./screens/UserRegistrationPage')
 const UserProfilePage     = lazy(() => import('./screens/UserProfilePage'))
 const StoryPage           = lazy(() => import('./screens/StoryPage'))
 const InboxPage           = lazy(() => import('./screens/InboxPage'))
+const MessagesPage        = lazy(() => import('./screens/MessagesPage'))
 const RecurringPage       = lazy(() => import('./screens/RecurringPage'))
 const ForgotPasswordPage  = lazy(() => import('./screens/ForgotPasswordPage'))
 const ResetPasswordPage   = lazy(() => import('./screens/ResetPasswordPage'))
@@ -57,6 +58,7 @@ export default function Router() {
           <Route path="/dashboard"      element={<LandingPage />} />
           <Route path="/story"          element={<StoryPage />} />
           <Route path="/inbox"          element={<InboxPage />} />
+          <Route path="/messages"       element={<MessagesPage />} />
           <Route path="/recurring"      element={<RecurringPage />} />
           <Route path="/profile"        element={<UserProfilePage />} />
           <Route path="/expense-tracker" element={<ExpenseTrackerPage />} />

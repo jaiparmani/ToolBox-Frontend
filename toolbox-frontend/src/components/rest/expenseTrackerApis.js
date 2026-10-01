@@ -154,6 +154,9 @@ export const transformExpenseForUI = (apiExpense) => {
         // not yet looked at by the user. See expenses.assistant's
         // bank_message intent.
         pendingConfirmation: !!apiExpense.pending_confirmation,
+        // The verbatim bank/UPI/card alert this row came from, if any — kept
+        // so the Messages screen can show what it was extracted from.
+        sourceMessage: apiExpense.source_message || '',
         createdAt: apiExpense.created_at,
         updatedAt: apiExpense.updated_at,
         // Present only on a just-created expense the backend thinks echoes one

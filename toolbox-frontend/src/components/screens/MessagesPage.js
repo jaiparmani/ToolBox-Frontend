@@ -1,28 +1,36 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Box, Chip, CircularProgress, Container, MenuItem, Select, Stack, TextField, Typography,
+  Avatar, Box, Chip, CircularProgress, Container, MenuItem, Select, Snackbar, Stack, TextField, Typography,
 } from '@mui/material';
 import MarkChatUnreadRoundedIcon from '@mui/icons-material/MarkChatUnreadRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import ErrorOutlineRoundedIcon from '@mui/icons-material/ErrorOutlineRounded';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 
 import { useMoney } from '../../contexts/MoneyContext';
 import {
-  askAssistant, confirmExpense, getCategories, getPendingExpenses,
+  askAssistant, confirmExpense, deleteExpense, getCategories, getPendingExpenses, getTags,
+  transformExpenseForUI, updateExpense,
 } from '../rest/expenseTrackerApis';
 import Reveal from '../ui/Reveal';
+import ExpenseComposer from '../ui/ExpenseComposer';
 import { ExpenseListSkeleton } from '../ui/Skeletons';
 import { PageHeader, SectionHeader, EmptyState, Panel } from '../ui';
 import { money, relativeDay } from '../ui/money';
 import { accents, radius, type } from '../../theme/tokens';
+
+const DISCARD_UNDO_MS = 5000;
+const EMPTY_COMPOSER = { open: false, data: {} };
 
 /**
  * Messages — paste a forwarded bank/UPI/card alert and it's logged straight
  * away with a category suggested from past messages like it (expenses.
  * assistant's bank_message intent, same one the Ask box uses). It already
  * counts in every total; this screen is just where the suggestion gets a
- * once-over before it's marked confirmed.
+ * once-over — accept it, fix it in the same editor Activity uses, or throw
+ * it out — before it's marked confirmed.
  */
 export default function MessagesPage() {
   const { refresh: refreshMoney } = useMoney();
@@ -34,18 +42,31 @@ export default function MessagesPage() {
   const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState([]);
+  const [tags, setTags] = useState([]);
   const [edits, setEdits] = useState({}); // { [expenseId]: categoryId }
   const [confirming, setConfirming] = useState({}); // { [expenseId]: true }
 
+  // The same amount-first composer Activity uses for add/edit — opened here
+  // pre-filled, so "edit this one" never has to be a second, lesser form.
+  const [composer, setComposer] = useState(EMPTY_COMPOSER);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Discard, with a short undo window — mirrors the swipe-to-delete pattern
+  // on the main Activity list rather than a blocking confirm dialog.
+  const [discarded, setDiscarded] = useState(null); // { item }
+  const discardTimerRef = useRef(null);
+
   const load = useCallback(async () => {
     setLoading(true);
-    const [p, c] = await Promise.allSettled([getPendingExpenses(), getCategories()]);
+    const [p, c, t] = await Promise.allSettled([getPendingExpenses(), getCategories(), getTags()]);
     if (p.status === 'fulfilled') setPending(p.value);
     if (c.status === 'fulfilled') setCategories(c.value.results || []);
+    if (t.status === 'fulfilled') setTags(t.value.results || []);
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => () => { if (discardTimerRef.current) clearTimeout(discardTimerRef.current); }, []);
 
   const send = async () => {
     const message = text.trim();
@@ -55,14 +76,7 @@ export default function MessagesPage() {
     try {
       const r = await askAssistant(message);
       if (r.type === 'expense_pending') {
-        setPending((prev) => [
-          {
-            id: r.expense.id, amount: parseFloat(r.expense.amount), description: r.expense.description,
-            date: r.expense.date, category: r.expense.category, tags: r.expense.tags,
-            transaction_type: r.expense.transaction_type,
-          },
-          ...prev,
-        ]);
+        setPending((prev) => [transformExpenseForUI(r.expense), ...prev]);
         setText('');
         setSendResult({ ok: true, message: `Found ${money(parseFloat(r.expense.amount))} — suggested as ${r.expense.category?.name || 'uncategorised'}.` });
       } else if (r.type === 'expense_added') {
@@ -91,6 +105,78 @@ export default function MessagesPage() {
     } finally {
       setConfirming((c) => { const n = { ...c }; delete n[item.id]; return n; });
     }
+  };
+
+  // Same shape ExpenseTrackerPage.openExpenseForm builds for an edit — so the
+  // composer sees an identical "editing" session whether it was opened here
+  // or from Activity.
+  const openComposer = (item) => {
+    setComposer({
+      open: true,
+      data: {
+        id: item.id,
+        amount: item.amount,
+        description: item.description,
+        categoryId: edits[item.id] ?? item.category?.id ?? '',
+        date: item.date,
+        tagIds: (item.tags || []).map((t) => t.id),
+        location: item.location || '',
+        paymentMethod: item.paymentMethod || '',
+        transactionType: item.type || 'expense',
+        isRecurring: item.isRecurring || false,
+      },
+    });
+  };
+  const closeComposer = () => setComposer(EMPTY_COMPOSER);
+
+  const saveComposer = async () => {
+    const d = composer.data;
+    if (!d.amount || parseFloat(d.amount) <= 0) { setSendResult({ ok: false, message: 'Enter a valid amount.' }); return; }
+    if (!d.description || d.description.trim().length < 3) { setSendResult({ ok: false, message: 'Enter a description.' }); return; }
+    if (!d.categoryId) { setSendResult({ ok: false, message: 'Pick a category.' }); return; }
+    setSavingEdit(true);
+    try {
+      const updated = await updateExpense(d.id, d);
+      setPending((prev) => prev.map((p) => (p.id === d.id ? updated : p)));
+      closeComposer();
+      refreshMoney();
+    } catch (e) {
+      setSendResult({ ok: false, message: e.message || 'Could not save that edit.' });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // Optimistic remove + a 5s undo window before the delete actually commits.
+  // A second discard while one is already in flight commits the first right
+  // away, same as the Activity list's swipe-to-delete.
+  const discardOne = (item) => {
+    if (discardTimerRef.current) {
+      clearTimeout(discardTimerRef.current);
+      discardTimerRef.current = null;
+      if (discarded?.item) deleteExpense(discarded.item.id).catch(() => {});
+    }
+    setPending((prev) => prev.filter((p) => p.id !== item.id));
+    setDiscarded({ item });
+    discardTimerRef.current = setTimeout(async () => {
+      discardTimerRef.current = null;
+      setDiscarded(null);
+      try {
+        await deleteExpense(item.id);
+        refreshMoney();
+      } catch {
+        setSendResult({ ok: false, message: 'Could not discard that one.' });
+        load();
+      }
+    }, DISCARD_UNDO_MS);
+  };
+
+  const undoDiscard = () => {
+    if (discardTimerRef.current) { clearTimeout(discardTimerRef.current); discardTimerRef.current = null; }
+    const item = discarded?.item;
+    setDiscarded(null);
+    if (!item) return;
+    setPending((prev) => [item, ...prev]);
   };
 
   const categoriesByType = useMemo(() => {
@@ -166,74 +252,149 @@ export default function MessagesPage() {
               <Reveal key={item.id} index={3 + i}>
                 <PendingRow
                   item={item}
-                  categories={categoriesByType[item.transaction_type] || categories}
+                  categories={categoriesByType[item.type] || categories}
                   selectedCategoryId={edits[item.id] ?? item.category?.id ?? ''}
                   onCategoryChange={(id) => setEdits((e) => ({ ...e, [item.id]: id }))}
                   onConfirm={() => confirmOne(item)}
                   confirming={!!confirming[item.id]}
+                  onEdit={() => openComposer(item)}
+                  onDiscard={() => discardOne(item)}
                 />
               </Reveal>
             ))}
           </Stack>
         </Box>
       )}
+
+      <Snackbar
+        open={!!discarded}
+        message={discarded ? `Discarded "${discarded.item.description}"` : ''}
+        autoHideDuration={DISCARD_UNDO_MS}
+        onClose={(_, reason) => { if (reason !== 'clickaway') setDiscarded(null); }}
+        action={(
+          <Box
+            component="button"
+            onClick={undoDiscard}
+            sx={{
+              background: 'none', border: 'none', cursor: 'pointer', font: 'inherit',
+              color: accents.cyan, fontWeight: 650, fontSize: '0.82rem', px: 1,
+            }}
+          >
+            Undo
+          </Box>
+        )}
+      />
+
+      {/* Same composer Activity uses to add/edit an expense — opened here
+          pre-filled with the pending row, so editing it looks and behaves
+          identically wherever it's done from. */}
+      <ExpenseComposer
+        open={composer.open}
+        editing
+        data={composer.data}
+        saving={savingEdit}
+        categories={categories}
+        tags={tags}
+        onClose={closeComposer}
+        onChange={(patch) => setComposer((prev) => ({ ...prev, data: { ...prev.data, ...patch } }))}
+        onSave={saveComposer}
+      />
     </Container>
   );
 }
 
-function PendingRow({ item, categories, selectedCategoryId, onCategoryChange, onConfirm, confirming }) {
-  const isIncome = item.transaction_type === 'income';
+function PendingRow({ item, categories, selectedCategoryId, onCategoryChange, onConfirm, confirming, onEdit, onDiscard }) {
+  const isIncome = item.type === 'income';
+  const tone = item.category?.color || accents.amber;
+  const initial = (item.description || item.category?.name || '?').charAt(0).toUpperCase();
+  const tags = item.tags || [];
+
   return (
     <Panel tint={accents.amber} sx={{ p: 1.75 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 650 }} noWrap>{item.description}</Typography>
-          <Typography variant="caption" color="text.secondary">{relativeDay(item.date)}</Typography>
-        </Box>
-        <Typography sx={{
-          fontFamily: type.displayFamily, fontWeight: 750, fontVariantNumeric: 'tabular-nums',
-          color: isIncome ? accents.mint : 'text.primary',
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25 }}>
+        <Avatar sx={{
+          width: 40, height: 40, flexShrink: 0, fontSize: '1rem', fontWeight: 700,
+          bgcolor: `${tone}22`, color: tone, boxShadow: `inset 0 0 0 1.5px ${tone}3d`,
         }}>
-          {isIncome ? '+' : ''}{money(item.amount)}
-        </Typography>
-      </Box>
-
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.25 }}>
-        <Chip
-          label="Suggested" size="small"
-          sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700, bgcolor: `${accents.amber}22`, color: accents.amber }}
-        />
-        <Select
-          size="small"
-          value={selectedCategoryId || ''}
-          onChange={(e) => onCategoryChange(e.target.value)}
-          displayEmpty
-          sx={{ flex: 1, fontSize: '0.82rem', '& .MuiSelect-select': { py: 0.5 } }}
-        >
-          {!categories.some((c) => c.id === selectedCategoryId) && (
-            <MenuItem value={selectedCategoryId}>{item.category?.name || 'Uncategorised'}</MenuItem>
+          {initial}
+        </Avatar>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 650, flex: 1, minWidth: 0 }} noWrap>{item.description}</Typography>
+            <Typography sx={{
+              fontFamily: type.displayFamily, fontWeight: 750, fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+              color: isIncome ? accents.mint : 'text.primary',
+            }}>
+              {isIncome ? '+' : ''}{money(item.amount)}
+            </Typography>
+          </Box>
+          <Typography variant="caption" color="text.secondary">{relativeDay(item.date)}</Typography>
+          {item.sourceMessage && (
+            <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.25, fontStyle: 'italic', lineHeight: 1.4 }}>
+              from: "{item.sourceMessage}"
+            </Typography>
           )}
-          {categories.map((c) => (
-            <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
-          ))}
-        </Select>
+        </Box>
       </Box>
 
-      <Box
-        component="button"
-        onClick={onConfirm}
-        disabled={confirming}
-        sx={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75,
-          width: '100%', mt: 1.25, py: 0.9, borderRadius: `${radius.md}px`,
-          border: 'none', cursor: confirming ? 'default' : 'pointer', font: 'inherit',
-          fontWeight: 650, fontSize: '0.85rem', color: '#fff',
-          backgroundColor: accents.mint, opacity: confirming ? 0.6 : 1,
-        }}
-      >
-        {confirming ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <CheckCircleRoundedIcon sx={{ fontSize: 16 }} />}
-        {confirming ? 'Confirming…' : 'Confirm'}
+      <Box sx={{ mt: 1.5 }}>
+        <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: accents.amber }}>
+          AI suggested
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.75, mt: 0.6 }}>
+          <Select
+            size="small"
+            value={selectedCategoryId || ''}
+            onChange={(e) => onCategoryChange(e.target.value)}
+            displayEmpty
+            sx={{ minWidth: 120, fontSize: '0.82rem', '& .MuiSelect-select': { py: 0.5 } }}
+          >
+            {!categories.some((c) => c.id === selectedCategoryId) && (
+              <MenuItem value={selectedCategoryId}>{item.category?.name || 'Uncategorised'}</MenuItem>
+            )}
+            {categories.map((c) => (
+              <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+            ))}
+          </Select>
+          {tags.map((t) => (
+            <Chip
+              key={t.id ?? t.name} label={t.name} size="small"
+              sx={{ height: 24, fontSize: '0.7rem', fontWeight: 600, bgcolor: `${t.color || accents.amber}22`, color: t.color || accents.amber }}
+            />
+          ))}
+        </Box>
+      </Box>
+
+      <Box sx={{ display: 'flex', gap: 0.75, mt: 1.25 }}>
+        <ActionButton onClick={onConfirm} disabled={confirming} color={accents.mint} flex
+          icon={confirming ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <CheckCircleRoundedIcon sx={{ fontSize: 16 }} />}>
+          {confirming ? 'Confirming…' : 'Confirm'}
+        </ActionButton>
+        <ActionButton onClick={onEdit} muted icon={<EditRoundedIcon sx={{ fontSize: 16 }} />} aria-label="Edit" />
+        <ActionButton onClick={onDiscard} muted tone={accents.red} icon={<DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />} aria-label="Discard" />
       </Box>
     </Panel>
+  );
+}
+
+function ActionButton({ onClick, disabled, color, muted, tone, flex, icon, children, ...rest }) {
+  return (
+    <Box
+      component="button"
+      onClick={onClick}
+      disabled={disabled}
+      {...rest}
+      sx={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.6,
+        flex: flex ? 1 : '0 0 auto', py: 0.9, px: flex ? 1.5 : 1.1,
+        borderRadius: `${radius.md}px`, border: 'none', cursor: disabled ? 'default' : 'pointer',
+        font: 'inherit', fontWeight: 650, fontSize: '0.85rem',
+        color: muted ? (tone || 'text.secondary') : '#fff',
+        backgroundColor: muted ? 'action.hover' : color,
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      {icon}{children}
+    </Box>
   );
 }

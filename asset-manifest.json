@@ -1,15 +1,24 @@
 {
   "files": {
-    "main.css": "/ToolBox-Frontend/static/css/main.f855e6bc.css",
-    "main.js": "/ToolBox-Frontend/static/js/main.3a5baee7.js",
-    "static/js/488.65e1b365.chunk.js": "/ToolBox-Frontend/static/js/488.65e1b365.chunk.js",
+    "main.css": "/ToolBox-Frontend/static/css/main.97fd10a3.css",
+    "main.js": "/ToolBox-Frontend/static/js/main.8ea5f6d9.js",
+    "static/css/956.210e88e3.chunk.css": "/ToolBox-Frontend/static/css/956.210e88e3.chunk.css",
+    "static/js/956.8f654dbc.chunk.js": "/ToolBox-Frontend/static/js/956.8f654dbc.chunk.js",
+    "static/js/488.f122f559.chunk.js": "/ToolBox-Frontend/static/js/488.f122f559.chunk.js",
+    "static/media/geist-latin-wght-normal.woff2": "/ToolBox-Frontend/static/media/geist-latin-wght-normal.ee5d167b615cdb197f4a.woff2",
+    "static/media/geist-latin-ext-wght-normal.woff2": "/ToolBox-Frontend/static/media/geist-latin-ext-wght-normal.b29dbc4234e76289a5b9.woff2",
+    "static/media/geist-cyrillic-wght-normal.woff2": "/ToolBox-Frontend/static/media/geist-cyrillic-wght-normal.e1e85cd9eab54096528f.woff2",
+    "static/media/geist-vietnamese-wght-normal.woff2": "/ToolBox-Frontend/static/media/geist-vietnamese-wght-normal.ed8ddc5c3f2df573fa57.woff2",
+    "static/media/geist-cyrillic-ext-wght-normal.woff2": "/ToolBox-Frontend/static/media/geist-cyrillic-ext-wght-normal.141916beb91c487496c8.woff2",
     "index.html": "/ToolBox-Frontend/index.html",
-    "main.f855e6bc.css.map": "/ToolBox-Frontend/static/css/main.f855e6bc.css.map",
-    "main.3a5baee7.js.map": "/ToolBox-Frontend/static/js/main.3a5baee7.js.map",
-    "488.65e1b365.chunk.js.map": "/ToolBox-Frontend/static/js/488.65e1b365.chunk.js.map"
+    "main.97fd10a3.css.map": "/ToolBox-Frontend/static/css/main.97fd10a3.css.map",
+    "main.8ea5f6d9.js.map": "/ToolBox-Frontend/static/js/main.8ea5f6d9.js.map",
+    "956.210e88e3.chunk.css.map": "/ToolBox-Frontend/static/css/956.210e88e3.chunk.css.map",
+    "956.8f654dbc.chunk.js.map": "/ToolBox-Frontend/static/js/956.8f654dbc.chunk.js.map",
+    "488.f122f559.chunk.js.map": "/ToolBox-Frontend/static/js/488.f122f559.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.f855e6bc.css",
-    "static/js/main.3a5baee7.js"
+    "static/css/main.97fd10a3.css",
+    "static/js/main.8ea5f6d9.js"
   ]
 }

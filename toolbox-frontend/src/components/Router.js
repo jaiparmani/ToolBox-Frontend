@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { authUtils } from './rest/authUtils'
 import DashboardLayoutBasic from './DashboardLayout'
@@ -19,6 +19,9 @@ import MoneyUniversePage from './screens/MoneyUniversePage'
 import CashFlowPulsePage from './screens/CashFlowPulsePage'
 import GuidePage from './screens/GuidePage'
 import { Box, CircularProgress, Typography } from '@mui/material'
+
+// The separate, motion-forward UI (src/next). Lazy so the classic bundle is unchanged.
+const NextApp = lazy(() => import('../next/NextApp'))
 
 // Loading Component
 const LoadingSpinner = () => (
@@ -101,6 +104,13 @@ export default function Router() {
         <Route path="/array-sum" element={<Navigate to="/" replace />} />
         <Route path="/qr-generator" element={<Navigate to="/" replace />} />
       </Route>
+
+      {/* ToolBox Next: separate UI that runs beside the classic app */}
+      <Route path="/next/*" element={
+        <ProtectedRoute>
+          <Suspense fallback={<LoadingSpinner />}><NextApp /></Suspense>
+        </ProtectedRoute>
+      } />
 
       {/* Legacy routes - redirect to dashboard */}
       <Route path="/about" element={<Navigate to="/" replace />} />

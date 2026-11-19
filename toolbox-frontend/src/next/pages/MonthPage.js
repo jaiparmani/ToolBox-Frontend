@@ -1,16 +1,20 @@
 /**
  * "This month": one page of the money book. The blank line at the top is
- * where you write; every line carries the month's running total in the margin;
- * the page closes with the carried-forward total.
+ * where you write (or write it in one line and let the book fill the blanks);
+ * every line carries the month's running total in the margin; the page closes
+ * with the carried-forward total. Only spending is written here: money coming
+ * in (income, credits, refunds) never enters this book.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion as m, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { addExpenseApi } from '../../components/rest/expenseTrackerApis';
 import {
-  useLedger, bookLines, summarizeMonth, inr, inrExact, monthName, shiftMonth, dayLabel, todayIso,
+  useLedger, bookLines, summarizeMonth, inr, monthName, shiftMonth, dayLabel, todayIso,
+  parseLine, suggestHead, CREDIT_WORDS,
 } from '../ledger';
 import { EASE, sec, DUR } from '../motionKit';
-import { Stamp, ReceiptSlip, BookState, tiltFor } from './parts';
+import { Stamp, ReceiptSlip, BookState } from './parts';
+import LedgerRows from './LedgerRows';
 
 function MonthTabs({ months, current, onPick }) {
   return (
@@ -31,14 +35,14 @@ function Total({ value, struck }) {
   return (
     <div className="nx-total" aria-live="polite">
       <AnimatePresence>
-        {struck != null && (
+        {struck != null && Math.round(struck) !== Math.round(value) && (
           <m.s key={`s${struck}`} className="nx-total-old" aria-label={`was ${inr(struck)}`}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {inr(struck)}
           </m.s>
         )}
       </AnimatePresence>
-      <m.span key={value} className="nx-total-v"
+      <m.span key={Math.round(value)} className="nx-total-v"
         initial={struck != null && !reduce ? { clipPath: 'inset(0% 100% 0% 0%)' } : false}
         animate={{ clipPath: 'inset(0% 0% 0% 0%)' }}
         transition={{ duration: sec(DUR.slower), ease: EASE, delay: 0.2 }}>
@@ -52,13 +56,17 @@ function WriteLine({ month, onWritten }) {
   const L = useLedger();
   const isCurrent = month === todayIso().slice(0, 7);
   const lastDay = `${month}-${String(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()).padStart(2, '0')}`;
+  const [line, setLine] = useState('');
   const [date, setDate] = useState(isCurrent ? todayIso() : lastDay);
   const [part, setPart] = useState('');
   const [amount, setAmount] = useState('');
   const [head, setHead] = useState(null);
+  const [headBy, setHeadBy] = useState(null); // 'you' | 'suggested'
+  const [tagIds, setTagIds] = useState([]);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
-  const partRef = useRef(null);
+  const [dupe, setDupe] = useState(null); // the line just written, if it echoes a recent one
+  const amountRef = useRef(null);
   useEffect(() => { setDate(isCurrent ? todayIso() : lastDay); }, [month]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Heads you use most come first.
@@ -68,6 +76,31 @@ function WriteLine({ month, onWritten }) {
     return [...L.categories].sort((a, b) => (freq[b.id] || 0) - (freq[a.id] || 0));
   }, [L.categories, L.expenses]);
 
+  // Until you choose a head yourself, suggest one from lines like this one.
+  const onPart = (v) => {
+    setPart(v);
+    if (headBy === 'you') return;
+    const s = suggestHead(v, L.expenses);
+    setHead(s); setHeadBy(s ? 'suggested' : null);
+  };
+  const chooseHead = (id) => { setHead(id); setHeadBy('you'); setErrors((x) => ({ ...x, head: undefined })); };
+
+  const fill = (ev) => {
+    ev.preventDefault();
+    if (!line.trim()) return;
+    if (CREDIT_WORDS.test(line)) {
+      setErrors({ form: 'That reads like money coming in. This book only records spending, so it wasn’t written.' });
+      return;
+    }
+    const p = parseLine(line);
+    if (p.amount) setAmount(String(p.amount));
+    if (p.date) setDate(p.date);
+    if (p.part) onPart(p.part);
+    setErrors({});
+    setLine('');
+    (p.amount ? null : amountRef.current)?.focus();
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     const n = Number(amount);
@@ -75,14 +108,17 @@ function WriteLine({ month, onWritten }) {
     if (!(n > 0)) errs.amount = 'an amount above ₹0';
     if (!head) errs.head = 'a head';
     if (!date) errs.date = 'a date';
+    if (CREDIT_WORDS.test(part)) errs.form = 'That reads like money coming in. This book only records spending.';
     setErrors(errs);
     if (Object.keys(errs).length) return;
     setBusy(true);
     try {
-      const saved = await addExpenseApi({ amount: n, categoryId: head, description: part.trim() || undefined, date, transactionType: 'expense' });
-      setPart(''); setAmount(''); setHead(null);
+      // Particulars are required by the API; a blank line is filed under its head's name.
+      const description = part.trim() || L.categories.find((c) => c.id === head)?.name || 'Expense';
+      const saved = await addExpenseApi({ amount: n, categoryId: head, description, date, tagIds, transactionType: 'expense' });
+      setPart(''); setAmount(''); setHead(null); setHeadBy(null); setTagIds([]);
+      setDupe(saved?.duplicateWarning ? saved : null);
       await onWritten(saved, date.slice(0, 7));
-      partRef.current?.focus();
     } catch (err) {
       setErrors({ form: err?.message || 'Could not write this line. Check your connection and try again.' });
     } finally { setBusy(false); }
@@ -90,37 +126,73 @@ function WriteLine({ month, onWritten }) {
 
   const missing = ['amount', 'head', 'date'].filter((k) => errors[k]).map((k) => errors[k]);
   return (
-    <form className="nx-write" onSubmit={submit} noValidate aria-label="Write a line">
-      <label className="nx-f nx-f--date">
-        <span>Date</span>
-        <input type="date" value={date} max={todayIso()} onChange={(e) => setDate(e.target.value)} aria-invalid={!!errors.date} />
-      </label>
-      <label className="nx-f nx-f--part">
-        <span>Particulars</span>
-        <input ref={partRef} value={part} maxLength={120} onChange={(e) => setPart(e.target.value)} placeholder="What was it for?" autoComplete="off" />
-      </label>
-      <label className="nx-f nx-f--amt">
-        <span>Amount (₹)</span>
-        <input inputMode="decimal" value={amount} placeholder="0" aria-invalid={!!errors.amount} aria-describedby="nx-write-err"
-          onChange={(e) => { setAmount(e.target.value.replace(/[^\d.]/g, '')); setErrors((x) => ({ ...x, amount: undefined })); }} />
-      </label>
-      <fieldset className="nx-f nx-f--heads" aria-describedby="nx-write-err">
-        <legend>Head</legend>
-        <div className="nx-headpick">
-          {heads.map((c) => (
-            <button key={c.id} type="button" aria-pressed={head === c.id}
-              className={`nx-stamp nx-stamp--pick ${L.inkFor(c.id)} ${head === c.id ? 'is-inked' : ''}`}
-              onClick={() => { setHead(c.id); setErrors((x) => ({ ...x, head: undefined })); }}>
-              {c.name}
-            </button>
-          ))}
+    <div className="nx-writearea">
+      <form className="nx-oneline" onSubmit={fill} aria-label="Write it in one line">
+        <label className="nx-f nx-f--one">
+          <span>In one line</span>
+          <input value={line} onChange={(e) => setLine(e.target.value)} placeholder="e.g. 60 chai with Ravi yesterday" autoComplete="off" />
+        </label>
+        <button type="submit" className="nx-btn nx-btn--quiet">Fill the line</button>
+      </form>
+
+      <form className="nx-write" onSubmit={submit} noValidate aria-label="Write a line">
+        <label className="nx-f nx-f--date">
+          <span>Date</span>
+          <input type="date" value={date} max={todayIso()} onChange={(e) => setDate(e.target.value)} aria-invalid={!!errors.date} />
+        </label>
+        <label className="nx-f nx-f--part">
+          <span>Particulars</span>
+          <input value={part} maxLength={120} onChange={(e) => onPart(e.target.value)} placeholder="What was it for?" autoComplete="off" />
+        </label>
+        <label className="nx-f nx-f--amt">
+          <span>Amount (₹)</span>
+          <input ref={amountRef} inputMode="decimal" value={amount} placeholder="0" aria-invalid={!!errors.amount} aria-describedby="nx-write-err"
+            onChange={(e) => { setAmount(e.target.value.replace(/[^\d.]/g, '')); setErrors((x) => ({ ...x, amount: undefined })); }} />
+        </label>
+        <fieldset className="nx-f nx-f--heads" aria-describedby="nx-write-err">
+          <legend>Head{headBy === 'suggested' && <em className="nx-suggested"> · suggested from past lines</em>}</legend>
+          <div className="nx-headpick">
+            {heads.map((c) => (
+              <button key={c.id} type="button" aria-pressed={head === c.id}
+                className={`nx-stamp nx-stamp--pick ${L.inkFor(c.id)} ${head === c.id ? 'is-inked' : ''} ${head === c.id && headBy === 'suggested' ? 'is-pencil' : ''}`}
+                onClick={() => chooseHead(c.id)}>
+                {c.name}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        {L.tags.length > 0 && (
+          <fieldset className="nx-f nx-f--tags">
+            <legend>Tags</legend>
+            <div className="nx-tagpick">
+              {L.tags.map((t) => {
+                const on = tagIds.includes(t.id);
+                return (
+                  <button key={t.id} type="button" aria-pressed={on} className={`nx-tag ${on ? 'is-on' : ''}`}
+                    onClick={() => setTagIds((ids) => (on ? ids.filter((i) => i !== t.id) : [...ids, t.id]))}>
+                    #{t.name.toLowerCase()}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
+        <button className="nx-btn nx-write-go" type="submit" disabled={busy}>{busy ? 'Writing…' : 'Write a line'}</button>
+        <p className="nx-write-err" id="nx-write-err" role="alert">
+          {missing.length ? `To write this line, add ${missing.join(', ')}.` : errors.form || ''}
+        </p>
+      </form>
+
+      {dupe && (
+        <div className="nx-dupe-warn" role="status">
+          <span><strong>This looks like a line you wrote a few minutes ago</strong> ({inr(dupe.amount)}, {dupe.category?.name}).</span>
+          <span className="nx-dupe-acts">
+            <button type="button" className="nx-btn nx-btn--sm" onClick={() => { L.cancelLine(dupe.id); setDupe(null); }}>Cancel the new line</button>
+            <button type="button" className="nx-btn nx-btn--sm nx-btn--quiet" onClick={() => setDupe(null)}>Keep both</button>
+          </span>
         </div>
-      </fieldset>
-      <button className="nx-btn nx-write-go" type="submit" disabled={busy}>{busy ? 'Writing…' : 'Write a line'}</button>
-      <p className="nx-write-err" id="nx-write-err" role="alert">
-        {missing.length ? `To write this line, add ${missing.join(', ')}.` : errors.form || ''}
-      </p>
-    </form>
+      )}
+    </div>
   );
 }
 
@@ -133,10 +205,17 @@ export default function MonthPage({ onToast }) {
   const [open, setOpen] = useState(null);
   const [turn, setTurn] = useState(0);
 
-  const lines = useMemo(() => bookLines(L.expenses, L.month), [L.expenses, L.month]);
-  const sum = useMemo(() => summarizeMonth(L.expenses, L.month), [L.expenses, L.month]);
-  const prev = useMemo(() => summarizeMonth(L.expenses, shiftMonth(L.month, -1)), [L.expenses, L.month]);
-  useEffect(() => { setStruck(null); setFilter(null); }, [L.month]);
+  const lines = useMemo(() => bookLines(L.expenses, L.month, L.cancelled), [L.expenses, L.month, L.cancelled]);
+  const sum = useMemo(() => summarizeMonth(L.live, L.month), [L.live, L.month]);
+  const prev = useMemo(() => summarizeMonth(L.live, shiftMonth(L.month, -1)), [L.live, L.month]);
+  const lastTotal = useRef(null);
+  useEffect(() => { setStruck(null); setFilter(null); lastTotal.current = null; }, [L.month]);
+  // Any change to the month's total (write, correct, cancel, undo) leaves the old figure struck.
+  useEffect(() => {
+    if (L.status !== 'ready') return;
+    if (lastTotal.current != null && Math.round(lastTotal.current) !== Math.round(sum.total)) setStruck(lastTotal.current);
+    lastTotal.current = sum.total;
+  }, [sum.total, L.status]);
 
   if (L.status !== 'ready') return <BookState status={L.status} error={L.error} retry={() => L.reload()} />;
 
@@ -147,11 +226,10 @@ export default function MonthPage({ onToast }) {
   const delta = prev.count ? sum.total - prev.total : null;
 
   const pick = (ym) => { if (ym === L.month) return; setTurn((t) => t + 1); L.setMonth(ym); };
+  const goTo = (ym) => { if (ym !== L.month) { setTurn((t) => t + 1); L.setMonth(ym); } };
   const written = async (saved, ym) => {
-    const before = summarizeMonth(L.expenses, ym).total;
     await L.reload({ quiet: true });
-    if (ym !== L.month) { setTurn((t) => t + 1); L.setMonth(ym); }
-    setStruck(before > 0 ? before : null);
+    goTo(ym);
     setFresh(saved?.id ?? null);
     onToast?.(`Written: ${inr(saved?.amount || 0)} on ${dayLabel(saved?.date?.toISOString?.().slice(0, 10) || `${ym}-01`, { day: 'numeric', month: 'short' })}`);
   };
@@ -168,7 +246,7 @@ export default function MonthPage({ onToast }) {
           <div>
             <h1 className="nx-h1" id="nx-month-h">{monthName(L.month)} {L.month.slice(0, 4)}</h1>
             <p className="nx-meta">
-              Page {pageNo} · {sum.count} {sum.count === 1 ? 'line' : 'lines'} · amounts in ₹
+              Page {pageNo} · {sum.count} {sum.count === 1 ? 'line' : 'lines'} · spending only, in ₹
               {!isCurrent && L.month === L.months[L.months.length - 1] && ` · nothing written in ${monthName(now)} yet`}
             </p>
           </div>
@@ -194,19 +272,7 @@ export default function MonthPage({ onToast }) {
             {lines.length === 0 && (
               <tr className="nx-line nx-line--empty"><td colSpan={5}>No lines on this page yet. Write the first one above.</td></tr>
             )}
-            {lines.map((e) => (
-              <m.tr key={e.id} layout={reduce ? false : 'position'} transition={{ duration: sec(DUR.slow), ease: EASE }}
-                className={`nx-line ${e.firstOfDay ? 'is-day' : ''} ${filter != null && (e.category?.id ?? 'none') !== filter ? 'is-dim' : ''} ${fresh === e.id ? 'is-fresh' : ''}`}
-                onClick={() => setOpen(e)} tabIndex={0}
-                onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); setOpen(e); } }}
-                aria-label={`${dayLabel(e.day, { day: 'numeric', month: 'short' })}, ${e.description || e.category?.name}, ${inrExact(e.spend)}. Open entry`}>
-                <td className="c-date">{e.firstOfDay && <><b>{Number(e.day.slice(8))}</b><i>{dayLabel(e.day, { weekday: 'short' })}</i></>}</td>
-                <td className="c-part">{e.description || <span className="nx-faint">{e.category?.name || 'No particulars'}</span>}{e.isSplit && <span className="nx-share">your share</span>}</td>
-                <td className="c-head"><Stamp name={e.category?.name || 'Unfiled'} ink={L.inkFor(e.category?.id)} fresh={fresh === e.id} tilt={tiltFor(e.id)} /></td>
-                <td className="c-amt">{inrExact(e.spend)}</td>
-                <td className="c-run">{inr(e.run)}</td>
-              </m.tr>
-            ))}
+            <LedgerRows lines={lines} onOpen={setOpen} freshId={fresh} filter={filter} onToast={onToast} />
           </tbody>
         </table>
 
@@ -238,7 +304,9 @@ export default function MonthPage({ onToast }) {
           </section>
         )}
       </m.article>
-      <ReceiptSlip entry={open} ink={open ? L.inkFor(open.category?.id) : ''} onClose={() => setOpen(null)} />
+      <ReceiptSlip entry={open} ink={open ? L.inkFor(open.category?.id) : ''} onClose={() => setOpen(null)}
+        onCancel={(e) => { L.cancelLine(e.id); onToast?.(`Cancelled ${inr(e.spend)} on ${dayLabel(e.day, { day: 'numeric', month: 'short' })}. Undo on the struck line.`); }}
+        onCorrected={(id, ym) => { goTo(ym); setFresh(id); onToast?.('Correction saved.'); }} />
     </div>
   );
 }

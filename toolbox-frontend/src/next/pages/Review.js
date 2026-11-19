@@ -108,8 +108,8 @@ function Scrub({ month, notes, lastDay }) {
 export default function Review() {
   const L = useLedger();
   const reduce = useReducedMotion();
-  const month = useMemo(() => summarizeMonth(L.expenses, L.month), [L.expenses, L.month]);
-  const prev = useMemo(() => summarizeMonth(L.expenses, shiftMonth(L.month, -1)), [L.expenses, L.month]);
+  const month = useMemo(() => summarizeMonth(L.live, L.month), [L.live, L.month]);
+  const prev = useMemo(() => summarizeMonth(L.live, shiftMonth(L.month, -1)), [L.live, L.month]);
   const notes = useMemo(() => notesFor(month, prev), [month, prev]);
   const isCurrent = month.ym === todayIso().slice(0, 7);
   const lastDay = isCurrent ? Number(todayIso().slice(8, 10)) : month.days;

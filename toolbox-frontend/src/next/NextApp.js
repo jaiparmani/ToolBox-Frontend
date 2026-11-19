@@ -107,7 +107,7 @@ export default function NextApp() {
               <PageTurn key={location.pathname} turnKey={location.pathname}>
                 <Routes location={location}>
                   <Route index element={<MonthPage onToast={setToast} />} />
-                  <Route path="entries" element={<Entries />} />
+                  <Route path="entries" element={<Entries onToast={setToast} />} />
                   <Route path="review" element={<Review />} />
                   {/* earlier /next paths */}
                   <Route path="activity" element={<Navigate to="/next/entries" replace />} />

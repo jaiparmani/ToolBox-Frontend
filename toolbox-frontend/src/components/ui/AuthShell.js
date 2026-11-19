@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Container, Paper } from '@mui/material';
 import { motion } from 'framer-motion';
 import { accents } from '../../theme/tokens';
+import AuroraBackground from '../motion/AuroraBackground';
 
 /**
  * The shared "vault" shell for every authentication screen — login, register,
@@ -18,7 +19,7 @@ export default function AuthShell({ children, maxWidth = { xs: 430 } }) {
     <Box
       sx={{
         minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        position: 'relative', overflow: 'hidden',
+        position: 'relative',
         px: { xs: 2, sm: 3 },
         pt: 'max(env(safe-area-inset-top), 24px)',
         pb: 'max(env(safe-area-inset-bottom), 24px)',
@@ -40,6 +41,7 @@ export default function AuthShell({ children, maxWidth = { xs: 430 } }) {
         },
       }}
     >
+      <AuroraBackground weatherKey="clear" />
       <Container maxWidth={false} disableGutters sx={{ position: 'relative', zIndex: 1 }}>
         <Box
           component={motion.div}

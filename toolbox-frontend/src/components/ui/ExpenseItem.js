@@ -8,7 +8,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import NorthEastRoundedIcon from '@mui/icons-material/NorthEastRounded';
 import SouthWestRoundedIcon from '@mui/icons-material/SouthWestRounded';
 import { money, relativeDay } from './money';
-import { type } from '../../theme/tokens';
+import { accents, type } from '../../theme/tokens';
 
 /**
  * One expense, as a row that works at any width.
@@ -67,6 +67,12 @@ export default function ExpenseItem({ expense, onEdit, onDelete, onOpen }) {
           <Typography variant="body2" sx={{ fontWeight: 650, letterSpacing: '-0.01em' }} noWrap>
             {expense.description}
           </Typography>
+          {expense.pendingConfirmation && (
+            <Chip
+              label="Pending" size="small"
+              sx={{ height: 16, fontSize: '0.6rem', fontWeight: 700, flexShrink: 0, bgcolor: `${accents.amber}22`, color: accents.amber }}
+            />
+          )}
           <NorthEastRoundedIcon className="exp-open" sx={{ fontSize: 13, color: 'text.disabled', opacity: 0, transition: 'opacity 140ms ease', flexShrink: 0 }} />
         </Stack>
         <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.25, minWidth: 0 }}>

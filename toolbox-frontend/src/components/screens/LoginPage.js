@@ -32,10 +32,15 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
   const reduce = useReducedMotion();
+  const initialSaved = React.useRef((() => {
+    try { return localStorage.getItem('toolbox_last_identifier') || ''; } catch { return ''; }
+  })());
   const [method, setMethod] = useState('mpin');       // 'mpin' | 'otp' | 'password' | 'mpin-reset'
   const [otpStep, setOtpStep] = useState('identify');  // 'identify' | 'code'
   const [resetStep, setResetStep] = useState('request'); // 'request' | 'confirm'
-  const [identifier, setIdentifier] = useState('');
+  const [identifier, setIdentifier] = useState(() => {
+    try { return localStorage.getItem('toolbox_last_identifier') || ''; } catch { return ''; }
+  });
   const [password, setPassword] = useState('');
   const [mpin, setMpin] = useState('');
   const [pinStatus, setPinStatus] = useState('idle');  // 'idle' | 'error' | 'success'
@@ -47,7 +52,10 @@ export default function LoginPage() {
   const [unlocked, setUnlocked] = useState(null);      // null | { label } → plays the success overlay
 
   const finish = () => { window.location.href = '/'; };
-  const succeed = (label) => setUnlocked({ label });   // hand off to the unlock cinematic
+  const succeed = (label) => {
+    try { if (identifier.trim()) localStorage.setItem('toolbox_last_identifier', identifier.trim()); } catch { /* private mode */ }
+    setUnlocked({ label });
+  };   // hand off to the unlock cinematic
 
   // ---- MPIN (primary) ----
   const doMpin = async (pin) => {
@@ -151,7 +159,10 @@ export default function LoginPage() {
     : method === 'mpin-reset' ? 'Reset your MPIN'
     : method === 'otp' ? 'Sign in with a code'
     : 'Sign in with a password';
-  const heroSub = method === 'mpin' ? 'Enter your 6-digit MPIN'
+  const heroSub = method === 'mpin'
+    ? (initialSaved.current && identifier === initialSaved.current
+        ? 'Welcome back — enter your MPIN'
+        : 'Enter your 6‑digit MPIN')
     : method === 'mpin-reset' ? (resetStep === 'request' ? "We'll email you a reset code" : `Enter the code we sent, then choose a new MPIN`)
     : method === 'otp' ? (otpStep === 'identify' ? "We'll email you a one-time code" : `Enter the code we sent for ${identifier}`)
     : 'Use your account password';
@@ -174,13 +185,28 @@ export default function LoginPage() {
   // said so, which made it a feature nobody could find. Naming all three is
   // the whole fix - people type what the field asks for.
   const idField = (autoFocus) => (
-    <TextField
-      fullWidth label="Mobile, email or username" value={identifier} required autoFocus={autoFocus}
-      autoComplete="username"
-      helperText="Your mobile number works here too"
-      onChange={(e) => setIdentifier(e.target.value)}
-      InputProps={{ startAdornment: <InputAdornment position="start"><PersonIcon /></InputAdornment> }}
-    />
+    <Box>
+      <TextField
+        fullWidth label="Mobile, email or username" value={identifier} required autoFocus={autoFocus}
+        autoComplete="username"
+        helperText="Your mobile number works here too"
+        onChange={(e) => setIdentifier(e.target.value)}
+        InputProps={{ startAdornment: <InputAdornment position="start"><PersonIcon /></InputAdornment> }}
+      />
+      {initialSaved.current && identifier === initialSaved.current && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
+          <Link component="button" type="button" variant="caption" underline="hover"
+            sx={{ color: 'text.disabled', fontSize: '0.75rem' }}
+            onClick={() => {
+              setIdentifier('');
+              initialSaved.current = '';
+              try { localStorage.removeItem('toolbox_last_identifier'); } catch { /* */ }
+            }}>
+            Not you?
+          </Link>
+        </Box>
+      )}
+    </Box>
   );
 
   // Motion for the mode-switch: content slides + fades, the card height morphs
@@ -193,6 +219,13 @@ export default function LoginPage() {
         animate: { opacity: 1, x: 0, filter: 'blur(0px)' },
       };
   const panelTransition = { duration: reduce ? 0.18 : 0.34, ease: [0.32, 0.72, 0, 1] };
+
+  // Shared entrance animation factory for the left-panel elements.
+  const leftEntrance = (delay) => ({
+    initial: reduce ? { opacity: 0 } : { opacity: 0, x: -16 },
+    animate: { opacity: 1, x: 0 },
+    transition: { delay, duration: 0.4, ease: [0.32, 0.72, 0, 1] },
+  });
 
   return (
     <AuthShell maxWidth={{ xs: 430, md: 780 }}>
@@ -220,24 +253,35 @@ export default function LoginPage() {
           pr: { md: 4 }, borderRight: { md: '1px solid' }, borderColor: { md: 'divider' },
           alignSelf: { md: 'stretch' }, justifyContent: { md: 'center' },
         }}>
-          <UnlockCrest />
+          <motion.div {...leftEntrance(0.05)}>
+            <UnlockCrest />
+          </motion.div>
           <Box sx={{ minWidth: 0, position: 'relative', flex: { xs: 1, md: 'unset' } }}>
-            <motion.div
-              key={heroTitle}
-              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
-            >
-              <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: { xs: 'clamp(1.4rem,6vw,1.6rem)', md: '1.9rem' }, letterSpacing: '-0.02em', lineHeight: 1.1, mt: { md: 2 } }}>
-                {heroTitle}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{heroSub}</Typography>
+            <motion.div {...leftEntrance(0.15)}>
+              <motion.div
+                key={heroTitle}
+                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
+              >
+                <Typography sx={{ fontFamily: type.displayFamily, fontWeight: 700, fontSize: { xs: 'clamp(1.4rem,6vw,1.6rem)', md: '1.9rem' }, letterSpacing: '-0.02em', lineHeight: 1.1, mt: { md: 2 } }}>
+                  {heroTitle}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{heroSub}</Typography>
+              </motion.div>
             </motion.div>
-            <ReassurancePoints />
+            <motion.div {...leftEntrance(0.25)}>
+              <ReassurancePoints />
+            </motion.div>
           </Box>
         </Box>
 
         {/* ── Interactive auth column ── */}
+        <motion.div
+          initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+        >
         <Box sx={{ minWidth: 0 }}>
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
       {info && (method === 'otp' ? otpStep === 'code' : method === 'mpin-reset' ? resetStep === 'confirm' : false) &&
@@ -258,11 +302,25 @@ export default function LoginPage() {
               <Box>
                 <Box sx={{ mb: 2 }}>{idField(true)}</Box>
                 <MpinField value={mpin} onChange={(v) => { setMpin(v); if (pinStatus === 'error') setPinStatus('idle'); }}
-                  onComplete={(p) => doMpin(p)} status={pinStatus} disabled={loading || pinStatus === 'success'} autoFocus={false} />
-                <Button fullWidth variant="contained" size="large" disabled={loading || mpin.length !== 6 || pinStatus === 'success'}
-                  onClick={() => doMpin()} sx={{ mt: 2.25, py: 1.15 }}>
-                  {pinStatus === 'success' ? 'Unlocked ✓' : loading ? 'Unlocking…' : 'Unlock'}
-                </Button>
+                  onComplete={(p) => doMpin(p)} status={pinStatus} disabled={loading || pinStatus === 'success'} autoFocus={!!initialSaved.current} />
+                <Box sx={{ position: 'relative', mt: 2.25 }}>
+                  {mpin.length === 6 && pinStatus === 'idle' && !loading && !reduce && (
+                    <Box aria-hidden sx={{
+                      position: 'absolute', inset: 0, borderRadius: '8px', overflow: 'hidden',
+                      pointerEvents: 'none', zIndex: 1,
+                      '&::after': {
+                        content: '""', position: 'absolute', top: 0, left: '-60%', width: '40%', height: '100%',
+                        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)',
+                        '@keyframes unlockShimmer': { '0%': { left: '-60%' }, '100%': { left: '120%' } },
+                        animation: 'unlockShimmer 1.4s ease-in-out infinite',
+                      },
+                    }} />
+                  )}
+                  <Button fullWidth variant="contained" size="large" disabled={loading || mpin.length !== 6 || pinStatus === 'success'}
+                    onClick={() => doMpin()} sx={{ py: 1.15 }}>
+                    {pinStatus === 'success' ? 'Unlocked ✓' : loading ? 'Unlocking…' : 'Unlock'}
+                  </Button>
+                </Box>
                 {rememberRow}
                 <SecurityNote />
 
@@ -378,6 +436,7 @@ export default function LoginPage() {
             </Typography>
           </Box>
         </Box>{/* /interactive auth column */}
+        </motion.div>
       </Box>{/* /two-column grid */}
 
       {/* The signature success cinematic */}
@@ -489,4 +548,3 @@ function BackRow({ onClick, label, subtle }) {
     </Box>
   );
 }
-

@@ -27,6 +27,7 @@ import DashUpcomingBills from '../ui/DashUpcomingBills';
 import DashWeekCompare from '../ui/DashWeekCompare';
 import DashCategoryMovers from '../ui/DashCategoryMovers';
 import AnimatedNumber from '../ui/AnimatedNumber';
+import { StorySkeleton } from '../ui/Skeletons';
 import ExpenseComposer from '../ui/ExpenseComposer';
 import usePressSpring from '../ui/usePressSpring';
 import useMonthlyDashboard from '../ui/useMonthlyDashboard';
@@ -129,12 +130,18 @@ export default function StoryPage() {
   const {
     report, lastReport, recent, insightText, categories, tags, recurring, history,
     dayOfMonth, daysInMonth, monthName, spent, count, trend, cats, topCat, delta, avgPerDay, rhythm, settle,
-    reload,
+    reload, status,
   } = useMonthlyDashboard();
 
   const openExpenseForm = () => {
     setExpenseForm({ open: true, editing: false, data: { ...BLANK_EXPENSE } });
   };
+
+  useEffect(() => {
+    const onAdd = () => openExpenseForm();
+    window.addEventListener('toolbox:add-expense', onAdd);
+    return () => window.removeEventListener('toolbox:add-expense', onAdd);
+  }, []);
   const closeExpenseForm = () => setExpenseForm({ open: false, editing: false, data: {} });
 
   const saveExpense = async () => {
@@ -489,6 +496,8 @@ export default function StoryPage() {
         );
     }
   };
+
+  if (status?.primary === 'loading') return <StorySkeleton />;
 
   return (
     <Box sx={{ position: 'relative', pb: { xs: 10, md: 6 } }}>

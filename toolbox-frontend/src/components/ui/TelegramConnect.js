@@ -1,9 +1,10 @@
 import React from 'react';
-import { Box, Typography, Button, TextField, CircularProgress } from '@mui/material';
+import { Box, Typography, Button, TextField, CircularProgress, Switch } from '@mui/material';
 import TelegramIcon from '@mui/icons-material/Telegram';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import { TELEGRAM_BOT_URL, TELEGRAM_BOT_HANDLE } from '../../config';
-import { getTelegramLink, linkTelegram, unlinkTelegram } from '../rest/userApis';
+import { getTelegramLink, linkTelegram, unlinkTelegram, setTelegramNotificationsEnabled } from '../rest/userApis';
+import { useAuth } from '../../contexts/AuthContext';
 import { feedback } from './feedback';
 
 const TG = '#229ED9'; // Telegram blue — the one accent this card gets to use
@@ -33,11 +34,35 @@ function Header() {
  * with an unlink, and surfaces link errors (e.g. an id already used elsewhere).
  */
 function FullConnect({ sx }) {
+  const { user, refreshUserProfile } = useAuth();
   const [state, setState] = React.useState(null); // { linked, telegram_id, username }
   const [loading, setLoading] = React.useState(true);
   const [idInput, setIdInput] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState('');
+  // Whether pings (expense/split/settle) go to the linked chat. Seeded from
+  // the profile and flipped optimistically — reverted if the save fails.
+  const [notifyOn, setNotifyOn] = React.useState(user?.telegramNotificationsEnabled !== false);
+  const [notifyBusy, setNotifyBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    setNotifyOn(user?.telegramNotificationsEnabled !== false);
+  }, [user?.telegramNotificationsEnabled]);
+
+  const toggleNotify = async () => {
+    const next = !notifyOn;
+    setNotifyOn(next); setNotifyBusy(true);
+    try {
+      await setTelegramNotificationsEnabled(next);
+      feedback(next ? 'success' : 'tap');
+      refreshUserProfile();
+    } catch (e) {
+      setNotifyOn(!next); // revert on failure
+      setError(e.message || 'Could not save that.');
+    } finally {
+      setNotifyBusy(false);
+    }
+  };
 
   React.useEffect(() => {
     let alive = true;
@@ -83,6 +108,20 @@ function FullConnect({ sx }) {
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
           Message the bot an expense like “20 chai” and it logs to this account.
         </Typography>
+
+        <Box sx={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5,
+          mt: 2, pt: 1.5, borderTop: '1px solid', borderColor: 'divider',
+        }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontSize: '0.9rem', fontWeight: 550 }}>Notifications</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Get a ping here when an expense, split, or settle-up happens
+            </Typography>
+          </Box>
+          <Switch checked={notifyOn} onChange={toggleNotify} disabled={notifyBusy} />
+        </Box>
+
         {error && <Typography variant="caption" color="error.main" sx={{ display: 'block', mt: 1 }}>{error}</Typography>}
         <Button onClick={disconnect} disabled={busy} size="small" color="inherit" sx={{ mt: 1.5 }}>
           {busy ? 'Unlinking…' : 'Unlink'}

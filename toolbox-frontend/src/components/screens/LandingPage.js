@@ -158,7 +158,7 @@ export default function LandingPage() {
     dismissedKey: lastReport ? `${lastReport.year}-${String(lastReport.month).padStart(2, '0')}` : '',
   });
 
-  // open quick-add with the "a" shortcut (when not typing)
+  // open quick-add with the "a" shortcut (when not typing) or the mobile bottom-bar FAB
   useEffect(() => {
     const onKey = (e) => {
       if (e.key.toLowerCase() === 'a' && !e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -167,8 +167,13 @@ export default function LandingPage() {
         e.preventDefault(); openExpenseForm();
       }
     };
+    const onAdd = () => openExpenseForm();
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('toolbox:add-expense', onAdd);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('toolbox:add-expense', onAdd);
+    };
   }, []);
 
   const name = user?.firstName || user?.first_name || user?.username || 'there';
@@ -247,7 +252,7 @@ export default function LandingPage() {
               <Reveal index={0}>
                 <Eyebrow>Spent this month</Eyebrow>
                 <Typography component="div" sx={{ ...num, fontSize: { xs: '3.4rem', sm: '4.4rem', md: '4.9rem' }, fontWeight: 640, letterSpacing: '-0.05em', lineHeight: 0.9, mt: 1 }}>
-                  <AnimatedNumber value={spent} format="money" />
+                  <AnimatedNumber value={spent} format="money" initial={0} duration={700} />
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 1.5, flexWrap: 'wrap' }}>
                   <Typography sx={{ fontSize: 13.5, color: 'text.secondary' }}>
@@ -550,10 +555,10 @@ export default function LandingPage() {
         )}
       </Box>
 
-      {/* floating add (mobile-friendly, always reachable) */}
+      {/* floating add — desktop only; mobile uses the bottom tab bar centre slot */}
       <Fab ref={fabPress.ref} onClick={() => openExpenseForm()} aria-label="Add expense"
         {...fabPress.bindEvents}
-        sx={{ position: 'fixed', bottom: { xs: 20, md: 28 }, right: { xs: 20, md: 28 }, zIndex: 20, bgcolor: GREEN, color: '#04150e', boxShadow: '0 8px 24px -6px rgba(0,0,0,0.5)', '&:hover': { bgcolor: GREEN, filter: 'brightness(1.05)' } }}>
+        sx={{ position: 'fixed', bottom: { xs: 20, md: 28 }, right: { xs: 20, md: 28 }, zIndex: 20, bgcolor: GREEN, color: '#04150e', boxShadow: '0 8px 24px -6px rgba(0,0,0,0.5)', '&:hover': { bgcolor: GREEN, filter: 'brightness(1.05)' }, display: { xs: 'none', md: 'inline-flex' } }}>
         <AddRoundedIcon />
       </Fab>
 

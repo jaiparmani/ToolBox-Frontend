@@ -13,6 +13,10 @@ import CursorGlow from '../motion/CursorGlow';
 import { ExpenseListSkeleton, SummarySkeleton } from '../ui/Skeletons';
 import { PageHeader, ChartContainer, EmptyState } from '../ui';
 
+import MonthlyNarrativeCard from '../ui/MonthlyNarrativeCard';
+import FinancialAgeCard from '../ui/FinancialAgeCard';
+import SentimentReportCard from '../ui/SentimentReportCard';
+import SpendingPersonalityCard from '../ui/SpendingPersonalityCard';
 import InsightsMonthTrend from '../insights/InsightsMonthTrend';
 import InsightsCategoryDelta from '../insights/InsightsCategoryDelta';
 import InsightsDailyRhythm from '../insights/InsightsDailyRhythm';
@@ -112,7 +116,13 @@ export default function ReportsPage() {
 
   const hasData = total > 0 || count > 0 || categoryTotals.length > 0;
 
-  if (isLoading) return null;
+  if (isLoading) return (
+    <Box sx={{ maxWidth: 860, mx: 'auto', px: { xs: 2, sm: 3 }, pt: 3, pb: 6 }}>
+      <SummarySkeleton count={4} />
+      <Box sx={{ mt: 2 }}><ExpenseListSkeleton rows={4} /></Box>
+      <Box sx={{ mt: 2 }}><ExpenseListSkeleton rows={5} /></Box>
+    </Box>
+  );
   if (!isAuthenticated) {
     return (
       <Container maxWidth="sm" sx={{ mt: 8 }}>
@@ -167,6 +177,26 @@ export default function ReportsPage() {
             {/* 1. Hero — spend trend across months */}
             <Reveal index={1}>
               <InsightsMonthTrend months={monthSeries} count={count} />
+            </Reveal>
+
+            {/* 1b. Monthly narrative — model-written prose summary of the month */}
+            <Reveal index={1}>
+              <MonthlyNarrativeCard year={year} month={month} />
+            </Reveal>
+
+            {/* 1b2. Financial age score — maturity level + personalised description */}
+            <Reveal index={1}>
+              <FinancialAgeCard />
+            </Reveal>
+
+            {/* 1c. Regret Score — sentiment breakdown across all time */}
+            <Reveal index={1}>
+              <SentimentReportCard />
+            </Reveal>
+
+            {/* 1c. Spending personality — 90-day behavioural profile */}
+            <Reveal index={1}>
+              <SpendingPersonalityCard />
             </Reveal>
 
             {/* 2. Where it went — categories with per-category MoM delta */}

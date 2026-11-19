@@ -3,11 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Box, Container, Typography, Paper,
-  Button, Dialog, TextField, Alert, Snackbar, Chip, IconButton, Tooltip,
-  Fab, Switch, FormControlLabel,
+  Button, TextField, Alert, Snackbar, Chip, IconButton, Tooltip,
+  Fab, Dialog, DialogTitle, DialogContent, DialogActions,
   Table, TableBody, TableCell, TableContainer,
-  TableRow, TablePagination, InputAdornment, Autocomplete,
-  useMediaQuery, Slide, Stack, InputBase
+  TableRow, TablePagination, InputAdornment,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -20,9 +19,8 @@ import {
   Refresh as RefreshIcon,
   Close as CloseIcon,
   Insights as InsightsIcon,
-  CallSplit as CallSplitIcon,
-  Person as PersonIcon,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  CallSplit as MergeIcon,
 } from '@mui/icons-material';
 
 // Import API functions and reusable components
@@ -32,13 +30,10 @@ import {
   getTags, createTag, updateTag, deleteTag,
   getExpenseSummary, quickAddExpense, bulkAddExpenses,
   generateExpenseInsight, getLatestExpenseInsight, askExpenses,
-  splitAddExpense, getSplitBalances, settleUpWith,
-  createSplitManually, searchSplitUsers, getSplits, addSplitToExpenses,
-  updateSplit, deleteSplit
+  getSplits, getCategoryMergeSuggestions, setSentiment,
 } from '../rest/expenseTrackerApis';
 
 import DatePickerComponent from '../ReusableComponents/DatePickerComponent';
-import AutocompleteComponent from '../ReusableComponents/AutocompleteComponent';
 import SummaryStrip from '../ui/SummaryStrip';
 import ActivityDeck from '../ui/ActivityDeck';
 import ExpenseTimeline from '../ui/ExpenseTimeline';
@@ -60,12 +55,14 @@ import ConfirmDialog from '../ui/ConfirmDialog';
 import ActivityInsightsPanel from '../ui/ActivityInsightsPanel';
 import ActivityLabelsPanel from '../ui/ActivityLabelsPanel';
 import ActivityLabelDialog from '../ui/ActivityLabelDialog';
-import ActivitySplitsPanel from '../ui/ActivitySplitsPanel';
 import { TransactionStoryDrawer, buildStoryFromExpense, PageHeader } from '../ui';
+import DashMonthForecast from '../ui/DashMonthForecast';
+import PersonalisedHomeCard from '../ui/PersonalisedHomeCard';
+import SmartShortcutsBar from '../ui/SmartShortcutsBar';
+import MoneyMood from '../ui/MoneyMood';
 import CursorGlow from '../motion/CursorGlow';
 import AssistantOrb from '../ui/AssistantOrb';
-import { accents, color, motion, radius, type } from '../../theme/tokens';
-import { useTheme } from '@mui/material/styles';
+import { accents, color, radius } from '../../theme/tokens';
 import { AnimatePresence, motion as framerMotion } from 'framer-motion';
 
 // Color palette for categories
@@ -75,15 +72,6 @@ const categoryColors = [
  '#009688', '#4caf50', '#8bc34a', '#cddc39',
  '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'
 ];
-
-/* SlideUp transition for full-screen mobile dialogs */
-const SlideUp = React.forwardRef((props, ref) => <Slide direction="up" ref={ref} {...props} />);
-
-/* framer-motion wrapper for animated rows */
-const MotionBox = framerMotion.create(Box);
-
-/* Shared number style — tabular, display face, tight tracking */
-const splitNumSx = { fontFamily: type.displayFamily, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.03em' };
 
 /** Opens the one ToolBox Assistant — the scattered AI boxes now live there. */
 function AssistantNudge({ label }) {
@@ -116,8 +104,6 @@ function AssistantNudge({ label }) {
 export default function ExpenseTrackerPage() {
   // Use global authentication state
   const { isAuthenticated, isLoading, user } = useAuth();
-  const theme = useTheme();
-  const splitFullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
  // Main data state
  const [expenses, setExpenses] = useState([]);
@@ -214,6 +200,21 @@ export default function ExpenseTrackerPage() {
    }
    // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [searchParams]);
+
+ // Handle PWA manifest shortcut URLs: ?action=quick-add opens the composer,
+ // ?action=ask opens the ToolBox assistant. Runs once on mount so the action
+ // isn't replayed on every filter change.
+ useEffect(() => {
+   const action = searchParams.get('action');
+   if (!action) return;
+   setSearchParams({}, { replace: true });
+   if (action === 'quick-add') {
+     openExpenseForm();
+   } else if (action === 'ask') {
+     window.dispatchEvent(new Event('toolbox:command-palette'));
+   }
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, []);
  const [pagination, setPagination] = useState({
    page: 0,
    pageSize: 10,
@@ -249,6 +250,14 @@ export default function ExpenseTrackerPage() {
    selectTab(0);
    feedback('open');
  };
+ // Same idea, for a tag row — tags are multi-select in the filter sheet, so
+ // this replaces rather than adds to whatever tag filter was already active.
+ const drillIntoTag = (tagId) => {
+   setFilters(prev => ({ ...prev, tags: [String(tagId)] }));
+   setPagination(prev => ({ ...prev, page: 0 }));
+   selectTab(0);
+   feedback('open');
+ };
  // Filters live in a sheet, opened on demand — a modal that springs open
  // unasked on page load is never "there's room for it," just a surprise.
  const [filtersOpen, setFiltersOpen] = useState(false);
@@ -267,38 +276,68 @@ export default function ExpenseTrackerPage() {
  // Plain-language question over the expense list
  const [ask, setAsk] = useState({ question: '', loading: false, answer: null });
 
- // Shared bills: who owes what
- const [splits, setSplits] = useState({
-   text: '', loading: false, balances: [], youOwe: [],
-   totalOwed: 0, totalYouOwe: 0, net: 0, loaded: false, settling: null
- });
+ // Swipe-to-delete undo state
+ const [deletedExpense, setDeletedExpense] = useState(null);
+ const [undoOpen, setUndoOpen] = useState(false);
+ const undoTimerRef = React.useRef(null);
+ const pendingDeleteIdRef = React.useRef(null);
 
- // Split-only bills: tracked in Splits but not in expenses — can be flipped.
- const [splitOnlyBills, setSplitOnlyBills] = useState([]);
+ // Sentiment quick-pick: null or the newly created expense id
+ const [sentimentExpenseId, setSentimentExpenseId] = useState(null);
+ const sentimentTimerRef = React.useRef(null);
 
- // Expanded balance cards — show individual splits for a person.
- const [expandedPerson, setExpandedPerson] = useState(null);
- const [personSplits, setPersonSplits] = useState([]);
- // Inline editing of a split amount.
- const [editingSplit, setEditingSplit] = useState(null); // { id, amount }
+ // Smart date inference: set after a new expense added between midnight and 4am
+ const [datePromptExpense, setDatePromptExpense] = useState(null);
+
+ // Quick-confirm card: shown after quick_add succeeds
+ const [quickConfirmCard, setQuickConfirmCard] = useState(null);
+ const quickConfirmTimerRef = React.useRef(null);
+
+ const showSentimentPrompt = React.useCallback((expenseId) => {
+   if (sentimentTimerRef.current) clearTimeout(sentimentTimerRef.current);
+   setSentimentExpenseId(expenseId);
+   sentimentTimerRef.current = setTimeout(() => {
+     setSentimentExpenseId(null);
+     sentimentTimerRef.current = null;
+   }, 6000);
+ }, []);
+
+ const dismissSentiment = React.useCallback(() => {
+   if (sentimentTimerRef.current) { clearTimeout(sentimentTimerRef.current); sentimentTimerRef.current = null; }
+   setSentimentExpenseId(null);
+ }, []);
+
+ const handleSentiment = React.useCallback(async (value) => {
+   const id = sentimentExpenseId;
+   dismissSentiment();
+   if (!id) return;
+   try { await setSentiment(id, value); } catch { /* best-effort */ }
+ }, [sentimentExpenseId, dismissSentiment]);
+
+ // Category merge suggestions
+ const [mergeSuggestions, setMergeSuggestions] = useState([]);
+ const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+ const [mergeDismissed, setMergeDismissed] = useState(
+   () => sessionStorage.getItem('merge_suggestion_dismissed') === '1'
+ );
 
  /**
-  * The four sections, and the one real figure each can put on the peek card
+  * The three sections, and the one real figure each can put on the peek card
   * that rides in behind a page drag (Apple Design §8). Every hint is a number
   * this page already holds — the server's transaction count, the label counts,
-  * the categories the summary actually broke down, the people with a live
-  * balance. A section whose data has not loaded yet contributes no hint at all
-  * rather than a placeholder: the peek shows its name, and nothing more.
+  * the categories the summary actually broke down. A section whose data has
+  * not loaded yet contributes no hint at all rather than a placeholder: the
+  * peek shows its name, and nothing more.
   */
  const deckSections = React.useMemo(() => [
    {
-     label: 'Expenses', icon: DashboardIcon, color: accents.blue,
+     label: 'Expenses', icon: DashboardIcon, color: accents.cyan,
      hint: pagination.total
        ? `${pagination.total} ${pagination.total === 1 ? 'transaction' : 'transactions'} · ${scopeLabel}`
        : undefined,
    },
    {
-     label: 'Labels', icon: LabelsIcon, color: accents.purple,
+     label: 'Labels', icon: LabelsIcon, color: accents.violet,
      hint: categories.length || tags.length
        ? `${categories.length} categories · ${tags.length} tags`
        : undefined,
@@ -309,21 +348,7 @@ export default function ExpenseTrackerPage() {
        ? `${summary.categoryBreakdown.length} categories · ${scopeLabel}`
        : undefined,
    },
-   {
-     label: 'Splits', icon: CallSplitIcon, color: accents.amber,
-     hint: splits.loaded && (splits.totalOwed || splits.totalYouOwe)
-       ? `${money(splits.totalOwed)} owed to you · ${money(splits.totalYouOwe)} you owe`
-       : undefined,
-   },
- ], [pagination.total, scopeLabel, categories.length, tags.length, summary, splits.loaded, splits.totalOwed, splits.totalYouOwe]);
-
-
- // Manual split: exact numbers, no model call and no quota spent
- const [splitForm, setSplitForm] = useState({
-   open: false, saving: false, amount: '', description: '', categoryId: '',
-   splitWithMe: true, paidBy: '', addToExpenses: true,
-   people: [], userOptions: [], searching: false
- });
+ ], [pagination.total, scopeLabel, categories.length, tags.length, summary]);
 
  // Load data when authenticated
  useEffect(() => {
@@ -453,7 +478,8 @@ export default function ExpenseTrackerPage() {
  };
 
  // Form handlers
- const openExpenseForm = (expense = null) => {
+ // options.categoryId pre-fills the category picker for new expenses (e.g. from SmartShortcutsBar)
+ const openExpenseForm = (expense = null, options = {}) => {
    if (expense) {
      setExpenseForm({
        open: true,
@@ -479,7 +505,7 @@ export default function ExpenseTrackerPage() {
          id: null,
          amount: '',
          description: '',
-         categoryId: '',
+         categoryId: options.categoryId || '',
          date: new Date(),
          tagIds: [],
          location: '',
@@ -493,6 +519,13 @@ export default function ExpenseTrackerPage() {
 
  const closeExpenseForm = () => {
    setExpenseForm({ open: false, editing: false, data: {} });
+ };
+
+ // Called from SmartShortcutsBar — looks up the category id by name so the
+ // composer opens with the right picker value already selected.
+ const handleCategoryShortcut = (categoryName) => {
+   const cat = categories.find((c) => c.name === categoryName);
+   openExpenseForm(null, { categoryId: cat?.id || '' });
  };
 
  const saveExpense = async () => {
@@ -525,9 +558,16 @@ export default function ExpenseTrackerPage() {
      } else {
        const created = await addExpenseApi(expenseForm.data);
        setSuccess('Expense added successfully!');
+       if (created?.id) showSentimentPrompt(created.id);
        if (created?.duplicateWarning) {
          const d = created.duplicateWarning;
          setDuplicateWarning(`Looks like a duplicate of "${d.description}" (${money(parseFloat(d.amount))}) added moments ago.`);
+       }
+       // Smart date inference: between midnight and 4am the entered expense
+       // might actually be from the previous day — ask once, non-blocking.
+       const nowHour = new Date().getHours();
+       if (nowHour >= 0 && nowHour < 4 && created?.id) {
+         setDatePromptExpense({ id: created.id });
        }
      }
      feedback('success');
@@ -570,6 +610,21 @@ export default function ExpenseTrackerPage() {
      const amountText = saved.displayAmount || formatCurrency(saved.amount);
      const categoryText = saved.category?.name ? ` \u00b7 ${saved.category.name}` : '';
      setSuccess(`Added "${saved.description}" \u2014 ${amountText}${categoryText}`);
+     if (saved?.id) showSentimentPrompt(saved.id);
+     // Show a slim confirm card so the user can immediately edit or undo
+     // without hunting for the row in the list.
+     if (quickConfirmTimerRef.current) clearTimeout(quickConfirmTimerRef.current);
+     setQuickConfirmCard({
+       id: saved.id,
+       description: saved.description,
+       amountText,
+       categoryName: saved.category?.name || '',
+       expense: saved,
+     });
+     quickConfirmTimerRef.current = setTimeout(() => {
+       setQuickConfirmCard(null);
+       quickConfirmTimerRef.current = null;
+     }, 4000);
      setQuickAddText('');
      loadExpenses();
      loadSummary();
@@ -602,265 +657,6 @@ export default function ExpenseTrackerPage() {
    setSuccess(`Added ${result.count === 1 ? (result.items?.[0]?.description || 'expense') : `${result.count} transactions`}`);
    loadExpenses();
    loadSummary();
- };
-
- const openSplitForm = () => {
-   setSplitForm({
-     open: true, saving: false, amount: '', description: '', categoryId: '',
-     splitWithMe: true, paidBy: '', addToExpenses: true,
-     people: [], userOptions: [], searching: false
-   });
-   // Seed the picker with people already split with, before any typing.
-   searchSplitUsers('').then(userOptions =>
-     setSplitForm(prev => ({ ...prev, userOptions }))).catch(() => {});
- };
-
- const closeSplitForm = () => setSplitForm(prev => ({ ...prev, open: false }));
-
- const searchUsers = async (term) => {
-   setSplitForm(prev => ({ ...prev, searching: true }));
-   try {
-     const userOptions = await searchSplitUsers(term);
-     setSplitForm(prev => ({ ...prev, userOptions, searching: false }));
-   } catch (error) {
-     setSplitForm(prev => ({ ...prev, searching: false }));
-   }
- };
-
- // What each person will owe, worked out the same way the server will, so the
- // form shows the real numbers before anything is saved.
- const previewShares = () => {
-   const total = parseFloat(splitForm.amount);
-   if (!total || total <= 0 || splitForm.people.length === 0) return null;
-   const explicit = splitForm.people.filter(p => p.amount);
-   const paise = Math.round(total * 100);
-   if (explicit.length) {
-     const named = explicit.reduce((sum, p) => sum + Math.round(parseFloat(p.amount) * 100), 0);
-     if (named > paise) return { error: 'Those shares add up to more than the bill' };
-     const rest = splitForm.people.filter(p => !p.amount);
-     const each = rest.length ? Math.floor((paise - named) / rest.length) : 0;
-     return {
-       shares: splitForm.people.map(p => ({
-         label: p.label,
-         amount: p.amount ? parseFloat(p.amount) : each / 100
-       })),
-       yours: (paise - named - each * rest.length) / 100
-     };
-   }
-   const ways = splitForm.people.length + (splitForm.splitWithMe ? 1 : 0);
-   const base = Math.floor(paise / ways);
-   const remainder = paise - base * ways;
-   return {
-     shares: splitForm.people.map(p => ({ label: p.label, amount: base / 100 })),
-     yours: splitForm.splitWithMe ? (base + remainder) / 100 : 0
-   };
- };
-
- const saveManualSplit = async () => {
-   const preview = previewShares();
-   if (!preview || preview.error) {
-     setError(preview?.error || 'Enter an amount and at least one person');
-     return;
-   }
-   if (!splitForm.description.trim()) {
-     setError('What was the expense for?');
-     return;
-   }
-   setSplitForm(prev => ({ ...prev, saving: true }));
-   try {
-     const result = await createSplitManually({
-       amount: parseFloat(splitForm.amount),
-       description: splitForm.description.trim(),
-       categoryId: splitForm.categoryId || undefined,
-       splitWithMe: splitForm.splitWithMe,
-       paidBy: splitForm.paidBy || undefined,
-       addToExpenses: splitForm.addToExpenses,
-       participants: splitForm.people.map(p => ({
-         userId: p.userId, name: p.label, amount: p.amount || undefined
-       }))
-     });
-     setSuccess(`Split ${formatCurrency(result.expense.amount)} with ${result.splits.length} ` +
-                `${result.splits.length === 1 ? 'person' : 'people'}`);
-     feedback('success');
-     window.dispatchEvent(new Event('toolbox:notify-refresh'));
-     setSplitForm(prev => ({ ...prev, open: false, saving: false }));
-     loadBalances();
-     loadExpenses();
-     loadSummary();
-   } catch (error) {
-     setSplitForm(prev => ({ ...prev, saving: false }));
-     setError(error.message || 'Could not create the split');
-   }
- };
-
- const loadBalances = async () => {
-   try {
-     const data = await getSplitBalances();
-     setSplits(prev => ({
-       ...prev,
-       balances: data.balances,
-       youOwe: data.youOwe,
-       totalOwed: data.totalOwedToYou,
-       totalYouOwe: data.totalYouOwe,
-       net: data.net,
-       loaded: true
-     }));
-   } catch (error) {
-     setSplits(prev => ({ ...prev, loaded: true }));
-     setError(error.message || 'Could not load balances');
-   }
- };
-
- const loadSplitOnlyBills = async () => {
-   try {
-     const all = await getSplits({ settled: 'false' });
-     // getSplits returns both directions now. A split-only bill somebody ELSE
-     // paid isn't ours to promote: "Add to expenses" PATCHes an expense owned
-     // by them and 404s. Only bills owed *to* us belong in this section.
-     setSplitOnlyBills(all.filter(s => s.splitOnly && s.direction === 'owed_to_you'));
-   } catch (e) { /* silent */ }
- };
-
- const handleAddToExpenses = async (expenseId) => {
-   try {
-     await addSplitToExpenses(expenseId);
-     setSuccess('Added to your expenses');
-     setSplitOnlyBills(prev => prev.filter(s => s.expenseId !== expenseId));
-     loadExpenses();
-     loadSummary();
-   } catch (e) {
-     setError(e.message || 'Could not update');
-   }
- };
-
- const togglePersonSplits = async (personId) => {
-   if (expandedPerson === personId) {
-     setExpandedPerson(null);
-     setPersonSplits([]);
-     return;
-   }
-   setExpandedPerson(personId);
-   try {
-     const all = await getSplits({ personId, settled: 'false' });
-     setPersonSplits(all);
-   } catch (e) {
-     setPersonSplits([]);
-   }
- };
-
- const askSettleSingle = (s) => setConfirm({
-   title: 'Mark this as paid?',
-   message: `${formatCurrency(s.amount)} from ${s.personName} for "${s.description}" will be settled.`,
-   confirmLabel: 'Mark paid',
-   onConfirm: () => handleSettleSingle(s.id, s.amount),
- });
-
- const handleSettleSingle = async (splitId, amount) => {
-   setSplits(prev => ({ ...prev, settling: `s${splitId}` }));
-   try {
-     await settleUpWith({ splitIds: [splitId] });
-     setSuccess(`Settled ${formatCurrency(amount)}`);
-     setPersonSplits(prev => prev.filter(s => s.id !== splitId));
-     setSplits(prev => ({ ...prev, settling: null }));
-     loadBalances();
-   } catch (e) {
-     setSplits(prev => ({ ...prev, settling: null }));
-     setError(e.message || 'Could not settle');
-   }
- };
-
- const handleEditSplit = async (splitId, newAmount) => {
-   const parsed = parseFloat(newAmount);
-   if (!parsed || parsed <= 0) {
-     setError('Amount must be greater than zero');
-     return;
-   }
-   try {
-     await updateSplit(splitId, { amount: parsed });
-     setSuccess(`Split updated to ${formatCurrency(parsed)}`);
-     feedback('success');
-     window.dispatchEvent(new Event('toolbox:notify-refresh'));
-     setEditingSplit(null);
-     if (expandedPerson) {
-       const all = await getSplits({ personId: expandedPerson, settled: 'false' });
-       setPersonSplits(all);
-     }
-     loadBalances();
-   } catch (e) {
-     setError(e.message || 'Could not update split');
-   }
- };
-
- const askDeleteSplit = (s) => setConfirm({
-   title: 'Remove this split?',
-   message: `${s.personName}'s ${formatCurrency(s.amount)} share of "${s.description}" stops being tracked. The expense itself stays.`,
-   confirmLabel: 'Remove',
-   destructive: true,
-   onConfirm: () => handleDeleteSplit(s.id),
- });
-
- const handleDeleteSplit = async (splitId) => {
-   try {
-     await deleteSplit(splitId);
-     setSuccess('Split removed');
-     feedback('success');
-     window.dispatchEvent(new Event('toolbox:notify-refresh'));
-     setPersonSplits(prev => prev.filter(s => s.id !== splitId));
-     loadBalances();
-   } catch (e) {
-     setError(e.message || 'Could not remove split');
-   }
- };
-
- const handleSplitAdd = async () => {
-   if (!splits.text.trim()) {
-     setError('Describe the shared expense first');
-     return;
-   }
-   setSplits(prev => ({ ...prev, loading: true }));
-   try {
-     const result = await splitAddExpense(splits.text.trim());
-     const who = result.splits.map(s => `${s.person_name} ${formatCurrency(s.amount)}`).join(', ');
-     setSuccess(`Split ${formatCurrency(result.expense.amount)} — ${who || 'no one'}`);
-     setSplits(prev => ({ ...prev, text: '', loading: false }));
-     loadBalances();
-     loadExpenses();
-     loadSummary();
-   } catch (error) {
-     setSplits(prev => ({ ...prev, loading: false }));
-     setError(error.message || 'Could not split that');
-   }
- };
-
- // The unified people list carries its own direction, so the panel hands the
- // whole entry back rather than the caller having to remember which way round
- // this person was.
- const askSettle = (entry) => {
-   const owedByMe = entry.direction === 'you_owe';
-   setConfirm({
-     title: owedByMe ? `Paid ${entry.name} back?` : `Settle up with ${entry.name}?`,
-     message: owedByMe
-       ? `The ${formatCurrency(entry.owed)} you owe ${entry.name} across ${entry.unsettledCount} ${entry.unsettledCount === 1 ? 'bill' : 'bills'} will be marked paid.`
-       : `${entry.name}'s ${formatCurrency(entry.owed)} across ${entry.unsettledCount} ${entry.unsettledCount === 1 ? 'bill' : 'bills'} will be marked settled.`,
-     confirmLabel: owedByMe ? 'Mark paid' : 'Settle',
-     onConfirm: () => handleSettle(entry.raw, owedByMe ? 'i_owe' : 'owed_to_me'),
-   });
- };
-
- const handleSettle = async (balance, direction = 'owed_to_me') => {
-   const owedByMe = direction === 'i_owe';
-   const key = owedByMe ? `u${balance.userId}` : balance.personId;
-   setSplits(prev => ({ ...prev, settling: key }));
-   try {
-     const result = await settleUpWith(
-       owedByMe ? { owedToUserId: balance.userId } : { personId: balance.personId });
-     setSuccess(`Settled ${formatCurrency(result.total)} with ${balance.name}`);
-     setSplits(prev => ({ ...prev, settling: null }));
-     loadBalances();
-   } catch (error) {
-     setSplits(prev => ({ ...prev, settling: null }));
-     setError(error.message || 'Could not settle');
-   }
  };
 
  const runAsk = async () => {
@@ -901,27 +697,87 @@ export default function ExpenseTrackerPage() {
    }
  };
 
- const deleteExpenseDirect = async (expenseId) => {
-   setLoading(true);
-   try {
-     await deleteExpense(expenseId);
-     setSuccess('Expense deleted successfully!');
-     loadExpenses();
-     loadSummary();
-   } catch (error) {
-     setError('Failed to delete expense');
-   } finally {
-     setLoading(false);
+ // Swipe-to-delete: optimistically remove from UI, offer a 5-second undo window,
+ // then commit the real API delete. If another swipe arrives before the timer
+ // fires, the pending deletion is committed immediately.
+ const deleteExpenseDirect = (expenseId) => {
+   // Commit any previous pending deletion before starting this one
+   if (undoTimerRef.current) {
+     clearTimeout(undoTimerRef.current);
+     undoTimerRef.current = null;
+     const prevId = pendingDeleteIdRef.current;
+     pendingDeleteIdRef.current = null;
+     if (prevId) deleteExpense(prevId).then(() => loadSummary()).catch(() => {});
+     setUndoOpen(false);
+     setDeletedExpense(null);
    }
+
+   const toDelete = expenses.find(e => e.id === expenseId);
+   if (!toDelete) return;
+
+   pendingDeleteIdRef.current = expenseId;
+   setExpenses(prev => prev.filter(e => e.id !== expenseId));
+   setDeletedExpense(toDelete);
+   setUndoOpen(true);
+
+   undoTimerRef.current = setTimeout(async () => {
+     undoTimerRef.current = null;
+     pendingDeleteIdRef.current = null;
+     setUndoOpen(false);
+     setDeletedExpense(null);
+     try {
+       await deleteExpense(expenseId);
+       loadSummary();
+     } catch {
+       setError('Failed to delete expense');
+       loadExpenses();
+     }
+   }, 5000);
  };
 
- // The menu delete keeps a confirm; the swipe gesture is its own confirmation.
+ const handleUndoDelete = () => {
+   if (undoTimerRef.current) { clearTimeout(undoTimerRef.current); undoTimerRef.current = null; }
+   pendingDeleteIdRef.current = null;
+   setUndoOpen(false);
+   const exp = deletedExpense;
+   setDeletedExpense(null);
+   if (!exp) return;
+   addExpenseApi({
+     amount: String(exp.amount),
+     transactionType: exp.type || 'expense',
+     categoryId: exp.category?.id || '',
+     description: exp.description,
+     date: exp.date,
+     tagIds: (exp.tags || []).map(t => t.id),
+     location: exp.location || '',
+     paymentMethod: exp.paymentMethod || '',
+     isRecurring: exp.isRecurring || false,
+   }).then(() => {
+     loadExpenses();
+     loadSummary();
+     setSuccess('Expense restored');
+   }).catch(() => setError('Could not restore the expense'));
+ };
+
+ // The menu delete already has a confirm dialog — delete immediately there.
  const deleteExpenseHandler = (expenseId) => setConfirm({
    title: 'Delete this expense?',
    message: 'It disappears from the timeline and from every total on this page.',
    confirmLabel: 'Delete',
    destructive: true,
-   onConfirm: () => deleteExpenseDirect(expenseId),
+   onConfirm: async () => {
+     setLoading(true);
+     try {
+       await deleteExpense(expenseId);
+       setSuccess('Expense deleted successfully!');
+       loadExpenses();
+       loadSummary();
+     } catch {
+       setError('Failed to delete expense');
+     } finally {
+       setLoading(false);
+     }
+   },
  });
 
  // Category handlers
@@ -1075,12 +931,14 @@ export default function ExpenseTrackerPage() {
    }
  }, [activeTab, insight.loaded, isAuthenticated]);
 
+ // Fetch category merge suggestions once on load; respect session-level dismissal.
  useEffect(() => {
-   if (activeTab === 3 && !splits.loaded && isAuthenticated) {
-     loadBalances();
-     loadSplitOnlyBills();
-   }
- }, [activeTab, splits.loaded, isAuthenticated]);
+   if (!isAuthenticated || mergeDismissed) return;
+   getCategoryMergeSuggestions()
+     .then(data => setMergeSuggestions(data?.suggestions || []))
+     .catch(() => {});
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [isAuthenticated]);
 
  // Filter handlers
  const handleFilterChange = (key, value) => {
@@ -1277,6 +1135,176 @@ export default function ExpenseTrackerPage() {
        </Alert>
      </Snackbar>
 
+     {/* Swipe-to-delete undo toast */}
+     <Snackbar
+       open={undoOpen}
+       anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+       sx={{ bottom: { xs: 80, md: 24 } }}
+       message="Expense deleted"
+       action={
+         <Button color="inherit" size="small" onClick={handleUndoDelete}>
+           Undo
+         </Button>
+       }
+     />
+
+     {/* Sentiment quick-pick — "How did that feel?" */}
+     <Snackbar
+       open={!!sentimentExpenseId}
+       anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+       sx={{ bottom: { xs: 140, md: 80 } }}
+     >
+       <Box sx={{
+         display: 'flex', alignItems: 'center', gap: 1.5,
+         px: 2, py: 1.25,
+         borderRadius: 3,
+         bgcolor: 'background.paper',
+         border: '1px solid',
+         borderColor: 'divider',
+         boxShadow: 4,
+       }}>
+         <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, flexShrink: 0 }}>
+           How did that feel?
+         </Typography>
+         <Tooltip title="Felt good">
+           <IconButton size="small" onClick={() => handleSentiment('good')} aria-label="Felt good"
+             sx={{ fontSize: 20, '&:hover': { bgcolor: `${accents.green}22` } }}>
+             😊
+           </IconButton>
+         </Tooltip>
+         <Tooltip title="Neutral">
+           <IconButton size="small" onClick={() => handleSentiment('neutral')} aria-label="Neutral"
+             sx={{ fontSize: 20, '&:hover': { bgcolor: 'action.hover' } }}>
+             😐
+           </IconButton>
+         </Tooltip>
+         <Tooltip title="Regret">
+           <IconButton size="small" onClick={() => handleSentiment('regret')} aria-label="Regret"
+             sx={{ fontSize: 20, '&:hover': { bgcolor: `${accents.red}22` } }}>
+             😔
+           </IconButton>
+         </Tooltip>
+         <IconButton size="small" onClick={dismissSentiment} aria-label="Dismiss" sx={{ ml: 0.5 }}>
+           <CloseIcon fontSize="small" />
+         </IconButton>
+       </Box>
+     </Snackbar>
+
+     {/* Smart date inference — "is this from today or yesterday?" */}
+     <Snackbar
+       open={!!datePromptExpense}
+       autoHideDuration={8000}
+       onClose={() => setDatePromptExpense(null)}
+       anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+       sx={{ bottom: { xs: 140, md: 80 } }}
+     >
+       <Box sx={{
+         display: 'flex', alignItems: 'center', gap: 1.5,
+         px: 2, py: 1.25,
+         borderRadius: 3,
+         bgcolor: 'background.paper',
+         border: '1px solid',
+         borderColor: 'divider',
+         boxShadow: 4,
+       }}>
+         <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, flexShrink: 0 }}>
+           Is this from today or yesterday?
+         </Typography>
+         <Button size="small" color="inherit" onClick={() => setDatePromptExpense(null)}>Today</Button>
+         <Button size="small" color="inherit" onClick={async () => {
+           const id = datePromptExpense?.id;
+           setDatePromptExpense(null);
+           if (!id) return;
+           const d = new Date();
+           d.setDate(d.getDate() - 1);
+           try {
+             await updateExpense(id, { date: d.toISOString().slice(0, 10) });
+             loadExpenses();
+           } catch { setError('Could not update the date'); }
+         }}>Yesterday</Button>
+         <IconButton size="small" onClick={() => setDatePromptExpense(null)} aria-label="Dismiss" sx={{ ml: 0.5 }}>
+           <CloseIcon fontSize="small" />
+         </IconButton>
+       </Box>
+     </Snackbar>
+
+     {/* Quick-confirm card — slides up after quick_add, auto-dismisses in 4s */}
+     <AnimatePresence>
+       {quickConfirmCard && (
+         <Box
+           key="quick-confirm-card"
+           component={framerMotion.div}
+           initial={{ y: '100%', opacity: 0 }}
+           animate={{ y: 0, opacity: 1 }}
+           exit={{ y: '100%', opacity: 0 }}
+           transition={{ type: 'spring', damping: 30, stiffness: 350 }}
+           sx={{
+             position: 'fixed',
+             bottom: { xs: 'calc(72px + env(safe-area-inset-bottom))', md: 0 },
+             left: 0, right: 0,
+             zIndex: 1400,
+             height: 56,
+             display: 'flex', alignItems: 'center',
+             px: 2, gap: 1,
+             background: (t) => t.palette.mode === 'dark' ? '#1c1c22' : '#f5f5f7',
+             border: '0.5px solid',
+             borderColor: 'divider',
+             borderRadius: '12px 12px 0 0',
+             boxShadow: '0 -4px 24px rgba(0,0,0,0.22)',
+           }}
+         >
+           <Typography sx={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'text.primary', minWidth: 0 }} noWrap>
+             {quickConfirmCard.description}
+             {' · '}
+             {quickConfirmCard.amountText}
+             {quickConfirmCard.categoryName ? ` · ${quickConfirmCard.categoryName}` : ''}
+           </Typography>
+           <Tooltip title="Dismiss">
+             <IconButton
+               size="small"
+               aria-label="Dismiss"
+               onClick={() => { clearTimeout(quickConfirmTimerRef.current); setQuickConfirmCard(null); }}
+             >
+               <CloseIcon fontSize="small" />
+             </IconButton>
+           </Tooltip>
+           <Tooltip title="Edit">
+             <IconButton
+               size="small"
+               aria-label="Edit"
+               onClick={() => {
+                 clearTimeout(quickConfirmTimerRef.current);
+                 const exp = quickConfirmCard.expense;
+                 setQuickConfirmCard(null);
+                 openExpenseForm({ ...exp, type: exp.transaction_type || exp.type || 'expense' });
+               }}
+             >
+               <EditIcon fontSize="small" />
+             </IconButton>
+           </Tooltip>
+           <Tooltip title="Delete">
+             <IconButton
+               size="small"
+               aria-label="Delete"
+               sx={{ color: accents.red }}
+               onClick={async () => {
+                 clearTimeout(quickConfirmTimerRef.current);
+                 const id = quickConfirmCard.id;
+                 setQuickConfirmCard(null);
+                 try {
+                   await deleteExpense(id);
+                   setExpenses(prev => prev.filter(e => e.id !== id));
+                   loadSummary();
+                 } catch { setError('Could not delete expense'); }
+               }}
+             >
+               <DeleteIcon fontSize="small" />
+             </IconButton>
+           </Tooltip>
+         </Box>
+       )}
+     </AnimatePresence>
+
      {/* Headline figures */}
      <Box sx={{ mb: { xs: 2, sm: 3 } }}>
        {!summary && loading ? (
@@ -1292,6 +1320,42 @@ export default function ExpenseTrackerPage() {
          />
        ) : null}
      </Box>
+
+     {/* Category merge suggestion banner — shown once per session, dismissed to sessionStorage */}
+     {!mergeDismissed && mergeSuggestions.length > 0 && (
+       <Box
+         sx={{
+           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+           gap: 1, px: 1.5, py: 1, mb: 2,
+           borderRadius: `${radius.lg}px`,
+           border: '1px solid', borderColor: `${accents.amber}44`,
+           bgcolor: (t) => t.palette.mode === 'dark' ? `${accents.amber}10` : `${accents.amber}08`,
+         }}
+       >
+         <Box
+           role="button"
+           onClick={() => setMergeDialogOpen(true)}
+           sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, cursor: 'pointer', minWidth: 0 }}
+         >
+           <MergeIcon sx={{ fontSize: 16, color: accents.amber, flexShrink: 0 }} />
+           <Typography sx={{ fontSize: 13, fontWeight: 550, color: 'text.secondary' }} noWrap>
+             Tip: You have overlapping categories — review
+           </Typography>
+           <ChevronRightIcon sx={{ fontSize: 16, color: 'text.disabled', flexShrink: 0 }} />
+         </Box>
+         <IconButton
+           size="small"
+           aria-label="Dismiss"
+           onClick={() => {
+             sessionStorage.setItem('merge_suggestion_dismissed', '1');
+             setMergeDismissed(true);
+           }}
+           sx={{ flexShrink: 0, color: 'text.disabled' }}
+         >
+           <CloseIcon sx={{ fontSize: 15 }} />
+         </IconButton>
+       </Box>
+     )}
 
      {/* Main Content Tabs */}
      <Paper
@@ -1317,6 +1381,15 @@ export default function ExpenseTrackerPage() {
        {/* Expenses Tab */}
        {activeTab === 0 && (
          <Box key="tab-0" sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
+           {/* Personalised greeting card — time-of-day aware, loads independently */}
+           <PersonalisedHomeCard onQuickAdd={() => openExpenseForm()} />
+
+           {/* Smart shortcuts — top 5 categories from last 30 days as one-tap chips */}
+           <SmartShortcutsBar onCategorySelect={handleCategoryShortcut} />
+
+           {/* Money mood — daily financial feeling, stored in localStorage */}
+           <MoneyMood />
+
            {/* Ask result — the question is asked from the one Assistant (⌘K);
                when it answers, the reading lands here as its own card. */}
            {ask.answer && (
@@ -1570,6 +1643,9 @@ export default function ExpenseTrackerPage() {
                biggest single expense, all derived from the loaded rows. */}
            <ActivityGlance expenses={expenses} />
 
+           {/* Month-end forecast — projected total, pace, top categories */}
+           <DashMonthForecast />
+
            {/* One-tap category narrowing, wired into the existing category filter. */}
            {/* Where the period's money actually went — the server's own
                per-category totals for this exact scope, as one bar you can put
@@ -1637,6 +1713,7 @@ export default function ExpenseTrackerPage() {
              categories={categories}
              tags={tags}
              breakdown={summary?.categoryBreakdown}
+             tagBreakdown={summary?.tagBreakdown}
              scopeLabel={scopeLabel}
              segment={labelSegment}
              onSegmentChange={setLabelSegment}
@@ -1647,6 +1724,7 @@ export default function ExpenseTrackerPage() {
              onEditTag={(t) => openTagForm(t)}
              onDeleteTag={askDeleteTag}
              onSelectCategory={drillIntoCategory}
+             onSelectTag={drillIntoTag}
            />
          </Box>
        )}
@@ -1661,31 +1739,6 @@ export default function ExpenseTrackerPage() {
              insight={insight}
              onGenerate={runInsight}
              onSelectCategory={drillIntoCategory}
-           />
-         </Box>
-       )}
-
-       {/* Splits Tab */}
-       {activeTab === 3 && (
-         <Box key="tab-3" sx={{ px: { xs: 0.75, sm: 3 }, py: { xs: 1.5, sm: 3 } }}>
-           <ActivitySplitsPanel
-             splits={splits}
-             splitOnlyBills={splitOnlyBills}
-             expandedPerson={expandedPerson}
-             personSplits={personSplits}
-             editingSplit={editingSplit}
-             onTextChange={(text) => setSplits(prev => ({ ...prev, text }))}
-             onSplitAdd={handleSplitAdd}
-             onOpenManual={openSplitForm}
-             onTogglePerson={togglePersonSplits}
-             onSettle={askSettle}
-             onStartEditSplit={(s) => setEditingSplit({ id: s.id, amount: s.amount })}
-             onEditSplitChange={(amount) => setEditingSplit(prev => ({ ...prev, amount }))}
-             onCancelEditSplit={() => setEditingSplit(null)}
-             onEditSplit={handleEditSplit}
-             onDeleteSplit={askDeleteSplit}
-             onSettleSingle={askSettleSingle}
-             onAddToExpenses={handleAddToExpenses}
            />
          </Box>
        )}
@@ -1745,6 +1798,58 @@ export default function ExpenseTrackerPage() {
        onSave={saveTag}
      />
 
+     {/* Category merge suggestions dialog */}
+     <Dialog open={mergeDialogOpen} onClose={() => setMergeDialogOpen(false)} maxWidth="xs" fullWidth>
+       <DialogTitle sx={{ fontWeight: 700, fontSize: 17 }}>Overlapping categories</DialogTitle>
+       <DialogContent sx={{ pb: 1 }}>
+         {mergeSuggestions.map((s, i) => (
+           <Box
+             key={i}
+             sx={{
+               p: 1.5, mb: 1.5, borderRadius: `${radius.md}px`,
+               border: '1px solid', borderColor: 'divider',
+               bgcolor: 'background.paper',
+             }}
+           >
+             <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 0.5 }}>
+               Merge into: <Box component="span" sx={{ color: accents.mint }}>{s.into}</Box>
+             </Typography>
+             <Typography sx={{ fontSize: 12.5, color: 'text.secondary', mb: 0.75 }}>
+               {Array.isArray(s.merge) ? s.merge.join(', ') : s.merge}
+             </Typography>
+             {s.reason && (
+               <Typography sx={{ fontSize: 12, color: 'text.disabled' }}>{s.reason}</Typography>
+             )}
+             <Button
+               size="small" variant="outlined"
+               sx={{ mt: 1, borderRadius: radius.pill, textTransform: 'none', fontWeight: 600, borderColor: 'divider', color: 'text.secondary' }}
+               onClick={() => {
+                 setMergeDialogOpen(false);
+                 setSuccess('Feature coming — contact support to merge categories');
+               }}
+             >
+               Merge
+             </Button>
+           </Box>
+         ))}
+       </DialogContent>
+       <DialogActions sx={{ px: 2.5, pb: 2 }}>
+         <Button
+           onClick={() => {
+             setMergeDialogOpen(false);
+             sessionStorage.setItem('merge_suggestion_dismissed', '1');
+             setMergeDismissed(true);
+           }}
+           sx={{ textTransform: 'none', color: 'text.secondary' }}
+         >
+           Dismiss
+         </Button>
+         <Button onClick={() => setMergeDialogOpen(false)} sx={{ textTransform: 'none', fontWeight: 700 }}>
+           Close
+         </Button>
+       </DialogActions>
+     </Dialog>
+
      {/* Every destructive or irreversible step goes through the one house
          confirmation instead of a browser-chrome window.confirm. */}
      <ConfirmDialog
@@ -1756,463 +1861,6 @@ export default function ExpenseTrackerPage() {
        onCancel={() => setConfirm(null)}
        onConfirm={() => { const c = confirm; setConfirm(null); c?.onConfirm?.(); }}
      />
-
-     {/* Manual split - exact numbers, no model call */}
-     <Dialog
-       open={splitForm.open}
-       onClose={closeSplitForm}
-       maxWidth="sm"
-       fullWidth
-       fullScreen={splitFullScreen}
-       TransitionComponent={splitFullScreen ? SlideUp : undefined}
-       PaperProps={{
-         sx: {
-           borderRadius: splitFullScreen ? 0 : `${radius.xl}px`,
-           overflow: 'hidden',
-           bgcolor: 'background.default',
-           backgroundImage: 'none',
-         },
-       }}
-     >
-       {/* ── Hero header ─────────────────────────────────────────────── */}
-       <Box
-         sx={{
-           position: 'relative', px: 2.5,
-           pt: splitFullScreen ? 'calc(env(safe-area-inset-top) + 12px)' : 2.5,
-           pb: 3,
-           background: `linear-gradient(168deg, ${accents.amber}14 0%, transparent 60%)`,
-         }}
-       >
-         {/* ── Title bar ── */}
-         <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ mb: 2.5 }}>
-           <IconButton
-             onClick={closeSplitForm} size="small"
-             aria-label="Close split dialog"
-             sx={{
-               ml: -0.5, width: 36, height: 36,
-               borderRadius: `${radius.md}px`,
-               bgcolor: color.sunken.dark, border: '1px solid', borderColor: color.hairline.dark,
-               color: 'text.secondary',
-               '&:hover': { bgcolor: color.raised.dark },
-             }}
-           >
-             <CloseIcon sx={{ fontSize: 18 }} />
-           </IconButton>
-           <Stack direction="row" alignItems="center" spacing={1}>
-             <Box
-               sx={{
-                 width: 28, height: 28, borderRadius: `${radius.sm}px`,
-                 bgcolor: `${accents.amber}22`,
-                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-               }}
-             >
-               <CallSplitIcon sx={{ color: accents.amber, fontSize: 16 }} />
-             </Box>
-             <Typography
-               sx={{
-                 fontSize: 13, fontWeight: 650, letterSpacing: '-0.01em',
-                 color: 'text.secondary',
-               }}
-             >
-               Split a bill
-             </Typography>
-           </Stack>
-           <Box sx={{ width: 36 }} />
-         </Box>
-
-         {/* ── Hero amount ── */}
-         <Box
-           sx={{
-             cursor: 'text', textAlign: 'center', py: 1,
-             display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.25,
-           }}
-         >
-           <Typography
-             sx={{
-               ...splitNumSx, fontWeight: 600,
-               fontSize: 'clamp(1.8rem, 6vw, 2.6rem)',
-               color: accents.amber, opacity: 0.45,
-               lineHeight: 1,
-             }}
-           >
-             {'₹'}
-           </Typography>
-           <InputBase
-             type="number" placeholder="0" value={splitForm.amount}
-             onChange={(e) => setSplitForm(prev => ({ ...prev, amount: e.target.value }))}
-             inputProps={{ inputMode: 'decimal', style: { textAlign: 'center' }, 'aria-label': 'Total amount' }}
-             sx={{
-               '& input': {
-                 ...splitNumSx,
-                 fontSize: 'clamp(2.8rem, 10vw, 4rem)', fontWeight: 700,
-                 lineHeight: 1,
-                 color: accents.amber,
-                 width: `${Math.max((String(splitForm.amount).length || 1), 1) + 1}ch`,
-                 minWidth: '2ch', maxWidth: '8ch', padding: 0,
-                 MozAppearance: 'textfield',
-               },
-               '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
-                 WebkitAppearance: 'none', margin: 0,
-               },
-               '& input::placeholder': { color: `${accents.amber}33` },
-             }}
-           />
-         </Box>
-       </Box>
-
-       {/* ── Hairline separator ── */}
-       <Box sx={{ height: '1px', bgcolor: color.hairline.dark }} />
-
-       {/* ── Body ─────────────────────────────────────────────────────── */}
-       <Box sx={{ px: 2.5, pt: 2.5, pb: 2, overflowY: 'auto', flex: 1 }}>
-         <Stack spacing={2.5}>
-           {/* ── Description field ── */}
-           <TextField
-             fullWidth label="What for? *"
-             value={splitForm.description}
-             onChange={(e) => setSplitForm(prev => ({ ...prev, description: e.target.value }))}
-             sx={{
-               '& .MuiOutlinedInput-root': {
-                 borderRadius: `${radius.md}px`,
-                 '& fieldset': { borderColor: color.hairline.dark },
-                 '&:hover fieldset': { borderColor: 'text.disabled' },
-                 '&.Mui-focused fieldset': { borderColor: `${accents.amber}66`, borderWidth: 1 },
-               },
-             }}
-           />
-
-           {/* ── Category ── */}
-           <AutocompleteComponent
-             options={categories.map(cat => ({ label: cat.name, id: cat.id }))}
-             label="Category"
-             value={splitForm.categoryId}
-             onChange={(value) => setSplitForm(prev => ({ ...prev, categoryId: value }))}
-           />
-
-           {/* ── People search ── */}
-           <Autocomplete
-             multiple
-             freeSolo
-             options={splitForm.userOptions}
-             getOptionLabel={(option) =>
-               typeof option === 'string' ? option : option.username}
-             filterSelectedOptions
-             loading={splitForm.searching}
-             onInputChange={(e, value, reason) => {
-               if (reason === 'input' && value.length >= 2) searchUsers(value);
-             }}
-             onChange={(e, values) => {
-               setSplitForm(prev => ({
-                 ...prev,
-                 // An option from the list carries a userId, so the split
-                 // reaches that account's panel; free text is a name only.
-                 people: values.map(v => {
-                   const existing = prev.people.find(p =>
-                     p.label === (typeof v === 'string' ? v : v.username));
-                   if (existing) return existing;
-                   return typeof v === 'string'
-                     ? { label: v, userId: null, amount: '' }
-                     : { label: v.username, userId: v.userId, amount: '' };
-                 })
-               }));
-             }}
-             renderInput={(params) => (
-               <TextField
-                 {...params}
-                 label="Split with *"
-                 placeholder="Search accounts, or type a name"
-                 helperText="People with an account see the split in their own panel"
-                 sx={{
-                   '& .MuiOutlinedInput-root': {
-                     borderRadius: `${radius.md}px`,
-                     '& fieldset': { borderColor: color.hairline.dark },
-                     '&:hover fieldset': { borderColor: 'text.disabled' },
-                     '&.Mui-focused fieldset': { borderColor: `${accents.amber}66`, borderWidth: 1 },
-                   },
-                 }}
-               />
-             )}
-           />
-
-           {/* ── People details (animated in) ── */}
-           <AnimatePresence initial={false}>
-             {splitForm.people.length > 0 && (
-               <MotionBox
-                 initial={{ opacity: 0, y: 12 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 exit={{ opacity: 0, y: -8 }}
-                 transition={{ duration: motion.normal / 1000, ease: [0.32, 0.72, 0, 1] }}
-               >
-                 <Stack spacing={2}>
-                   {/* ── Toggles ── */}
-                   <Box
-                     sx={{
-                       borderRadius: `${radius.lg}px`,
-                       bgcolor: color.sunken.dark,
-                       border: '1px solid', borderColor: color.hairline.dark,
-                       px: 2, py: 0.75,
-                       display: 'flex', flexWrap: 'wrap', gap: 1,
-                     }}
-                   >
-                     <FormControlLabel
-                       control={
-                         <Switch
-                           checked={splitForm.splitWithMe}
-                           onChange={(e) => setSplitForm(prev => ({ ...prev, splitWithMe: e.target.checked }))}
-                           size="small"
-                         />
-                       }
-                       label={<Typography sx={{ fontSize: 13, fontWeight: 500 }}>I shared this too</Typography>}
-                     />
-                     <FormControlLabel
-                       control={
-                         <Switch
-                           checked={splitForm.addToExpenses}
-                           onChange={(e) => setSplitForm(prev => ({ ...prev, addToExpenses: e.target.checked }))}
-                           size="small"
-                         />
-                       }
-                       label={<Typography sx={{ fontSize: 13, fontWeight: 500 }}>Add to my expenses</Typography>}
-                     />
-                   </Box>
-
-                   {/* ── Who paid? toggle group ── */}
-                   <Box>
-                     <Typography
-                       sx={{
-                         fontSize: 11, fontWeight: 650, letterSpacing: '0.08em', textTransform: 'uppercase',
-                         color: 'text.secondary', mb: 1,
-                       }}
-                     >
-                       Who paid?
-                     </Typography>
-                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                       {[{ label: 'I paid', value: '' }, ...splitForm.people.map(p => ({ label: p.label, value: p.label }))].map(opt => {
-                         const selected = splitForm.paidBy === opt.value;
-                         return (
-                           <Box
-                             key={opt.value || '__me'}
-                             onClick={() => setSplitForm(prev => ({ ...prev, paidBy: opt.value }))}
-                             role="radio"
-                             aria-checked={selected}
-                             tabIndex={0}
-                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSplitForm(prev => ({ ...prev, paidBy: opt.value })); }}}
-                             sx={{
-                               px: 1.5, py: 0.625,
-                               borderRadius: `${radius.pill}px`,
-                               border: '1.5px solid',
-                               borderColor: selected ? accents.amber : color.hairline.dark,
-                               bgcolor: selected ? `${accents.amber}18` : 'transparent',
-                               color: selected ? accents.amber : 'text.secondary',
-                               fontSize: 13, fontWeight: selected ? 650 : 500,
-                               cursor: 'pointer', userSelect: 'none',
-                               transition: `all ${motion.fast}ms ${motion.ease}`,
-                               '&:hover': {
-                                 borderColor: selected ? accents.amber : 'text.disabled',
-                                 bgcolor: selected ? `${accents.amber}22` : color.sunken.dark,
-                               },
-                             }}
-                           >
-                             {opt.label}
-                           </Box>
-                         );
-                       })}
-                     </Box>
-                   </Box>
-
-                   {/* ── Per-person share rows ── */}
-                   <Box>
-                     <Typography
-                       sx={{
-                         fontSize: 11, fontWeight: 650, letterSpacing: '0.08em', textTransform: 'uppercase',
-                         color: 'text.secondary', mb: 1,
-                       }}
-                     >
-                       Individual shares
-                     </Typography>
-                     <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1.5 }}>
-                       Leave blank to divide evenly, or set a fixed share
-                     </Typography>
-                     <Stack spacing={1}>
-                       <AnimatePresence initial={false}>
-                         {splitForm.people.map((person, index) => (
-                           <MotionBox
-                             key={person.label}
-                             initial={{ opacity: 0, x: -16 }}
-                             animate={{ opacity: 1, x: 0 }}
-                             exit={{ opacity: 0, x: 16 }}
-                             transition={{ duration: motion.fast / 1000, ease: [0.32, 0.72, 0, 1] }}
-                             sx={{
-                               display: 'flex', alignItems: 'center', gap: 1.5,
-                               px: 1.5, py: 1,
-                               borderRadius: `${radius.md}px`,
-                               bgcolor: color.sunken.dark,
-                               border: '1px solid', borderColor: color.hairline.dark,
-                             }}
-                           >
-                             {/* Person avatar circle */}
-                             <Box
-                               sx={{
-                                 width: 32, height: 32, borderRadius: '50%',
-                                 bgcolor: person.userId ? `${accents.blue}22` : `${accents.violet}18`,
-                                 border: '1.5px solid',
-                                 borderColor: person.userId ? `${accents.blue}44` : `${accents.violet}33`,
-                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                 flexShrink: 0,
-                               }}
-                             >
-                               <PersonIcon sx={{
-                                 fontSize: 16,
-                                 color: person.userId ? accents.blue : accents.violet,
-                               }} />
-                             </Box>
-                             {/* Name */}
-                             <Typography
-                               sx={{
-                                 flex: 1, fontSize: 14, fontWeight: 550,
-                                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                               }}
-                             >
-                               {person.label}
-                             </Typography>
-                             {/* Amount input */}
-                             <Box
-                               sx={{
-                                 display: 'flex', alignItems: 'center', gap: 0.5,
-                                 px: 1, py: 0.25,
-                                 borderRadius: `${radius.sm}px`,
-                                 bgcolor: 'background.default',
-                                 border: '1px solid', borderColor: color.hairline.dark,
-                                 width: 120,
-                                 transition: `border-color ${motion.fast}ms ${motion.ease}`,
-                                 '&:focus-within': { borderColor: `${accents.amber}55` },
-                               }}
-                             >
-                               <Typography sx={{ fontSize: 13, color: 'text.disabled', fontWeight: 500, flexShrink: 0 }}>₹</Typography>
-                               <InputBase
-                                 type="number" placeholder="even"
-                                 value={person.amount}
-                                 onChange={(e) => setSplitForm(prev => {
-                                   const people = [...prev.people];
-                                   people[index] = { ...people[index], amount: e.target.value };
-                                   return { ...prev, people };
-                                 })}
-                                 inputProps={{ inputMode: 'decimal', 'aria-label': `Share for ${person.label}` }}
-                                 sx={{
-                                   flex: 1,
-                                   '& input': {
-                                     ...splitNumSx, fontSize: 14, fontWeight: 600,
-                                     py: 0.5, px: 0, color: 'text.primary',
-                                     MozAppearance: 'textfield',
-                                   },
-                                   '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
-                                     WebkitAppearance: 'none', margin: 0,
-                                   },
-                                   '& input::placeholder': { fontWeight: 400, color: 'text.disabled' },
-                                 }}
-                               />
-                             </Box>
-                           </MotionBox>
-                         ))}
-                       </AnimatePresence>
-                     </Stack>
-                   </Box>
-
-                   {/* ── Preview: Who owes what ── */}
-                   {(() => {
-                     const preview = previewShares();
-                     if (!preview) return null;
-                     if (preview.error) {
-                       return <Alert severity="warning" sx={{ borderRadius: `${radius.md}px` }}>{preview.error}</Alert>;
-                     }
-                     return (
-                       <MotionBox
-                         initial={{ opacity: 0, y: 10 }}
-                         animate={{ opacity: 1, y: 0 }}
-                         transition={{ duration: motion.normal / 1000, ease: [0.32, 0.72, 0, 1] }}
-                       >
-                         <Box
-                           sx={{
-                             p: 2, borderRadius: `${radius.lg}px`,
-                             background: `linear-gradient(135deg, ${accents.amber}0a 0%, ${accents.violet}08 100%)`,
-                             border: '1px solid', borderColor: `${accents.amber}22`,
-                           }}
-                         >
-                           <Typography
-                             sx={{
-                               fontSize: 11, fontWeight: 650, letterSpacing: '0.08em', textTransform: 'uppercase',
-                               color: 'text.secondary', mb: 1.25,
-                             }}
-                           >
-                             Who owes what
-                           </Typography>
-                           <Stack spacing={0.75}>
-                             {preview.shares.map((share) => (
-                               <Box key={share.label} display="flex" justifyContent="space-between" alignItems="center">
-                                 <Typography sx={{ fontSize: 14, fontWeight: 500 }}>{share.label}</Typography>
-                                 <Typography sx={{ ...splitNumSx, fontSize: 14, fontWeight: 650, color: accents.amber }}>
-                                   {formatCurrency(share.amount)}
-                                 </Typography>
-                               </Box>
-                             ))}
-                             <Box sx={{ height: '1px', bgcolor: color.hairline.dark, my: 0.25 }} />
-                             <Box display="flex" justifyContent="space-between" alignItems="center">
-                               <Typography sx={{ fontSize: 14, fontWeight: 500, color: 'text.secondary' }}>you</Typography>
-                               <Typography sx={{ ...splitNumSx, fontSize: 14, fontWeight: 650, color: 'text.secondary' }}>
-                                 {formatCurrency(preview.yours)}
-                               </Typography>
-                             </Box>
-                           </Stack>
-                         </Box>
-                       </MotionBox>
-                     );
-                   })()}
-                 </Stack>
-               </MotionBox>
-             )}
-           </AnimatePresence>
-         </Stack>
-       </Box>
-
-       {/* ── Footer ── */}
-       <Box
-         sx={{
-           px: 2.5, pt: 1.5,
-           pb: splitFullScreen ? 'calc(env(safe-area-inset-bottom) + 16px)' : 2,
-           borderTop: '1px solid', borderColor: color.hairline.dark,
-           display: 'flex', justifyContent: 'flex-end', gap: 1.5,
-         }}
-       >
-         <Button
-           onClick={closeSplitForm}
-           sx={{
-             color: 'text.secondary', fontWeight: 600,
-             borderRadius: `${radius.md}px`,
-             '&:hover': { bgcolor: color.sunken.dark },
-           }}
-         >
-           Cancel
-         </Button>
-         <Button
-           onClick={saveManualSplit}
-           variant="contained"
-           disabled={splitForm.saving || !splitForm.amount || splitForm.people.length === 0}
-           sx={{
-             borderRadius: `${radius.md}px`,
-             bgcolor: accents.amber,
-             color: '#000',
-             fontWeight: 650,
-             px: 3,
-             textTransform: 'none',
-             boxShadow: `0 4px 14px -4px ${accents.amber}66`,
-             '&:hover': { bgcolor: accents.amber, filter: 'brightness(1.08)' },
-             '&.Mui-disabled': { bgcolor: `${accents.amber}33`, color: 'rgba(0,0,0,0.3)' },
-           }}
-         >
-           {splitForm.saving ? 'Saving...' : 'Create split'}
-         </Button>
-       </Box>
-     </Dialog>
 
      {/* Floating Action Button for mobile */}
      <Fab

@@ -19,7 +19,7 @@ import { deriveWeather } from '../ui/FinancialWeather';
  * Heavily blurred and low opacity, so content stays readable — atmosphere, not
  * decoration that competes. Honours reduced-motion by holding still. Reads the
  * shared money context itself, so it needs no wiring; pass `weatherKey` to
- * override (e.g. for a preview), or it falls back to calm 'clear'.
+ * override (e.g. for a preview or auth screens), bypassing the context entirely.
  */
 
 // Orb colours per weather condition, built from the accent roles rather than
@@ -55,16 +55,13 @@ const ANCHORS = [
   { top: '55%', left: '-10%' },
 ];
 
-export default function AuroraBackground({ weatherKey }) {
+// Pure rendering — receives an already-resolved weather key, no context needed.
+function AuroraCore({ resolvedKey }) {
   const theme = useTheme();
   const dark = theme.palette.mode === 'dark';
   const reduce = useReducedMotion();
-  const { projection, pulse } = useMoney();
 
-  // Zero-wiring: derive the same condition the weather pill shows. An explicit
-  // key wins (previews); anything unknown falls back to calm.
-  const key = weatherKey || deriveWeather({ projection, pulse }).key || 'clear';
-  const p = PALETTES[key] || PALETTES.clear;
+  const p = PALETTES[resolvedKey] || PALETTES.clear;
   const orbs = p.orbs.map(([hex, a]) => alpha(hex, dark ? a : a * 0.7));
 
   const drift = (amp) => ({
@@ -112,4 +109,19 @@ export default function AuroraBackground({ weatherKey }) {
       ))}
     </Box>
   );
+}
+
+// Context-aware wrapper — only mounted inside the authenticated app shell.
+function AuroraWithContext() {
+  const { projection, pulse } = useMoney();
+  const key = deriveWeather({ projection, pulse }).key || 'clear';
+  return <AuroraCore resolvedKey={key} />;
+}
+
+// Public API: pass `weatherKey` to bypass MoneyContext entirely (e.g. on the
+// login page where the context is not mounted). Omit it inside the authenticated
+// shell and the aurora tracks live financial weather.
+export default function AuroraBackground({ weatherKey }) {
+  if (weatherKey) return <AuroraCore resolvedKey={weatherKey} />;
+  return <AuroraWithContext />;
 }

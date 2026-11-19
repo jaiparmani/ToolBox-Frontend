@@ -66,6 +66,10 @@ export default function TransactionStoryDrawer({ open, story, onClose }) {
             <Chip icon={<AutorenewRoundedIcon />} label={story.recurringLabel} size="small"
               sx={{ bgcolor: `${tone}22`, color: tone, fontWeight: 600 }} />
           )}
+          {story.pendingConfirmation && (
+            <Chip label="Pending confirmation" size="small"
+              sx={{ bgcolor: `${accents.amber}22`, color: accents.amber, fontWeight: 600 }} />
+          )}
         </Stack>
         <Avatar sx={{ width: 54, height: 54, mb: 1.5, fontSize: '1.4rem', fontWeight: 700, bgcolor: `${tone}2a`, color: tone }}>
           {initial}
@@ -109,6 +113,17 @@ export default function TransactionStoryDrawer({ open, story, onClose }) {
           <Box sx={{ mt: 2, p: 1.75, borderRadius: 3, backgroundColor: 'action.hover' }}>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>Notes</Typography>
             <Typography variant="body2" color="text.secondary">{story.note}</Typography>
+          </Box>
+        )}
+
+        {story.sourceMessage && (
+          <Box sx={{ mt: 2, p: 1.75, borderRadius: 3, backgroundColor: 'action.hover' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>
+              Original message
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+              "{story.sourceMessage}"
+            </Typography>
           </Box>
         )}
 
@@ -245,5 +260,9 @@ export function buildStoryFromExpense(expense, all = []) {
     note: expense.notes || expense.note || null,
     similar: sameCat,
     context,
+    pendingConfirmation: !!(expense.pending_confirmation ?? expense.pendingConfirmation),
+    // The verbatim bank/UPI/card alert this row was created from, if any —
+    // see expenses.assistant's bank_message intent.
+    sourceMessage: expense.source_message || expense.sourceMessage || null,
   };
 }

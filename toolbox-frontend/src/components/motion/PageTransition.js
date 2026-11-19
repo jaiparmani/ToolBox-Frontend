@@ -1,48 +1,68 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { motion as motionTokens } from '../../theme/tokens';
 
+// NAV order for direction inference (lower index = "earlier" / left-swipe)
+const NAV_ORDER = [
+  '', 'dashboard', 'story', 'expense-tracker', 'recurring',
+  'reports', 'pulse', 'splits', 'guide', 'verdict',
+  'inbox', 'profile', 'api-keys', 'universe', 'share',
+];
+
+function navIdx(pathname) {
+  const seg = pathname.split('/')[1] || '';
+  const i = NAV_ORDER.indexOf(seg);
+  return i === -1 ? 99 : i;
+}
+
 /**
- * Interruptible page entrance — Apple Design §3.
+ * Directional page entrance — slides in from the direction you navigated.
+ * Going "deeper" in the nav (higher index) enters from the right;
+ * going back enters from the left; the initial fade-up is the fallback.
  *
- * Replaced the CSS @keyframes with a framer-motion spring so navigating
- * mid-animation crossfades seamlessly from the current opacity/position
- * instead of cutting. The spring animates from the presentation value by
- * default, which is exactly what interruption needs.
+ * AnimatePresence lives here — stable, not recreated per route — so the
+ * outgoing page can play its exit before the incoming page starts.
  *
- * The exit is deliberately near-instant (one `instant` beat) so the outgoing
- * page never holds the incoming one hostage; the entrance carries the whole
- * transition.
- *
- * Only transform and opacity animate. The entrance used to also animate a
- * `filter: blur()` on the entire page subtree, which forces a full-page
- * re-rasterisation on every frame of every navigation — the most expensive
- * possible way to say "this is arriving". The spring's overshoot-free settle
- * says it for free.
+ * Call as: <PageTransition locationKey={location.pathname}><Outlet /></PageTransition>
  */
-export default function PageTransition({ children }) {
+export default function PageTransition({ children, locationKey }) {
+  const location = useLocation();
+  const key = locationKey || location.pathname;
+
   const reduce = useReducedMotion();
+  const prevKey = useRef(key);
+  const dirRef = useRef(0);
+
+  if (key !== prevKey.current) {
+    const next = navIdx(key);
+    const prev = navIdx(prevKey.current);
+    dirRef.current = next > prev ? 1 : next < prev ? -1 : 0;
+    prevKey.current = key;
+  }
+  const dir = dirRef.current;
+
+  const xEnter = reduce ? 0 : dir === 1 ? 22 : dir === -1 ? -22 : 0;
+  const xExit  = reduce ? 0 : dir === 1 ? -14 : dir === -1 ? 14 : 0;
+  const yEnter = dir === 0 && !reduce ? 10 : 0;
 
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
-        key={children?.key || 'page'}
-        initial={reduce ? { opacity: 0 } : { opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0 }}
+        key={key}
+        initial={{ opacity: 0, x: xEnter, y: yEnter }}
+        animate={{ opacity: 1, x: 0, y: 0 }}
+        exit={{ opacity: 0, x: xExit, y: 0 }}
         transition={reduce
           ? { duration: motionTokens.fast / 1000 }
           : {
-              // Damping ratio ≈ 1.0: settles without overshoot, and re-targets
-              // from the value on screen if a navigation interrupts it.
               type: 'spring',
-              stiffness: 380,
-              damping: 36,
-              mass: 0.8,
+              stiffness: 360,
+              damping: 34,
+              mass: 0.85,
               opacity: { duration: motionTokens.normal / 1000 },
             }
         }
-        // The outgoing page leaves immediately; nothing waits on it.
         exitTransition={{ duration: motionTokens.instant / 1000 }}
       >
         {children}

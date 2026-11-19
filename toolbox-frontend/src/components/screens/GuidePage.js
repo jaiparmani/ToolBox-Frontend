@@ -381,6 +381,9 @@ const JUMPS = [
   { id: 'start', label: 'Start here' },
   { id: 'capture', label: 'Adding expenses' },
   { id: 'assistant', label: 'The assistant' },
+  { id: 'ai', label: 'AI features' },
+  { id: 'home-screen', label: 'Home screen' },
+  { id: 'ease', label: 'Quick flow' },
   { id: 'gestures', label: 'Hidden gestures' },
   { id: 'sharing', label: 'Sharing bills' },
   { id: 'forecast', label: 'Your forecast' },
@@ -502,17 +505,25 @@ export default function GuidePage() {
 
           <More summary="Adding from your phone">
             <P sx={{ mb: 1.25, fontSize: '0.89rem' }}>
-              Both live in <strong>Settings</strong>, reachable from your name at the bottom of
-              the sidebar.
+              Settings lives under your name at the bottom of the sidebar.
             </P>
             <Item title="Telegram" headingLevel="h4">
-              Message the bot once and it replies with your Telegram ID; paste that ID into
-              Settings and connect. After that you can log expenses and get alerts in the chat.
+              Connect your Telegram ID in Settings. After that, send <em>any</em> plain message
+              to the bot &mdash; <em>&ldquo;coffee 120&rdquo;</em>, <em>&ldquo;petrol 2000&rdquo;</em>
+              &mdash; and it is logged instantly. You also get a Telegram ping every time Money OS
+              records an expense.
             </Item>
-            <Item title="Apple Shortcuts" headingLevel="h4">
+            <Item title="Android: share sheet" headingLevel="h4">
+              Add Money OS to your home screen first (Android Chrome &rarr; &ldquo;Add to Home Screen&rdquo;).
+              After that, any PhonePe / GPay &ldquo;Share&rdquo; button will include <strong>Money OS</strong>
+              in the list. Tap it and the payment text is logged automatically &mdash; zero taps.
+            </Item>
+            <Item title="iPhone: Shortcuts &amp; SMS" headingLevel="h4">
               Settings generates an API key and offers ready-made shortcuts you can install on
-              your iPhone with the key already filled in. The key is shown once &mdash; copy it
-              then, or make a new one.
+              your iPhone with the key already filled in. One shortcut watches incoming bank SMS
+              (HDFC-Bank, ICICIBANKLTD, etc.) and logs the debit automatically; another lets you
+              share any text directly to Money OS from the iOS share sheet. The key is shown
+              once &mdash; copy it then, or make a new one.
             </Item>
           </More>
         </Section>
@@ -549,8 +560,156 @@ export default function GuidePage() {
           </Callout>
         </Section>
 
-        {/* ── 4. Gestures ── */}
-        <Section id="gestures" index={4} eyebrow="Undiscoverable by design" title="Gestures worth knowing">
+        {/* ── 4. AI features ── */}
+        <Section id="ai" index={4} eyebrow="Always working" title="What the AI does">
+          <P sx={{ mb: 1 }}>
+            Some of these run quietly in the background; others respond to something you tap or type.
+            None of them require set-up.
+          </P>
+          <Item title="Smart fill">
+            As you type a description, past expenses surface as suggestions with the right category
+            already filled in. Press Tab or tap to accept.
+          </Item>
+          <Item title="Quick add">
+            Type any expense in plain language &mdash; &ldquo;20 chai 100 vada pav&rdquo; &mdash; and
+            the AI parses amount, description, and category in one go. Works with voice input too.
+          </Item>
+          <Item title="Merchant memory">
+            The first time you log a Swiggy order, the AI notes the category. Every Swiggy expense
+            after that inherits it automatically &mdash; no re-typing.
+          </Item>
+          <Item title="Location detect">
+            Tap the crosshair icon in the expense form. The app reads your GPS and fills the merchant
+            name without you typing it.
+          </Item>
+          <Item title="Financial assistant">
+            Press <Kbd>⌘K</Kbd> and ask anything from your own data &mdash;{' '}
+            <em>&ldquo;how much did I spend on food last month?&rdquo;</em> or{' '}
+            <em>&ldquo;who owes me the most?&rdquo;</em> The AI answers from your real figures.
+          </Item>
+          <Item title="Monthly narrative">
+            At the close of each month, the app writes a 3-sentence story: what happened, what
+            pattern emerged, what to watch. It appears in Today.
+          </Item>
+          <Item title="Month forecast">
+            From mid-month, a projected end-of-month total appears, based on your current pace and
+            your recurring bills.
+          </Item>
+          <Item title="Spending personality">
+            After 15 or more expenses, a short profile describes your habits in plain language, drawn
+            entirely from your actual patterns.
+          </Item>
+          <Item title="Regret score">
+            After logging an expense, optionally rate it: felt good, neutral, or regret. Over time, a
+            picture forms of which categories bring you joy and which bring guilt.
+          </Item>
+          <Item title="Anomaly alerts">
+            If a single expense is three times your daily average, a push notification flags it and
+            explains why it stood out.
+          </Item>
+          <Item title="Behaviour nudge">
+            Four delivery orders in one week, and the app notes the pattern quietly &mdash; just the
+            fact, no lecture.
+          </Item>
+          <Item title="Category merge suggestions">
+            Overlapping categories like &ldquo;Zomato&rdquo;, &ldquo;Food Delivery&rdquo;, and
+            &ldquo;Eating Out&rdquo; prompt a suggestion to merge them into one.
+          </Item>
+          <Item title="Weekly brief">
+            Every Monday morning, a 2-sentence push notification compares last week against the week
+            before.
+          </Item>
+          <Item title="Financial age score">
+            A five-level rating &mdash; Student, Starter, Builder, Owner, Free &mdash; based on your
+            income, savings rate, and spending habits. Two sentences explain exactly where you stand
+            and what moves the needle next.
+          </Item>
+          <Item title="Tap to log from a notification">
+            On Android, push notifications show a <strong>Log expense</strong> reply field. Type{' '}
+            <em>&ldquo;40 chai&rdquo;</em> directly in the notification banner and it is saved
+            without opening the app.
+          </Item>
+          <Item title="Smart shortcuts bar">
+            Your top 5 categories from the last 30 days appear as one-tap chips at the top of the
+            home screen. Tap any chip to open the expense composer with that category pre-filled.
+          </Item>
+          <Item title="Streak counter">
+            Tracks how many consecutive days you have logged at least one expense. Milestone labels
+            appear at 7, 30, and 100 days — visible in the greeting card at the top of the home
+            screen.
+          </Item>
+          <Item title="Money mood">
+            Tap one of five emoji once a day to record how you feel about today&apos;s spending.
+            Stored locally on your device; patterns surface over time.
+          </Item>
+        </Section>
+
+        {/* ── 5. Home screen ── */}
+        <Section id="home-screen" index={5} eyebrow="Always in view" title="The home screen, explained">
+          <P sx={{ mb: 1 }}>
+            The top of the home screen changes through the day. Everything below it is persistent.
+          </P>
+          <Item title="Personalised greeting card">
+            The first card adapts to the time of day: a morning summary, an afternoon pace check,
+            an evening prompt to catch anything missed, and a quiet night recap. It knows your
+            name, today&rsquo;s total, and your daily average &mdash; all without set-up.
+          </Item>
+          <Item title="Streak counter">
+            Runs inside the greeting card. It counts consecutive days with at least one expense
+            logged. The label changes at 7, 30, and 100 days.
+          </Item>
+          <Item title="Smart shortcuts bar">
+            Your five most-used categories from the last 30 days as one-tap chips. Tap any chip
+            and the expense composer opens with that category pre-filled.
+          </Item>
+          <Item title="Money mood">
+            One tap, once a day. Five emoji from 😄 to 😔 record how today&rsquo;s spending felt.
+            Stored on this device; nothing is sent to a server.
+          </Item>
+          <Item title="Month forecast tile">
+            Your projected end-of-month total, a progress bar, and the three categories driving the
+            overage. Turns amber and then red as you close in on the limit.
+          </Item>
+          <Item title="Monthly narrative">
+            A short paragraph at the close of each month: what happened, what pattern stood out,
+            what to watch next month. Tap the refresh icon to regenerate.
+          </Item>
+        </Section>
+
+        {/* ── 6. Ease / quick flow ── */}
+        <Section id="ease" index={6} eyebrow="Fewer taps" title="Getting out of your way">
+          <P sx={{ mb: 1 }}>
+            Features built around the moment you are adding something quickly and just want it done.
+          </P>
+          <Item title="Expense templates">
+            After saving an expense, a <strong>Pin as template</strong> link appears above the Save
+            button. Pinned templates become chips at the top of the composer &mdash; tap one to fill
+            all four fields at once. Up to four templates; tap &times; on a chip to remove it.
+          </Item>
+          <Item title="Smart date inference">
+            If you log an expense between midnight and 4&nbsp;am, a banner asks whether the expense
+            belongs to today or yesterday. One tap corrects the date without re-opening the form.
+          </Item>
+          <Item title="Confirm-and-continue card">
+            After a quick add, a 56&nbsp;px bar slides up from the bottom showing what was just
+            saved. Three actions &mdash; dismiss, edit, or delete &mdash; are reachable for four
+            seconds before it clears automatically. Keeps the screen uncluttered while still giving
+            you an undo.
+          </Item>
+          <Item title="Swipe to delete with undo">
+            Swipe a row left on Activity to delete it. A five-second snackbar at the bottom lets
+            you restore it before it is gone.
+          </Item>
+          <Item title="Home screen shortcuts">
+            Long-press the Money OS icon on your phone&rsquo;s home screen. A menu appears with
+            two shortcuts: <strong>Quick Add</strong> (opens the composer immediately) and{' '}
+            <strong>Ask</strong> (opens the assistant). Works on Android and iOS once the app is
+            added to the home screen.
+          </Item>
+        </Section>
+
+        {/* ── 7. Gestures ── */}
+        <Section id="gestures" index={7} eyebrow="Undiscoverable by design" title="Gestures worth knowing">
           <P sx={{ mb: 1.5 }}>
             Nothing on screen advertises these, and they are the fastest way to work.
           </P>
@@ -579,8 +738,8 @@ export default function GuidePage() {
           </P>
         </Section>
 
-        {/* ── 5. Sharing ── */}
-        <Section id="sharing" index={5} eyebrow="Splits and groups" title="Sharing a bill with someone">
+        {/* ── 6. Sharing ── */}
+        <Section id="sharing" index={8} eyebrow="Splits and groups" title="Sharing a bill with someone">
           <P>
             Go to <strong>Activity</strong> and open the <strong>Splits</strong> tab. Either
             describe the bill &mdash; <em>&ldquo;split 1200 dinner with raj and priya&rdquo;</em>{' '}
@@ -615,8 +774,8 @@ export default function GuidePage() {
           </Box>
         </Section>
 
-        {/* ── 6. Forecast ── */}
-        <Section id="forecast" index={6} eyebrow="Recurring and Inbox" title="How the forecast is made">
+        {/* ── 7. Forecast ── */}
+        <Section id="forecast" index={9} eyebrow="Recurring and Inbox" title="How the forecast is made">
           <P>
             <strong>Recurring</strong> is the input for everything predictive in the app. Add your
             rent and subscriptions as recurring bills, each with a cadence
@@ -630,8 +789,8 @@ export default function GuidePage() {
           </P>
         </Section>
 
-        {/* ── 7. The map ── */}
-        <Section id="map" index={7} eyebrow="Wayfinding" title="Where everything lives">
+        {/* ── 8. The map ── */}
+        <Section id="map" index={10} eyebrow="Wayfinding" title="Where everything lives">
           <P sx={{ mb: 1.5 }}>The sidebar, in order. Each row here goes to that screen.</P>
           <Box sx={{ mx: { xs: -1.25, sm: -1.5 } }}>
             <MapRow icon={DashboardIcon} tone={accents.blue} label="Home" to="/dashboard" onGo={navigate}>
@@ -666,8 +825,8 @@ export default function GuidePage() {
           </Box>
         </Section>
 
-        {/* ── 8. Account ── */}
-        <Section id="account" index={8} eyebrow="Sign-in and settings" title="Your account">
+        {/* ── 9. Account ── */}
+        <Section id="account" index={11} eyebrow="Sign-in and settings" title="Your account">
           <Item title="A 6-digit MPIN is the normal way in">
             The sign-in screen leads with the PIN pad. <strong>Use Email OTP instead</strong> and
             a password sign-in are behind links on that same screen, and{' '}
@@ -688,8 +847,8 @@ export default function GuidePage() {
           </Item>
         </Section>
 
-        {/* ── 9. Keyboard ── */}
-        <Section id="keyboard" index={9} eyebrow="Reference" title="Keyboard shortcuts">
+        {/* ── 10. Keyboard ── */}
+        <Section id="keyboard" index={12} eyebrow="Reference" title="Keyboard shortcuts">
           <Box
             component="table"
             sx={{ width: '100%', maxWidth: `${MEASURE + 8}ch`, borderCollapse: 'collapse', mt: 0.5 }}

@@ -149,6 +149,14 @@ export const transformExpenseForUI = (apiExpense) => {
         location: apiExpense.location,
         paymentMethod: apiExpense.payment_method,
         isRecurring: apiExpense.is_recurring,
+        // Landed straight off a forwarded bank/UPI/card alert with a
+        // model-suggested category — real, already counted in totals, but
+        // not yet looked at by the user. See expenses.assistant's
+        // bank_message intent.
+        pendingConfirmation: !!apiExpense.pending_confirmation,
+        // The verbatim bank/UPI/card alert this row came from, if any — kept
+        // so the Messages screen can show what it was extracted from.
+        sourceMessage: apiExpense.source_message || '',
         createdAt: apiExpense.created_at,
         updatedAt: apiExpense.updated_at,
         // Present only on a just-created expense the backend thinks echoes one
@@ -510,7 +518,12 @@ export const createSplitManually = async ({ amount, description, categoryId, dat
         });
         const data = await response.json();
         return {
-            expense: transformExpenseForUI(data.expense),
+            billId: data.bill_id,
+            // Present only when the bill was also added to expenses - the
+            // creator can choose not to, so this may be null.
+            expense: data.expense ? transformExpenseForUI(data.expense) : null,
+            amount: parseFloat(data.amount || 0),
+            description: data.description,
             splits: data.splits || [],
             yourShare: parseFloat(data.your_share || 0),
             owedToYou: parseFloat(data.owed_to_you || 0)
@@ -581,10 +594,10 @@ export const getSplits = async ({ personId, owedToUserId, settled, direction, in
     }
 };
 
-export const addSplitToExpenses = async (expenseId) => {
-    const response = await authenticatedFetch(`${API_BASE_URL}/expenses/${expenseId}/`, {
-        method: 'PATCH',
-        body: JSON.stringify({ split_only: false })
+export const addSplitToExpenses = async (billId) => {
+    const response = await authenticatedFetch(`${API_BASE_URL}/splits/add_to_expenses/`, {
+        method: 'POST',
+        body: JSON.stringify({ bill_id: billId })
     });
     return response.json();
 };
@@ -835,6 +848,42 @@ export const commitAssistant = async (payload) => {
         method: 'POST', body: JSON.stringify(payload),
     });
     return await r.json();
+};
+
+// ── Messages — bank/UPI/card alerts extracted to a suggested-but-unconfirmed
+// expense (expenses.assistant's bank_message intent) ───────────────────────
+
+/** Every expense still awaiting a look at its suggested category. */
+export const getPendingExpenses = async () => {
+    try {
+        const response = await authenticatedFetch(
+            `${API_BASE_URL}/expenses/?pending_confirmation=true&ordering=-created_at&page_size=100`);
+        const data = await response.json();
+        return (data.results || data || []).map(transformExpenseForUI);
+    } catch (error) {
+        throw handleApiError(error, 'fetch pending messages');
+    }
+};
+
+/**
+ * Accept (or correct) a pending expense's suggestion. Pass `categoryId`/
+ * `tagIds` only when the user changed them — omitted, the suggested category
+ * the message landed with stands.
+ */
+export const confirmExpense = async (expenseId, { categoryId, tagIds } = {}) => {
+    try {
+        const body = { pending_confirmation: false };
+        if (categoryId != null) body.category_id = categoryId;
+        if (tagIds != null) body.tag_ids = tagIds;
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/${expenseId}/`, {
+            method: 'PATCH',
+            body: JSON.stringify(body),
+        });
+        const data = await response.json();
+        return transformExpenseForUI(data);
+    } catch (error) {
+        throw handleApiError(error, 'confirm message');
+    }
 };
 
 // ── "Can I afford it?" — natural-language, computed from the projection ───────
@@ -1204,6 +1253,16 @@ export const getExpenseSummary = async (filters = {}) => {
                     name,
                     amount: parseFloat(amount)
                 })
+            ) : [],
+            // A tag can sit on several expenses at once, so — unlike categories —
+            // this is not a partition of total_expenses; a bill tagged both
+            // "Travel" and "Food" is credited in full to each. See tag_breakdown
+            // in the backend's net_spending for the accounting rule.
+            tagBreakdown: data.tag_breakdown ? Object.entries(data.tag_breakdown).map(
+                ([name, amount]) => ({
+                    name,
+                    amount: parseFloat(amount)
+                })
             ) : []
         };
     } catch (error) {
@@ -1254,6 +1313,81 @@ export const getMonthlyReport = async (year, month) => {
         return await response.json();
     } catch (error) {
         throw handleApiError(error, 'fetch monthly report');
+    }
+};
+
+export const getMonthlyNarrative = async (year, month) => {
+    try {
+        const params = new URLSearchParams({ year, month });
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/monthly_narrative/?${params}`);
+        return await response.json();
+    } catch (error) {
+        if (error.status === 404) return null;
+        throw handleApiError(error, 'fetch monthly narrative');
+    }
+};
+
+export const getMonthForecast = async () => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/month_forecast/`);
+        return await response.json();
+    } catch (error) {
+        if (error.status === 404) return null;
+        throw handleApiError(error, 'fetch month forecast');
+    }
+};
+
+export const getCategoryMergeSuggestions = async () => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/category_merge_suggestions/`);
+        return await response.json();
+    } catch (error) {
+        if (error.status === 404) return { suggestions: [] };
+        throw handleApiError(error, 'fetch category merge suggestions');
+    }
+};
+
+export const getSpendingPersonality = async () => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/spending_personality/`);
+        return await response.json();
+    } catch (error) {
+        if (error.status === 404) return null;
+        throw handleApiError(error, 'fetch spending personality');
+    }
+};
+
+export const getFinancialAgeScore = async () => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/financial_age_score/`);
+        return await response.json();
+    } catch (error) {
+        if (error.status === 404) return null;
+        throw handleApiError(error, 'fetch financial age score');
+    }
+};
+
+// Regret Score — set sentiment on a single expense
+export const setSentiment = async (expenseId, sentiment) => {
+    try {
+        const response = await authenticatedFetch(
+            `${API_BASE_URL}/expenses/${expenseId}/set_sentiment/`,
+            { method: 'POST', body: JSON.stringify({ sentiment }) },
+        );
+        return await response.json();
+    } catch (error) {
+        throw handleApiError(error, 'set sentiment');
+    }
+};
+
+// Regret Score — get the sentiment report
+export const getSentimentReport = async () => {
+    try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/expenses/sentiment_report/`);
+        return await response.json();
+    } catch (error) {
+        if (error.status === 404) return null;
+        throw handleApiError(error, 'fetch sentiment report');
     }
 };
 

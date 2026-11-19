@@ -12,9 +12,10 @@ import { money, moneySmart } from './money';
  *
  * Respects prefers-reduced-motion by jumping straight to the value.
  */
-export default function AnimatedNumber({ value, format = 'money', duration = 650, ...props }) {
-  const [display, setDisplay] = React.useState(value);
-  const fromRef = React.useRef(value);
+export default function AnimatedNumber({ value, format = 'money', duration = 650, initial, ...props }) {
+  const startValue = initial !== undefined ? initial : value;
+  const [display, setDisplay] = React.useState(startValue);
+  const fromRef = React.useRef(startValue);
   const frameRef = React.useRef();
 
   React.useEffect(() => {

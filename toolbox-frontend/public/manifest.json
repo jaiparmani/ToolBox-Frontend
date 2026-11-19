@@ -7,10 +7,45 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    },
+    {
+      "src": "logo192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "logo512.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ],
   "start_url": ".",
   "display": "standalone",
   "theme_color": "#0a0a0c",
-  "background_color": "#0a0a0c"
+  "background_color": "#0a0a0c",
+  "share_target": {
+    "action": "/share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "Quick Add",
+      "short_name": "Add",
+      "description": "Log an expense instantly",
+      "url": "/?action=quick-add",
+      "icons": [{"src": "favicon.svg", "sizes": "any", "type": "image/svg+xml"}]
+    },
+    {
+      "name": "Ask Assistant",
+      "short_name": "Ask",
+      "description": "Ask about your spending",
+      "url": "/?action=ask",
+      "icons": [{"src": "favicon.svg", "sizes": "any", "type": "image/svg+xml"}]
+    }
+  ]
 }

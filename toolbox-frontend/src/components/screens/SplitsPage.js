@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '@mui/material/styles';
 import {
-  Box, Button, Card, CardContent, Chip, Container, Fab, IconButton,
+  Box, Button, Card, CardContent, Container, Fab, IconButton,
   Paper, Snackbar, Alert, Stack, Typography,
 } from '@mui/material';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
@@ -9,6 +10,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import GroupsIcon from '@mui/icons-material/Groups';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import AddIcon from '@mui/icons-material/Add';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import EditIcon from '@mui/icons-material/Edit';
@@ -18,14 +20,22 @@ import PaymentsIcon from '@mui/icons-material/Payments';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 import MoneyConstellation from '../ui/MoneyConstellation';
+import SplitUniverse from '../ui/SplitUniverse';
+import ParticleFlow from '../motion/ParticleFlow';
+import AuroraBackground from '../motion/AuroraBackground';
+import ActivityDeck from '../ui/ActivityDeck';
 import Reveal from '../ui/Reveal';
 import LendingAssistant from '../ui/LendingAssistant';
 import ErrorBanner from '../ui/ErrorBanner';
 import { BalanceSkeleton } from '../ui/Skeletons';
 import SwipeAction from '../ui/SwipeAction';
-import { AnimatePresence, motion, LayoutGroup } from 'framer-motion';
+import ManualSplitDialog from '../ui/ManualSplitDialog';
+import ThinkingHint from '../ui/ThinkingHint';
+import AnimatedNumber from '../ui/AnimatedNumber';
+import TiltCard from '../motion/TiltCard';
+import { AnimatePresence, motion, LayoutGroup, useReducedMotion } from 'framer-motion';
 import { money, moneySmart, relativeDay } from '../ui/money';
-import { accents, type } from '../../theme/tokens';
+import { accents, flowColor, radius, type, motion as motionTokens } from '../../theme/tokens';
 import { feedback } from '../ui/feedback';
 import GroupStrip from '../ui/GroupStrip';
 import SettleConfirmSheet from '../ui/SettleConfirmSheet';
@@ -35,7 +45,7 @@ import SplitEditDialog from '../ui/SplitEditDialog';
 import SplitSettleDialog from '../ui/SplitSettleDialog';
 import {
   getSplitBalances, settleUpWith, getSplits, updateSplit, deleteSplit,
-  setSplitInExpenses, getCategories,
+  setSplitInExpenses, getCategories, splitAddExpense, addSplitToExpenses,
   getGroups, createGroup, getGroupBalances, getGroupExpenses, splitInGroup,
   addGroupMembers, searchSplitUsers,
 } from '../rest/expenseTrackerApis';
@@ -45,19 +55,22 @@ import {
 } from '@mui/material';
 
 /**
- * Send a ribbon of particles between a settled person's node and you, tied to
- * the real amount. Reads live DOM positions, so it must fire before the list
- * re-renders the node away. A no-op if the nodes aren't on screen.
+ * Send a ribbon of particles between a settled person's body and the star,
+ * tied to the real amount. Reads live screen positions off the universe's own
+ * ref API, so it must fire before the list re-renders the body away. A no-op
+ * if the universe isn't mounted (e.g. reduced motion, or it hasn't measured
+ * yet) or the person has no on-screen body.
  */
-function fireSettleFlow(person, amount) {
-  if (typeof window === 'undefined') return;
-  const node = document.querySelector(`[data-mc-node="${person.id}"]`);
-  const centre = document.querySelector('[data-mc-center]');
-  if (!node || !centre) return;
+function fireSettleFlow(universeApi, person, amount) {
+  if (typeof window === 'undefined' || !universeApi) return;
+  const point = universeApi.getPoint(person.id);
+  const centre = universeApi.getCentre();
+  if (!point || !centre) return;
   const owedByMe = person.net < 0;
+  universeApi.spawnNova(person.id);
   window.dispatchEvent(new CustomEvent('toolbox:flow', { detail: {
-    from: owedByMe ? centre : node,      // you owe → money leaves you; they owe → comes home
-    to: owedByMe ? node : centre,
+    from: owedByMe ? centre : point,      // you owe → money leaves you; they owe → comes home
+    to: owedByMe ? point : centre,
     amount: Math.abs(amount || person.net || 0),
     color: owedByMe ? accents.amber : accents.cyan,
   }}));
@@ -85,6 +98,339 @@ function optimisticSettle(prev, person) {
   return { ...prev, balances, totalOwed, net: totalOwed - prev.totalYouOwe };
 }
 
+const heroNumSx = { fontFamily: type.displayFamily, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.03em' };
+
+// framer-motion wants its `ease` as a bezier array, not the CSS string form
+// `theme/tokens.js` exports for plain `transition:` properties — same curve
+// (motionTokens.ease's "settle"), just serialized the way this library needs.
+const EASE_SETTLE = [0.32, 0.72, 0, 1];
+
+// What the quick-add box teaches while it's empty — real shapes of the same
+// one thing it does, not a single static hint.
+const QUICK_ADD_EXAMPLES = [
+  'split 1200 dinner with raj and priya',
+  'split 3600 goa trip three ways',
+  'arjun paid 850 for the movie, split with me',
+  'split 500 auto fare with priya',
+];
+
+/**
+ * The one figure the page exists to answer, and the one real ratio behind it.
+ *
+ * Not a card with a number and two stat rows bolted underneath - the bar IS
+ * the two totals, drawn to scale, so the eye reads "how much of my situation
+ * is each direction" before it even parses the digits. Both raw figures are
+ * still printed below it, in full - the bar is a ratio, never a replacement
+ * for the exact number.
+ */
+function NetPositionHero({ netPositive, net, totalOwed, totalYouOwe, onRefresh, posColor, negColor }) {
+  const mode = useTheme().palette.mode;
+  const reduce = useReducedMotion();
+  const flowIn = flowColor.in[mode];
+  const flowOut = flowColor.out[mode];
+  const total = totalOwed + totalYouOwe;
+  const inPct = total > 0 ? (totalOwed / total) * 100 : 0;
+  const settled = total === 0;
+
+  return (
+    <TiltCard max={4} sx={{ mb: 2 }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2.5, sm: 3 }, borderRadius: `${radius.xl}px`, textAlign: 'center',
+          border: '1px solid', borderColor: 'divider',
+          position: 'relative', overflow: 'hidden',
+        }}
+      >
+        {/* A slow, ambient breathe behind the number — tied to the same
+            direction as the figure itself, never a decoration on its own. */}
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute', top: '-45%', left: '50%', transform: 'translateX(-50%)',
+            width: 320, height: 180, borderRadius: '50%',
+            background: `radial-gradient(ellipse, ${netPositive ? posColor : negColor}20 0%, transparent 72%)`,
+            pointerEvents: 'none',
+            animation: reduce ? 'none' : 'toolbox-hero-breathe 5s ease-in-out infinite',
+            '@keyframes toolbox-hero-breathe': {
+              '0%, 100%': { opacity: 0.7, transform: 'translateX(-50%) scale(1)' },
+              '50%': { opacity: 1, transform: 'translateX(-50%) scale(1.08)' },
+            },
+          }}
+        />
+        <Box display="flex" alignItems="center" justifyContent="center" gap={1} sx={{ mb: 0.75, position: 'relative' }}>
+          <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.1em', fontSize: '0.65rem' }}>
+            {settled ? 'All square' : netPositive ? 'You are owed' : 'You owe'}
+          </Typography>
+          <IconButton size="small" onClick={onRefresh} aria-label="Refresh balances" sx={{ ml: 0.25 }}>
+            <RefreshIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+        </Box>
+        <Typography
+          component="div"
+          sx={{
+            position: 'relative',
+            ...heroNumSx, fontWeight: 700,
+            fontSize: { xs: '2.8rem', sm: '3.4rem' }, lineHeight: 1,
+            color: settled ? 'text.secondary' : netPositive ? posColor : negColor,
+          }}
+        >
+          <AnimatedNumber value={Math.abs(net)} />
+        </Typography>
+
+        {!settled && (
+          <>
+            {/* The ratio, to scale — the only spectacle here, and it is pure data. */}
+            <Box
+              aria-hidden
+              sx={{
+                position: 'relative', display: 'flex', mt: 2.5, height: 8, borderRadius: `${radius.pill}px`,
+                overflow: 'hidden',
+                bgcolor: mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+                boxShadow: mode === 'dark' ? 'inset 0 1px 2px rgba(0,0,0,0.35)' : 'inset 0 1px 2px rgba(0,0,0,0.06)',
+              }}
+            >
+              <Box
+                component={motion.div}
+                initial={reduce ? false : { scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 210, damping: 26 }}
+                style={{ transformOrigin: 'left center' }}
+                sx={{
+                  width: `${inPct}%`,
+                  background: `linear-gradient(90deg, ${flowIn}cc, ${flowIn})`,
+                  boxShadow: `0 0 10px ${flowIn}55`,
+                }}
+              />
+              <Box
+                component={motion.div}
+                initial={reduce ? false : { scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={reduce ? { duration: 0 } : { type: 'spring', stiffness: 210, damping: 26, delay: 0.06 }}
+                style={{ transformOrigin: 'right center' }}
+                sx={{
+                  width: `${100 - inPct}%`,
+                  background: `linear-gradient(90deg, ${flowOut}, ${flowOut}cc)`,
+                  boxShadow: `0 0 10px ${flowOut}55`,
+                }}
+              />
+            </Box>
+            <Box display="flex" justifyContent="space-between" sx={{ position: 'relative', mt: 1.1, px: 0.25 }}>
+              <Typography sx={{ fontSize: 12.5, color: 'text.secondary' }}>
+                <Box component="span" sx={{ ...heroNumSx, fontWeight: 650, color: flowIn }}>{money(totalOwed)}</Box>
+                {' owed to you'}
+              </Typography>
+              <Typography sx={{ fontSize: 12.5, color: 'text.secondary', textAlign: 'right' }}>
+                <Box component="span" sx={{ ...heroNumSx, fontWeight: 650, color: flowOut }}>{money(totalYouOwe)}</Box>
+                {' you owe'}
+              </Typography>
+            </Box>
+          </>
+        )}
+      </Paper>
+    </TiltCard>
+  );
+}
+
+// A stable colour per name, drawn from the accent wheel — the same person
+// always lands on the same hue across a session, without a Person id lookup.
+const AVATAR_HUES = [accents.blue, accents.violet, accents.cyan, accents.amber, accents.purple, accents.mint];
+function hueForName(name) {
+  let h = 0;
+  for (let i = 0; i < (name || '').length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_HUES[h % AVATAR_HUES.length];
+}
+function initialsForName(name) {
+  const parts = (name || '?').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
+}
+
+/** A colored initials badge — the one recurring "who" mark across Shared. */
+function PersonAvatar({ name, size = 40 }) {
+  const hue = hueForName(name);
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        width: size, height: size, borderRadius: '50%', flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: `linear-gradient(155deg, ${hue}38, ${hue}1c)`,
+        border: '1px solid', borderColor: `${hue}4a`,
+        color: hue, fontWeight: 700, fontSize: size * 0.38,
+        letterSpacing: '-0.01em',
+      }}
+    >
+      {initialsForName(name)}
+    </Box>
+  );
+}
+
+/**
+ * "Count it" as your own spending — a pill that morphs, not a static chip.
+ * The icon crossfades with a small spring pop so the state change reads as
+ * something that just happened, not a label that was always there.
+ */
+function CountToggle({ counted, busy, onClick, label }) {
+  return (
+    <Box
+      component="button"
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-label={label}
+      sx={{
+        border: '1px solid', borderColor: counted ? `${accents.mint}66` : 'divider',
+        bgcolor: counted ? `${accents.mint}16` : 'transparent',
+        color: counted ? accents.mint : 'text.secondary',
+        borderRadius: `${radius.pill}px`,
+        px: 1.4, py: 0.5, fontSize: 12.5, fontWeight: 650,
+        display: 'inline-flex', alignItems: 'center', gap: 0.5,
+        cursor: busy ? 'default' : 'pointer', font: 'inherit',
+        opacity: busy ? 0.6 : 1,
+        transition: `background-color ${motionTokens.normal}ms ${motionTokens.ease}, border-color ${motionTokens.normal}ms ${motionTokens.ease}, color ${motionTokens.normal}ms ${motionTokens.ease}`,
+        '&:hover': busy ? undefined : { borderColor: counted ? accents.mint : 'text.disabled' },
+      }}
+    >
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.span
+          key={counted ? 'on' : 'off'}
+          initial={{ opacity: 0, scale: 0.5, rotate: -25 }}
+          animate={{ opacity: 1, scale: 1, rotate: 0 }}
+          exit={{ opacity: 0, scale: 0.5 }}
+          transition={{ type: 'spring', stiffness: 520, damping: 20 }}
+          style={{ display: 'inline-flex' }}
+        >
+          {counted ? <CheckCircleIcon sx={{ fontSize: 14 }} /> : <AddIcon sx={{ fontSize: 14 }} />}
+        </motion.span>
+      </AnimatePresence>
+      {counted ? 'Counted' : 'Count'}
+    </Box>
+  );
+}
+
+/**
+ * One payer's bills, as a card with real depth. Two thin sibling edges peek
+ * out from behind it when there's more than one bill underneath - a bill
+ * *stack*, not a lone card that happens to hold several rows once opened.
+ * Reduced motion still gets the same layered look; only the tilt is a motion
+ * effect, and TiltCard already turns itself off for that.
+ */
+function SharedPayerCard({ personName, group, expanded, onToggle, including, onToggleInclude, onPay, onEdit }) {
+  const stacked = group.items.length > 1;
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -40, transition: { duration: 0.25 } }}
+    >
+      <Box sx={{ position: 'relative' }}>
+        {stacked && (
+          <Box aria-hidden sx={{
+            position: 'absolute', left: 10, right: 10, bottom: -6, height: 14,
+            borderRadius: '0 0 12px 12px', border: '1px solid', borderColor: 'divider',
+            borderTop: 'none', bgcolor: 'background.paper', opacity: 0.6,
+          }} />
+        )}
+        <TiltCard max={3} sx={{ position: 'relative' }}>
+          <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', overflow: 'visible' }}>
+            <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+              <Box
+                display="flex" alignItems="center" gap={1.5}
+                sx={{ cursor: 'pointer' }}
+                onClick={onToggle}
+              >
+                <PersonAvatar name={personName} size={38} />
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 650 }} noWrap>
+                    {personName}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {group.items.length} {group.items.length === 1 ? 'bill' : 'bills'}
+                  </Typography>
+                </Box>
+                <Box textAlign="right" sx={{ flexShrink: 0 }}>
+                  <SplitAmount direction="you_owe" amount={group.total} />
+                </Box>
+              </Box>
+
+              <AnimatePresence initial={false}>
+              {expanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 34 }}
+                  style={{ overflow: 'hidden' }}
+                >
+                <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+                  <Stack spacing={1}>
+                  {group.items.map((item) => (
+                    <Box
+                      key={item.id}
+                      sx={{ p: 1.25, borderRadius: 2.5, bgcolor: 'action.hover' }}
+                    >
+                      <Box display="flex" alignItems="flex-start" justifyContent="space-between" gap={1.5}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                            {item.description}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {money(item.expenseTotal)} total · {relativeDay(item.date)}
+                            {item.settledAmount > 0 ? ` · ${money(item.settledAmount)} paid` : ''}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ flexShrink: 0 }}>
+                          <SplitAmount direction="you_owe" amount={item.outstanding} />
+                        </Box>
+                      </Box>
+
+                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.75, flexWrap: 'wrap' }}>
+                        {item.canInclude && (
+                          <CountToggle
+                            counted={item.includeInExpenses}
+                            busy={including === item.id}
+                            onClick={() => onToggleInclude(item)}
+                            label={item.includeInExpenses
+                              ? `Stop counting ${item.description} as your spending`
+                              : `Count ${item.description} as your spending`}
+                          />
+                        )}
+                        <Box sx={{ flex: 1 }} />
+                        <IconButton
+                          size="small"
+                          aria-label={`Pay on ${item.description}`}
+                          onClick={() => onPay(item)}
+                          sx={{ color: accents.mint }}
+                        >
+                          <PaymentsIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                        {item.canEdit && (
+                          <IconButton
+                            size="small"
+                            aria-label={`Edit the ${item.description} bill`}
+                            onClick={() => onEdit(item)}
+                          >
+                            <EditIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        )}
+                      </Stack>
+                    </Box>
+                  ))}
+                  </Stack>
+                </Box>
+                </motion.div>
+              )}
+              </AnimatePresence>
+            </CardContent>
+          </Card>
+        </TiltCard>
+      </Box>
+    </motion.div>
+  );
+}
+
 /**
  * Splitting lives on its own page now.
  *
@@ -99,6 +445,11 @@ function optimisticSettle(prev, person) {
  */
 export default function SplitsPage() {
   const { isAuthenticated, isLoading } = useAuth();
+
+  // The split universe's own ref API (getPoint/getCentre/spawnNova) — set once
+  // the canvas has measured itself, read by runSettle to fire the particle
+  // flow and the supernova from the right live screen position.
+  const universeRef = React.useRef(null);
 
   const [state, setState] = useState({
     loading: true, balances: [], youOwe: [], totalOwed: 0, totalYouOwe: 0, net: 0,
@@ -126,7 +477,6 @@ export default function SplitsPage() {
   const [shared, setShared] = useState({ loading: true, items: [] });
   const [sharedExpanded, setSharedExpanded] = useState(null);
   const [including, setIncluding] = useState(null);
-  const [showSettled, setShowSettled] = useState(true);
   const [settledHistory, setSettledHistory] = useState({ loading: false, items: [] });
 
   // Groups. `openGroup` switches the page into that group's own view rather
@@ -137,6 +487,28 @@ export default function SplitsPage() {
   const [newGroup, setNewGroup] = useState({ open: false, name: '', emoji: '', saving: false });
   const [groupSplit, setGroupSplit] = useState({ amount: '', description: '', saving: false });
   const [addPeople, setAddPeople] = useState({ open: false, picked: [], options: [], saving: false });
+
+  // Adding a new split. The one-line capture reads plain language ("split
+  // 1200 dinner with raj and priya"); "Exact" opens the full dialog for named
+  // numbers instead. Both are the entry point now that splitting lives here.
+  const [quickAdd, setQuickAdd] = useState({ text: '', loading: false });
+  const [quickAddFocused, setQuickAddFocused] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  // Counting one shared-only bill into your own spending — tracked per-item so
+  // its "Count" pill can show busy without disturbing its siblings.
+  const [countingId, setCountingId] = useState(null);
+
+  // Bills you paid and split, but chose not to count as your own spending —
+  // tracked here only, until you say otherwise.
+  const [splitOnly, setSplitOnly] = useState([]);
+
+  // Splitting's own deck, the same swipeable four-section language Activity
+  // uses. Opening a group used to take over the *entire* page — quick-add,
+  // shared-with-you, history, all hidden behind `!openGroup` guards. Giving
+  // each concern its own tab means opening a group only replaces the Groups
+  // tab's own content; everything else stays one swipe away.
+  const [activeTab, setActiveTab] = useState(0);
+  const selectTab = React.useCallback((next) => setActiveTab(next), []);
 
   const load = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true }));
@@ -184,9 +556,32 @@ export default function SplitsPage() {
     }
   }, []);
 
+  // Split-only bills you paid: not yet counted in your own expenses. A split
+  // someone else made isn't ours to promote — "Add to expenses" PATCHes an
+  // expense owned by them and 404s — so only bills owed *to* us belong here.
+  const loadSplitOnly = useCallback(async () => {
+    try {
+      const all = await getSplits({ settled: 'false' });
+      setSplitOnly(all.filter(s => s.splitOnly && s.direction === 'owed_to_you'));
+    } catch (err) {
+      setSplitOnly([]);
+    }
+  }, []);
+
   useEffect(() => {
-    if (isAuthenticated) { load(); loadGroups(); loadShared(); loadSettledHistory(); }
-  }, [isAuthenticated, load, loadGroups, loadShared, loadSettledHistory]);
+    if (isAuthenticated) { load(); loadGroups(); loadShared(); loadSettledHistory(); loadSplitOnly(); }
+  }, [isAuthenticated, load, loadGroups, loadShared, loadSettledHistory, loadSplitOnly]);
+
+  // The quick-add placeholder cycles through real examples so the one-line
+  // capture teaches itself — paused the moment there's real text or focus, and
+  // held on the first phrase under reduced motion rather than looping.
+  const [quickAddPhrase, setQuickAddPhrase] = useState(0);
+  const reduceMotion = useReducedMotion();
+  useEffect(() => {
+    if (reduceMotion || quickAddFocused || quickAdd.text) return undefined;
+    const id = setInterval(() => setQuickAddPhrase(p => (p + 1) % QUICK_ADD_EXAMPLES.length), 2600);
+    return () => clearInterval(id);
+  }, [reduceMotion, quickAddFocused, quickAdd.text]);
 
   // The edit dialog needs the category list; fetch it once, quietly, and let
   // the dialog say so if it hasn't arrived.
@@ -302,6 +697,33 @@ export default function SplitsPage() {
     return [...byName.values()].sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
   }, [state.balances, state.youOwe]);
 
+  // One real figure per tab for the peek card behind a deck drag - the same
+  // "only show a hint once its data has actually loaded" rule Activity uses.
+  const deckSections = React.useMemo(() => [
+    {
+      label: 'Balances', icon: CallSplitIcon, color: accents.cyan,
+      hint: !state.loading
+        ? (state.net === 0 ? 'All square' : `${state.net > 0 ? '+' : '−'}${money(Math.abs(state.net))}`)
+        : undefined,
+    },
+    {
+      label: 'Groups', icon: GroupsIcon, color: accents.violet,
+      hint: groups.length ? `${groups.length} ${groups.length === 1 ? 'group' : 'groups'}` : undefined,
+    },
+    {
+      label: 'Shared', icon: MoveToInboxIcon, color: accents.mint,
+      hint: shared.items.length
+        ? `${money(shared.items.reduce((s, i) => s + (i.outstanding || 0), 0))} owed`
+        : undefined,
+    },
+    {
+      label: 'History', icon: DoneAllIcon, color: accents.amber,
+      hint: !settledHistory.loading && settledHistory.items.length
+        ? `${settledHistory.items.length} settled`
+        : undefined,
+    },
+  ], [state.loading, state.net, groups.length, shared.items, settledHistory.loading, settledHistory.items.length]);
+
   /**
    * The bills behind one person's balance.
    *
@@ -397,6 +819,47 @@ export default function SplitsPage() {
     }
   };
 
+  // Plain language, one line: "split 1200 dinner with raj and priya". The
+  // fastest path to a new bill — no model call for the manual dialog below it.
+  const runQuickAdd = async () => {
+    if (!quickAdd.text.trim()) { setError('Describe the shared expense first'); return; }
+    setQuickAdd(prev => ({ ...prev, loading: true }));
+    try {
+      const result = await splitAddExpense(quickAdd.text.trim());
+      const who = result.splits.map(s => `${s.person_name} ${money(s.amount)}`).join(', ');
+      setSuccess(`Split ${money(result.expense.amount)} — ${who || 'no one'}`);
+      feedback('success');
+      setQuickAdd({ text: '', loading: false });
+      load(); loadShared(); loadSplitOnly();
+    } catch (err) {
+      setQuickAdd(prev => ({ ...prev, loading: false }));
+      setError(err.message || 'Could not split that');
+    }
+  };
+
+  const onManualSplitCreated = (result) => {
+    setSuccess(`Split ${money(result.amount)} with ${result.splits.length} ` +
+      `${result.splits.length === 1 ? 'person' : 'people'}`);
+    feedback('success');
+    load(); loadShared(); loadSplitOnly();
+  };
+
+  // A bill you paid and split, moved from "tracked only" into your own
+  // expenses — the flip side of toggleInExpenses, for the other direction.
+  const addToExpenses = async (expenseId) => {
+    setCountingId(expenseId);
+    try {
+      await addSplitToExpenses(expenseId);
+      feedback('success');
+      setSuccess('Added to your expenses');
+      setSplitOnly(prev => prev.filter(s => s.expenseId !== expenseId));
+    } catch (err) {
+      setError(err.message || 'Could not update');
+    } finally {
+      setCountingId(null);
+    }
+  };
+
   const removeSplit = async () => {
     setRemoveTarget(prev => ({ ...prev, saving: true }));
     try {
@@ -429,7 +892,7 @@ export default function SplitsPage() {
     const owedByMe = person.net < 0;
     const snapshot = state;
     if (sheet) setSettle(prev => ({ ...prev, settling: true, error: null }));
-    fireSettleFlow(person, person.net);
+    fireSettleFlow(universeRef.current, person, person.net);
     setState(prev => optimisticSettle(prev, person));
     if (selected?.id === person.id) setSelected(null);
     try {
@@ -455,7 +918,11 @@ export default function SplitsPage() {
     }
   };
 
-  if (isLoading) return null;
+  if (isLoading) return (
+    <Box sx={{ maxWidth: 680, mx: 'auto', px: { xs: 2, sm: 3 }, pt: 3, pb: 6 }}>
+      <BalanceSkeleton rows={3} />
+    </Box>
+  );
 
   if (!isAuthenticated) {
     return (
@@ -475,74 +942,196 @@ export default function SplitsPage() {
 
   return (
     <>
+      {/* The one app-wide particle layer money-in-motion rides on. Not
+          mounted anywhere else yet, so it lives here for now — this is the
+          only screen that dispatches toolbox:flow. */}
+      <ParticleFlow />
+      {/* Shared didn't have its own weather, unlike Home/Today — a flat page
+          under a living app. Same signature moment, same real signal. */}
+      <AuroraBackground />
       <Container maxWidth="md" sx={{ mt: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 }, pb: 12, position: 'relative' }}>
         <Box sx={{ position: 'relative', zIndex: 1 }}>
         <ErrorBanner error={error} onClose={() => setError(null)} />
         {/* Financial weather now lives once in the app top bar, not per-screen. */}
 
-        {/* Net position — the one figure you glance at */}
+        <ActivityDeck value={activeTab} onChange={selectTab} sections={deckSections}>
+
+        {/* ── Balances ─────────────────────────────────────────────────── */}
+        {activeTab === 0 && (
+        <Box key="tab-0">
+        {/* Net position — the one figure you glance at, and the one real
+            ratio behind it. Every pixel of the bar below is (owed / total) or
+            (owe / total) — no width here is invented. */}
         <Reveal>
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 2.5, sm: 3 }, mb: 2, borderRadius: 4, textAlign: 'center',
-              border: '1px solid', borderColor: 'divider',
-              position: 'relative', overflow: 'hidden',
-            }}
-          >
-            {/* Subtle accent glow behind the number */}
-            <Box
-              aria-hidden
-              sx={{
-                position: 'absolute', top: '-40%', left: '50%', transform: 'translateX(-50%)',
-                width: 280, height: 140, borderRadius: '50%',
-                background: `radial-gradient(ellipse, ${netPositive ? posColor : negColor}18 0%, transparent 70%)`,
-                pointerEvents: 'none',
-              }}
-            />
-            <Box display="flex" alignItems="center" justifyContent="center" gap={1} sx={{ mb: 0.75, position: 'relative' }}>
-              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.1em', fontSize: '0.65rem' }}>
-                {netPositive ? 'You are owed' : 'You owe'}
-              </Typography>
-              <IconButton size="small" onClick={load} aria-label="Refresh balances" sx={{ ml: 0.25 }}>
-                <RefreshIcon sx={{ fontSize: 14 }} />
-              </IconButton>
-            </Box>
-            <Typography
-              sx={{
-                position: 'relative',
-                fontFamily: type.displayFamily, fontWeight: 700, letterSpacing: '-0.04em',
-                fontSize: { xs: '2.8rem', sm: '3.4rem' }, lineHeight: 1,
-                fontVariantNumeric: 'tabular-nums',
-                color: netPositive ? posColor : negColor,
-              }}
-            >
-              {money(Math.abs(state.net))}
-            </Typography>
-            <Stack
-              direction="row"
-              sx={{ mt: 2.5, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}
-            >
-              <Box sx={{ flex: 1, borderRight: '1px solid', borderColor: 'divider' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.3, mb: 0.5, fontWeight: 500, letterSpacing: '0.04em' }}>
-                  Owed to you
-                </Typography>
-                <Typography sx={{ fontWeight: 700, color: posColor, fontVariantNumeric: 'tabular-nums', fontSize: '1.05rem' }}>
-                  +{money(state.totalOwed)}
-                </Typography>
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.3, mb: 0.5, fontWeight: 500, letterSpacing: '0.04em' }}>
-                  You owe
-                </Typography>
-                <Typography sx={{ fontWeight: 700, color: state.totalYouOwe > 0 ? negColor : 'text.secondary', fontVariantNumeric: 'tabular-nums', fontSize: '1.05rem' }}>
-                  {state.totalYouOwe > 0 ? '−' : ''}{money(state.totalYouOwe)}
-                </Typography>
-              </Box>
-            </Stack>
-          </Paper>
+          <NetPositionHero
+            netPositive={netPositive}
+            net={state.net}
+            totalOwed={state.totalOwed}
+            totalYouOwe={state.totalYouOwe}
+            onRefresh={load}
+            posColor={posColor}
+            negColor={negColor}
+          />
         </Reveal>
 
+        {/* Add a split — plain language first, exact numbers if you'd rather */}
+          <Reveal index={1}>
+            <Box
+              sx={{
+                position: 'relative', p: '1px', mb: 2, borderRadius: `${radius.lg + 1}px`,
+                // The glow lives in a gradient border, not a box-shadow — cheap,
+                // GPU-friendly, and it reads as "this box is listening" the
+                // instant you focus it, then settles back to a plain hairline.
+                background: quickAddFocused
+                  ? `linear-gradient(120deg, ${accents.violet}, ${accents.cyan}, ${accents.violet})`
+                  : 'transparent',
+                backgroundSize: '200% 200%',
+                animation: quickAddFocused && !reduceMotion ? 'toolbox-quickadd-flow 3.2s ease infinite' : 'none',
+                transition: `background ${motionTokens.normal}ms ${motionTokens.ease}`,
+                '@keyframes toolbox-quickadd-flow': {
+                  '0%, 100%': { backgroundPosition: '0% 50%' },
+                  '50%': { backgroundPosition: '100% 50%' },
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap',
+                  p: 1, borderRadius: `${radius.lg}px`,
+                  border: '1px solid', borderColor: quickAddFocused ? 'transparent' : 'divider',
+                  bgcolor: 'background.paper',
+                }}
+              >
+                <AutoAwesomeIcon
+                  sx={{
+                    fontSize: 17, ml: 0.5, color: quickAddFocused ? accents.violet : 'text.disabled',
+                    transition: `color ${motionTokens.normal}ms ${motionTokens.ease}`,
+                  }}
+                />
+                <Box sx={{ flex: 1, minWidth: 200, position: 'relative' }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    variant="standard"
+                    InputProps={{ disableUnderline: true, sx: { fontSize: 14 } }}
+                    inputProps={{ 'aria-label': 'Describe a shared bill' }}
+                    value={quickAdd.text}
+                    onChange={(e) => setQuickAdd(prev => ({ ...prev, text: e.target.value }))}
+                    onFocus={() => setQuickAddFocused(true)}
+                    onBlur={() => setQuickAddFocused(false)}
+                    disabled={quickAdd.loading}
+                    onKeyDown={(e) => { if (e.key === 'Enter') runQuickAdd(); }}
+                  />
+                  {/* A real placeholder can't crossfade between phrases, so an
+                      absolutely-positioned twin carries the animated examples
+                      and steps aside the instant there's real text or focus. */}
+                  {!quickAdd.text && !quickAddFocused && (
+                    <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                      <AnimatePresence mode="wait">
+                        <Box
+                          component={motion.span}
+                          key={quickAddPhrase}
+                          initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -6 }}
+                          transition={{ duration: motionTokens.normal / 1000, ease: EASE_SETTLE }}
+                          sx={{ fontSize: 14, color: 'text.disabled' }}
+                        >
+                          "{QUICK_ADD_EXAMPLES[quickAddPhrase]}"
+                        </Box>
+                      </AnimatePresence>
+                    </Box>
+                  )}
+                </Box>
+                <Button
+                  component={motion.button}
+                  whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+                  variant="contained"
+                  size="small"
+                  onClick={runQuickAdd}
+                  disabled={quickAdd.loading || !quickAdd.text.trim()}
+                  startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+                  sx={{
+                    borderRadius: `${radius.pill}px`, px: 2,
+                    background: `linear-gradient(135deg, ${accents.violet}, ${accents.blue})`,
+                    boxShadow: `0 2px 12px ${accents.violet}40`,
+                    '&:hover': { background: `linear-gradient(135deg, ${accents.violet}, ${accents.blue})`, boxShadow: `0 3px 16px ${accents.violet}55` },
+                    '&.Mui-disabled': { background: 'action.disabledBackground' },
+                  }}
+                >
+                  {quickAdd.loading ? 'Splitting…' : 'Split'}
+                </Button>
+                <Button
+                  component={motion.button}
+                  whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+                  size="small"
+                  color="inherit"
+                  onClick={() => setManualOpen(true)}
+                  startIcon={<AddIcon sx={{ fontSize: 16 }} />}
+                  sx={{ borderRadius: `${radius.pill}px`, color: 'text.secondary' }}
+                >
+                  Exact
+                </Button>
+              </Box>
+            </Box>
+            <ThinkingHint show={quickAdd.loading} label="Working out the shares…" />
+          </Reveal>
+
+        {/* Split-only bills you paid: not yet counted as your own spending */}
+        {splitOnly.length > 0 && (
+          <Reveal index={1}>
+            <Box
+              sx={{
+                p: 2, mb: 2, borderRadius: `${radius.lg}px`,
+                border: '1px dashed', borderColor: `${accents.amber}55`,
+              }}
+            >
+              <Typography sx={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: accents.amber, mb: 0.5 }}>
+                Tracked as a split only
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                You paid these but they aren't counted in your spending yet.
+              </Typography>
+              {splitOnly.map((s, i) => (
+                <Box
+                  component={motion.div}
+                  key={s.id}
+                  initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: motionTokens.normal / 1000, ease: EASE_SETTLE, delay: reduceMotion ? 0 : i * 0.05 }}
+                  sx={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    gap: 1.5, flexWrap: 'wrap', py: 1.1,
+                    borderTop: '1px solid', borderColor: 'divider',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+                    <PersonAvatar name={s.personName} size={32} />
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>{s.description}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {s.personName} owes {money(s.amount)}{s.paidBy ? ` · paid by ${s.paidBy}` : ''}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <CountToggle
+                    counted={false}
+                    busy={countingId === s.expenseId}
+                    onClick={() => addToExpenses(s.expenseId)}
+                    label={`Count ${s.description} as your spending`}
+                  />
+                </Box>
+              ))}
+            </Box>
+          </Reveal>
+        )}
+
+        </Box>
+        )}
+
+        {/* ── Groups ───────────────────────────────────────────────────── */}
+        {activeTab === 1 && (
+        <Box key="tab-1">
         {/* Groups: a way in, above everything else */}
         {!openGroup && (
           <Reveal>
@@ -557,7 +1146,26 @@ export default function SplitsPage() {
           </Reveal>
         )}
 
-        {openGroup ? (
+        {!openGroup && groups.length === 0 && (
+          <Paper
+            elevation={0}
+            sx={{ p: { xs: 4, sm: 5 }, borderRadius: 4, textAlign: 'center', border: '1px dashed', borderColor: 'divider' }}
+          >
+            <GroupsIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1.5 }} />
+            <Typography variant="body1" sx={{ fontWeight: 600 }}>No groups yet</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              A flat, a trip, a regular table — start one above.
+            </Typography>
+          </Paper>
+        )}
+
+        {!openGroup && groups.length > 0 && (
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
+            Pick a group above to see its ledger.
+          </Typography>
+        )}
+
+        {openGroup && (
           /* ---- The group universe ---- */
           <Box>
             <Box display="flex" alignItems="center" gap={1} sx={{ mb: 2 }}>
@@ -765,7 +1373,14 @@ export default function SplitsPage() {
               </>
             ) : null}
           </Box>
-        ) : state.loading ? (
+        )}
+        </Box>
+        )}
+
+        {/* ── Balances, continued: the ledger itself ──────────────────────── */}
+        {activeTab === 0 && (
+        <Box key="tab-0b">
+        {state.loading ? (
           <BalanceSkeleton />
         ) : people.length === 0 ? (
           <Paper
@@ -795,16 +1410,12 @@ export default function SplitsPage() {
         ) : (
           <>
             <Reveal index={1}>
-              <Paper
-                elevation={0}
-                sx={{ p: { xs: 1, sm: 2 }, mb: 2, borderRadius: 4, border: '1px solid', borderColor: 'divider' }}
-              >
-                <MoneyConstellation
-                  people={people}
-                  selectedId={selected?.id}
-                  onSelect={openPerson}
-                />
-              </Paper>
+              <SplitUniverse
+                people={people}
+                selectedId={selected?.id}
+                onSelect={openPerson}
+                onReady={(api) => { universeRef.current = api; }}
+              />
             </Reveal>
 
             <Box
@@ -860,16 +1471,19 @@ export default function SplitsPage() {
                         sx={{ cursor: 'pointer' }}
                         onClick={() => openPerson(selected?.id === person.id ? null : person)}
                       >
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.3 }} noWrap>
-                            {person.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {person.net === 0
-                              ? 'all settled'
-                              : person.net > 0 ? 'owes you' : 'you owe them'}
-                            {person.unsettled ? ` · ${person.unsettled} ${person.unsettled === 1 ? 'bill' : 'bills'}` : ''}
-                          </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+                          <PersonAvatar name={person.name} size={36} />
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.3 }} noWrap>
+                              {person.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {person.net === 0
+                                ? 'all settled'
+                                : person.net > 0 ? 'owes you' : 'you owe them'}
+                              {person.unsettled ? ` · ${person.unsettled} ${person.unsettled === 1 ? 'bill' : 'bills'}` : ''}
+                            </Typography>
+                          </Box>
                         </Box>
                         <Box textAlign="right" sx={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography
@@ -999,21 +1613,26 @@ export default function SplitsPage() {
             )}
           </>
         )}
+        </Box>
+        )}
 
+        {/* ── Shared with you ──────────────────────────────────────────── */}
+        {activeTab === 2 && (
+        <Box key="tab-2">
         {/* Bills other people split with you, grouped by who paid. */}
-        {!openGroup && shared.items.length > 0 && (
+        {shared.items.length > 0 && (
           <Reveal index={2}>
-            <Box sx={{ mt: 3 }}>
-              <Box display="flex" alignItems="baseline" justifyContent="space-between" sx={{ px: 0.5, mb: 1 }}>
+            <Box sx={{ mt: 1 }}>
+              <Box display="flex" alignItems="baseline" justifyContent="space-between" sx={{ px: 0.5, mb: 1.5 }}>
                 <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 650 }}>
                   Shared with you
                 </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                  {money(shared.items.reduce((s, i) => s + (i.outstanding || 0), 0))} total
+                <Typography sx={{ ...heroNumSx, fontSize: 13, fontWeight: 700, color: accents.amber }}>
+                  {money(shared.items.reduce((s, i) => s + (i.outstanding || 0), 0))}
                 </Typography>
               </Box>
 
-              <Stack spacing={1.25}>
+              <Stack spacing={1.5}>
                 <AnimatePresence initial={false}>
                 {(() => {
                   const byPerson = new Map();
@@ -1025,133 +1644,17 @@ export default function SplitsPage() {
                     group.total += item.outstanding || 0;
                   });
                   return [...byPerson.entries()].map(([personName, group]) => (
-                    <motion.div
+                    <SharedPayerCard
                       key={personName}
-                      layout
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, x: -40, transition: { duration: 0.25 } }}
-                    >
-                    <Card
-                      elevation={0}
-                      sx={{
-                        borderRadius: 3, border: '1px solid', borderColor: 'divider',
-                        overflow: 'visible',
-                      }}
-                    >
-                      <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
-                        <Box
-                          display="flex" alignItems="center" justifyContent="space-between" gap={2}
-                          sx={{ cursor: 'pointer' }}
-                          onClick={() => setSharedExpanded(prev =>
-                            prev === personName ? null : personName
-                          )}
-                        >
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }} noWrap>
-                              {personName}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {group.items.length} {group.items.length === 1 ? 'bill' : 'bills'}
-                            </Typography>
-                          </Box>
-                          <Box textAlign="right" sx={{ flexShrink: 0 }}>
-                            <SplitAmount direction="you_owe" amount={group.total} />
-                          </Box>
-                        </Box>
-
-                        <AnimatePresence initial={false}>
-                        {sharedExpanded === personName && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ type: 'spring', stiffness: 400, damping: 34 }}
-                            style={{ overflow: 'hidden' }}
-                          >
-                          <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
-                            <Stack spacing={1}>
-                            {group.items.map((item) => (
-                              <Box
-                                key={item.id}
-                                sx={{
-                                  p: 1.25, borderRadius: 2.5,
-                                  bgcolor: 'action.hover',
-                                }}
-                              >
-                                <Box display="flex" alignItems="flex-start" justifyContent="space-between" gap={1.5}>
-                                  <Box sx={{ minWidth: 0 }}>
-                                    <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
-                                      {item.description}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {money(item.expenseTotal)} total · {relativeDay(item.date)}
-                                      {item.settledAmount > 0
-                                        ? ` · ${money(item.settledAmount)} paid`
-                                        : ''}
-                                    </Typography>
-                                  </Box>
-                                  <Box sx={{ flexShrink: 0 }}>
-                                    <SplitAmount direction="you_owe" amount={item.outstanding} />
-                                  </Box>
-                                </Box>
-
-                                <Stack
-                                  direction="row" spacing={0.5} alignItems="center"
-                                  sx={{ mt: 0.75, flexWrap: 'wrap' }}
-                                >
-                                  {item.canInclude && (
-                                    item.includeInExpenses ? (
-                                      <Chip
-                                        icon={<CheckCircleIcon />}
-                                        label="Counted"
-                                        size="small"
-                                        onClick={() => toggleInExpenses(item)}
-                                        disabled={including === item.id}
-                                        sx={{ color: accents.mint, borderColor: accents.mint, height: 24 }}
-                                        variant="outlined"
-                                      />
-                                    ) : (
-                                      <Chip
-                                        icon={<AddIcon />}
-                                        label="Count"
-                                        size="small"
-                                        onClick={() => toggleInExpenses(item)}
-                                        disabled={including === item.id}
-                                        variant="outlined"
-                                        sx={{ height: 24 }}
-                                      />
-                                    )
-                                  )}
-                                  <Box sx={{ flex: 1 }} />
-                                  <IconButton
-                                    size="small"
-                                    aria-label={`Pay on ${item.description}`}
-                                    onClick={() => setPartial({ open: true, item, saving: false, error: null })}
-                                    sx={{ color: accents.mint }}
-                                  >
-                                    <PaymentsIcon sx={{ fontSize: 16 }} />
-                                  </IconButton>
-                                  {item.canEdit && (
-                                    <IconButton
-                                      size="small"
-                                      aria-label={`Edit the ${item.description} bill`}
-                                      onClick={() => setEditSplit({ open: true, item, saving: false })}
-                                    >
-                                      <EditIcon sx={{ fontSize: 16 }} />
-                                    </IconButton>
-                                  )}
-                                </Stack>
-                              </Box>
-                            ))}
-                            </Stack>
-                          </Box>
-                          </motion.div>
-                        )}
-                        </AnimatePresence>
-                      </CardContent>
-                    </Card>
-                    </motion.div>
+                      personName={personName}
+                      group={group}
+                      expanded={sharedExpanded === personName}
+                      onToggle={() => setSharedExpanded(prev => (prev === personName ? null : personName))}
+                      including={including}
+                      onToggleInclude={toggleInExpenses}
+                      onPay={(item) => setPartial({ open: true, item, saving: false, error: null })}
+                      onEdit={(item) => setEditSplit({ open: true, item, saving: false })}
+                    />
                   ));
                 })()}
                 </AnimatePresence>
@@ -1160,36 +1663,28 @@ export default function SplitsPage() {
           </Reveal>
         )}
 
-        {/* Settled history — tucked away until needed */}
-        {!openGroup && (
-          <Reveal index={3}>
-            <Box sx={{ mt: 3 }}>
-              <Box
-                display="flex" alignItems="center" justifyContent="center"
-                sx={{
-                  cursor: 'pointer', py: 1, opacity: 0.7,
-                  '&:hover': { opacity: 1 },
-                  transition: 'opacity 0.2s ease',
-                }}
-                onClick={() => { setShowSettled(prev => !prev); }}
-              >
-                <DoneAllIcon sx={{ fontSize: 14, mr: 0.75, color: 'text.secondary' }} />
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: '0.04em' }}>
-                  {showSettled ? 'Hide settled' : 'Settled history'}
-                </Typography>
-              </Box>
-              <AnimatePresence initial={false}>
-              {showSettled && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 34 }}
-                  style={{ overflow: 'hidden' }}
-                >
+        {shared.items.length === 0 && (
+          <Paper
+            elevation={0}
+            sx={{ p: { xs: 4, sm: 5 }, borderRadius: 4, textAlign: 'center', border: '1px dashed', borderColor: 'divider' }}
+          >
+            <MoveToInboxIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1.5 }} />
+            <Typography variant="body1" sx={{ fontWeight: 600 }}>Nothing shared with you</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              When someone splits a bill with you, it shows up here first.
+            </Typography>
+          </Paper>
+        )}
+        </Box>
+        )}
+
+        {/* ── History ──────────────────────────────────────────────────── */}
+        {activeTab === 3 && (
+        <Box key="tab-3">
+          <Reveal>
                 <Paper
                   elevation={0}
-                  sx={{ p: 2, mt: 0.5, borderRadius: 4, border: '1px solid', borderColor: 'divider', textAlign: 'left' }}
+                  sx={{ p: 2, borderRadius: 4, border: '1px solid', borderColor: 'divider', textAlign: 'left' }}
                 >
                   {settledHistory.loading ? (
                     <LinearProgress sx={{ borderRadius: 999 }} />
@@ -1224,17 +1719,16 @@ export default function SplitsPage() {
                     </Stack>
                   )}
                 </Paper>
-                </motion.div>
-              )}
-              </AnimatePresence>
-            </Box>
           </Reveal>
+        </Box>
         )}
 
+        {/* ── Balances, continued: the AI surface ──────────────────────── */}
         {/* A distinct AI surface, scoped to lending only — kept apart from the
             app's spending analysis. Lives on the everyone view, not inside a
             group. */}
-        {!openGroup && !state.loading && <LendingAssistant />}
+        {activeTab === 0 && !state.loading && <LendingAssistant />}
+        </ActivityDeck>
 
         <SettleConfirmSheet
           open={settle.open}
@@ -1370,9 +1864,16 @@ export default function SplitsPage() {
           </DialogActions>
         </Dialog>
 
+        <ManualSplitDialog
+          open={manualOpen}
+          onClose={() => setManualOpen(false)}
+          categories={categories}
+          onCreated={onManualSplitCreated}
+        />
+
         <Fab
           color="primary"
-          href="/expense-tracker"
+          onClick={() => setManualOpen(true)}
           sx={{
             position: 'fixed', right: 16,
             bottom: { xs: 'calc(24px + env(safe-area-inset-bottom))', md: 24 },

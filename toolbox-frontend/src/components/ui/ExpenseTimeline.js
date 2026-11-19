@@ -149,9 +149,23 @@ function ExpenseRow({ expense, prominent, share = 0, onEdit, onDelete, onOpen })
       </Box>
 
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontSize: 13, fontWeight: 550, color: 'text.primary', letterSpacing: '-0.005em' }} noWrap>
-          {expense.description || subtitleOf(expense)}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 550, color: 'text.primary', letterSpacing: '-0.005em', minWidth: 0 }} noWrap>
+            {expense.description || subtitleOf(expense)}
+          </Typography>
+          {expense.pendingConfirmation && (
+            <Box
+              aria-label="Pending confirmation"
+              sx={{
+                flexShrink: 0, px: 0.6, py: 0.05, borderRadius: 999, fontSize: 9.5, fontWeight: 700,
+                letterSpacing: '0.02em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+                bgcolor: `${accents.amber}22`, color: accents.amber,
+              }}
+            >
+              Pending
+            </Box>
+          )}
+        </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.15, minWidth: 0 }}>
           <Typography
             sx={{

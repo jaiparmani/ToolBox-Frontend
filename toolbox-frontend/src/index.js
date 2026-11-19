@@ -17,6 +17,8 @@ reportWebVitals();
 // Register the service worker so push events work even with the tab closed.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+    // PUBLIC_URL is "/ToolBox-Frontend" on GitHub Pages and "" at a domain root,
+    // so the worker is found (and scoped) wherever the app is hosted.
+    navigator.serviceWorker.register(`${process.env.PUBLIC_URL}/service-worker.js`).catch(() => {});
   });
 }

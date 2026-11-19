@@ -4,6 +4,18 @@
 // is alive. Deliberately minimal: no offline caching, no asset precaching —
 // just the two events push needs.
 
+// The app can be served from a sub-path (GitHub Pages: /ToolBox-Frontend/) or
+// from a domain root (Netlify, localhost). The worker's scope is that base, so
+// every icon and every URL a notification opens is resolved against it.
+const BASE = new URL('./', self.registration.scope).pathname; // e.g. "/ToolBox-Frontend/" or "/"
+const asset = (file) => BASE + file;
+// Push payloads carry app routes like "/inbox"; map them under the base.
+const appUrl = (route) => {
+  if (!route || route === '/') return BASE;
+  if (/^https?:\/\//.test(route) || route.startsWith(BASE)) return route;
+  return BASE + route.replace(/^\//, '');
+};
+
 self.addEventListener('install', () => {
   self.skipWaiting();
 });
@@ -49,7 +61,7 @@ function getAuthToken() {
 // expense directly from the banner without opening the app.
 // ---------------------------------------------------------------------------
 self.addEventListener('push', (event) => {
-  let data = { title: 'Money OS', body: '', url: '/' };
+  let data = { title: 'Money OS', body: '', url: BASE };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {
@@ -61,9 +73,9 @@ self.addEventListener('push', (event) => {
     Promise.all([
       self.registration.showNotification(data.title, {
         body: data.body,
-        icon: '/logo192.png',
-        badge: '/logo192.png',
-        data: { url: data.url || '/' },
+        icon: asset('logo192.png'),
+        badge: asset('logo192.png'),
+        data: { url: appUrl(data.url) },
         tag: data.url || undefined,
         // Inline-reply action: Android Chrome shows a text field; iOS shows a
         // plain button (graceful degradation — type:'text' is ignored there).
@@ -99,7 +111,7 @@ self.addEventListener('notificationclick', (event) => {
         if (!token) {
           return self.registration.showNotification('Money OS', {
             body: 'Couldn\'t log — open the app to sign in first.',
-            icon: '/logo192.png',
+            icon: asset('logo192.png'),
             tag: 'log-error',
             silent: true,
           });
@@ -122,7 +134,7 @@ self.addEventListener('notificationclick', (event) => {
             const amount = data.amount != null ? '₹' + data.amount : '';
             return self.registration.showNotification('Logged ✓', {
               body: description + (amount ? ' — ' + amount : ''),
-              icon: '/favicon.svg',
+              icon: asset('favicon.svg'),
               tag: 'log-confirm',
               silent: true,
             });
@@ -130,7 +142,7 @@ self.addEventListener('notificationclick', (event) => {
           .catch(() => {
             return self.registration.showNotification('Money OS', {
               body: 'Couldn\'t log — open the app and try again.',
-              icon: '/logo192.png',
+              icon: asset('logo192.png'),
               tag: 'log-error',
               silent: true,
             });
@@ -141,7 +153,7 @@ self.addEventListener('notificationclick', (event) => {
   }
 
   // --- Default: focus an already-open tab or open one at the card's route ---
-  const url = event.notification.data?.url || '/';
+  const url = appUrl(event.notification.data?.url);
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {

@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/ToolBox-Frontend/static/css/main.97fd10a3.css",
-    "main.js": "/ToolBox-Frontend/static/js/main.1536a300.js",
+    "main.js": "/ToolBox-Frontend/static/js/main.ccd41319.js",
     "static/js/175.ce430125.chunk.js": "/ToolBox-Frontend/static/js/175.ce430125.chunk.js",
     "static/js/810.c90e6102.chunk.js": "/ToolBox-Frontend/static/js/810.c90e6102.chunk.js",
     "static/js/730.3121cf8c.chunk.js": "/ToolBox-Frontend/static/js/730.3121cf8c.chunk.js",
@@ -40,7 +40,7 @@
     "static/media/geist-cyrillic-ext-wght-normal.woff2": "/ToolBox-Frontend/static/media/geist-cyrillic-ext-wght-normal.141916beb91c487496c8.woff2",
     "index.html": "/ToolBox-Frontend/index.html",
     "main.97fd10a3.css.map": "/ToolBox-Frontend/static/css/main.97fd10a3.css.map",
-    "main.1536a300.js.map": "/ToolBox-Frontend/static/js/main.1536a300.js.map",
+    "main.ccd41319.js.map": "/ToolBox-Frontend/static/js/main.ccd41319.js.map",
     "175.ce430125.chunk.js.map": "/ToolBox-Frontend/static/js/175.ce430125.chunk.js.map",
     "810.c90e6102.chunk.js.map": "/ToolBox-Frontend/static/js/810.c90e6102.chunk.js.map",
     "730.3121cf8c.chunk.js.map": "/ToolBox-Frontend/static/js/730.3121cf8c.chunk.js.map",
@@ -75,6 +75,6 @@
   },
   "entrypoints": [
     "static/css/main.97fd10a3.css",
-    "static/js/main.1536a300.js"
+    "static/js/main.ccd41319.js"
   ]
 }

@@ -5,7 +5,6 @@
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { getExpenses, getCategories, yourShareOf } from '../components/rest/expenseTrackerApis';
-import { chart } from '../theme/tokens';
 
 // ── Formatting ──────────────────────────────────────────────────────────────
 const inrFmt = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
@@ -72,10 +71,21 @@ export function summarizeMonth(expenses, ym) {
   return { ym, rows, total, count: rows.length, perDay, cumulative, byCategory, biggest, heaviest, quiet, weeks, activeDays, days: n };
 }
 
+/** A month's lines in book order (oldest first) with the running total. */
+export function bookLines(expenses, ym) {
+  const rows = expenses.filter((e) => e.month === ym)
+    .sort((a, b) => (a.day === b.day ? a.id - b.id : a.day < b.day ? -1 : 1));
+  let run = 0;
+  return rows.map((e, i) => {
+    run += e.spend;
+    return { ...e, run, firstOfDay: i === 0 || rows[i - 1].day !== e.day };
+  });
+}
+
 // ── Context ─────────────────────────────────────────────────────────────────
 const LedgerContext = createContext(null);
 
-export function LedgerProvider({ mode, children }) {
+export function LedgerProvider({ children }) {
   const [state, setState] = useState({ status: 'loading', expenses: [], categories: [], error: null });
 
   const load = useCallback(async ({ quiet = false } = {}) => {
@@ -119,18 +129,18 @@ export function LedgerProvider({ mode, children }) {
     setMonth(months.includes(now) ? now : months[months.length - 1]);
   }, [months, month]);
 
-  // Stable per-category colour from the chart palette (never the UI accents).
-  const colorFor = useMemo(() => {
-    const palette = chart.categorical[mode] || chart.categorical.dark;
+  // Stable per-head stamp ink (six inks in next.css: .ink-0 … .ink-5), keyed by
+  // category id so a head keeps its ink across months and pages.
+  const inkFor = useMemo(() => {
     const ids = [...new Set([...state.categories.map((c) => c.id), ...state.expenses.map((e) => e.category?.id ?? 'none')])]
       .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
-    const map = new Map(ids.map((id, i) => [id, palette[i % palette.length]]));
-    return (id) => map.get(id ?? 'none') || palette[0];
-  }, [state.categories, state.expenses, mode]);
+    const map = new Map(ids.map((id, i) => [id, i % 6]));
+    return (id) => `ink-${map.get(id ?? 'none') ?? 0}`;
+  }, [state.categories, state.expenses]);
 
   const value = useMemo(() => ({
-    ...state, months, month: month || todayIso().slice(0, 7), setMonth, reload: load, colorFor,
-  }), [state, months, month, load, colorFor]);
+    ...state, months, month: month || todayIso().slice(0, 7), setMonth, reload: load, inkFor,
+  }), [state, months, month, load, inkFor]);
 
   return <LedgerContext.Provider value={value}>{children}</LedgerContext.Provider>;
 }
